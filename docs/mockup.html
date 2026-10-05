@@ -7,26 +7,26 @@
 /* Layout: one wide terminal as the hero, notes in a grid below it. */
 :root{
   --bg:#E8ECEB; --fg:#18211F; --muted:#56635F; --line:#C6CFCC; --panel:#F4F6F5; --accent:#9A5E08;
-  --t-bg:#FBFCFB; --t-fg:#1C2523; --t-dim:#7F8C88; --t-dim2:#B4BEBB; --t-acc:#A2620A; --t-sel:#E1E8E6;
-  --t-add:#2E7A3C; --t-mod:#2A62A3; --t-del:#B3423A; --t-addbg:#E3F1E4; --t-delbg:#F7E3E1; --t-dlg:#F1F4F3; --t-live:#7A4FB0;
+  --t-bg:#FBFCFB; --t-fg:#1C2523; --t-dim:#7F8C88; --t-dim2:#B4BEBB; --t-acc:#A2620A; --t-sel:#E1E8E6; --t-bar:#EDF1EF;
+  --t-add:#2E7A3C; --t-mod:#2A62A3; --t-del:#B3423A; --t-addbg:#E3F1E4; --t-delbg:#F7E3E1; --t-dlg:#F1F4F3; --t-live:#7A4FB0; --t-cyan:#1F7A8C;
   --mono:"JetBrains Mono",ui-monospace,"DejaVu Sans Mono",Menlo,monospace;
   --sans:"IBM Plex Sans",system-ui,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#101517; --fg:#D5DCDA; --muted:#8C9895; --line:#2A3437; --panel:#161D20; --accent:#E2A64B;
-  --t-bg:#12181B; --t-fg:#C9D2CF; --t-dim:#6E7B78; --t-dim2:#3C4749; --t-acc:#E4A84C; --t-sel:#243034;
-  --t-add:#82BC88; --t-mod:#7EAADB; --t-del:#DE7C73; --t-addbg:#1B2C1F; --t-delbg:#33201E; --t-dlg:#1A2225; --t-live:#B697E0;
+  --t-bg:#12181B; --t-fg:#C9D2CF; --t-dim:#6E7B78; --t-dim2:#3C4749; --t-acc:#E4A84C; --t-sel:#243034; --t-bar:#182024;
+  --t-add:#82BC88; --t-mod:#7EAADB; --t-del:#DE7C73; --t-addbg:#1B2C1F; --t-delbg:#33201E; --t-dlg:#1A2225; --t-live:#B697E0; --t-cyan:#6CC5D3;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#101517; --fg:#D5DCDA; --muted:#8C9895; --line:#2A3437; --panel:#161D20; --accent:#E2A64B;
-  --t-bg:#12181B; --t-fg:#C9D2CF; --t-dim:#6E7B78; --t-dim2:#3C4749; --t-acc:#E4A84C; --t-sel:#243034;
-  --t-add:#82BC88; --t-mod:#7EAADB; --t-del:#DE7C73; --t-addbg:#1B2C1F; --t-delbg:#33201E; --t-dlg:#1A2225; --t-live:#B697E0;
+  --t-bg:#12181B; --t-fg:#C9D2CF; --t-dim:#6E7B78; --t-dim2:#3C4749; --t-acc:#E4A84C; --t-sel:#243034; --t-bar:#182024;
+  --t-add:#82BC88; --t-mod:#7EAADB; --t-del:#DE7C73; --t-addbg:#1B2C1F; --t-delbg:#33201E; --t-dlg:#1A2225; --t-live:#B697E0; --t-cyan:#6CC5D3;
   color-scheme:dark}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55}
 .page{max-width:1080px;margin:0 auto;padding:32px 16px 48px}
 header{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 h1{font-family:var(--mono);font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
-header p{margin:0;color:var(--muted);max-width:70ch}
+header p{margin:0;color:var(--muted);max-width:72ch}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;color:var(--muted)}
 .toolbar button{font-family:var(--mono);font-size:12px;padding:3px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--fg);cursor:pointer}
 .toolbar button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
@@ -42,16 +42,20 @@ header p{margin:0;color:var(--muted);max-width:70ch}
 .b{font-weight:700}.dim{color:var(--t-dim)}.dim2{color:var(--t-dim2)}.acc{color:var(--t-acc)}
 .add{color:var(--t-add)}.mod{color:var(--t-mod)}.del{color:var(--t-del)}.dir{color:var(--t-mod);font-weight:700}
 .ghost{color:var(--t-dim);font-style:italic}.strike{text-decoration:line-through}.live{color:var(--t-live)}
-.warn{color:var(--t-del);font-weight:700}.hl{color:var(--t-mod)}.dlgb{color:var(--t-acc)}.mk{color:var(--t-fg)}
-.match{color:var(--t-acc);text-decoration:underline}
-.bar{background:var(--t-fg);color:var(--t-bg)}.sel{background:var(--t-sel)}.dlg{background:var(--t-dlg)}
+.warn{color:var(--t-del);font-weight:700}.hl{color:var(--t-mod)}.dlgb{color:var(--t-dim)}.mk{color:var(--t-fg)}
+.match{color:var(--t-acc);text-decoration:underline}.mark{color:var(--t-acc);font-weight:700}
+.ic-dir{color:var(--t-mod)}.ic-go{color:var(--t-cyan)}.ic-md{color:var(--t-live)}.ic-sh{color:var(--t-add)}.ic-txt{color:var(--t-dim)}.ic-cfg{color:var(--t-acc)}
+.sel{background:var(--t-sel)}.dlg{background:var(--t-dlg)}.sbar{background:var(--t-bar)}
 .addbg{background:var(--t-addbg)}.delbg{background:var(--t-delbg)}
 .mksel{background:var(--t-acc);color:var(--t-bg)}
+.pill{background:var(--t-acc);color:var(--t-bg);font-weight:700}.pillv{background:var(--t-mod);color:var(--t-bg);font-weight:700}
+.pillc{background:var(--t-live);color:var(--t-bg);font-weight:700}.pillr{background:var(--t-del);color:var(--t-bg);font-weight:700}
 [data-a]{cursor:pointer}[data-a]:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px;min-width:0}
 .card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
 .card ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.card p{margin:0;color:var(--muted);font-size:14px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
 .keys div{display:flex;gap:4px}
 .keys button{font-family:var(--mono);font-size:12px;min-width:30px;padding:3px 7px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer}
@@ -70,40 +74,40 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-r
 <div class="page">
   <header>
     <h1>restoric</h1>
-    <p>A clickable mockup of the TUI using an invented sample repo. Stay in one folder and step back through time. The timeline only stops at snapshots where something inside that folder changed. Keys follow vim, and arrow keys work too.</p>
+    <p>A clickable mockup of the TUI using an invented sample repo, styled after yazi. Stay in one folder and step back through time. The timeline only stops at snapshots where something inside that folder changed. The right column previews the selected file as it was in that snapshot.</p>
   </header>
 
   <div class="toolbar"><span>Terminal width</span><button id="w100" aria-pressed="true">100 cols</button><button id="w80" aria-pressed="false">80 cols</button></div>
   <div class="term-wrap"><pre id="term" tabindex="0" aria-label="restoric terminal mockup"></pre></div>
-  <div class="focus"><span id="focusState">Click the terminal to use the keyboard.</span><span>Everything is clickable too: timeline dots, rows, breadcrumbs, zoom, dialog options.</span></div>
+  <div class="focus"><span id="focusState">Click the terminal to use the keyboard.</span><span>Icons stand in for Nerd Font glyphs. Everything is clickable.</span></div>
 
   <div class="grid">
     <section class="card">
       <h2>Try this</h2>
       <ol>
-        <li>Press <kbd>H</kbd> (or <kbd>←</kbd>) a few times. You step through versions of <b>src/</b> and skip snapshots where it didn't change.</li>
-        <li><b>main.go</b> is selected, so the second timeline row shows only its changes. Press <kbd>{</kbd> or <kbd>}</kbd> to jump between them.</li>
-        <li>Type <kbd>:find legacy</kbd> and press <kbd>⏎</kbd> twice. You land on the last snapshot that still had the deleted file.</li>
-        <li>Press <kbd>v</kbd> on a file for its versions, <kbd>d</kbd> to diff, and <kbd>]c</kbd> to step through changes.</li>
-        <li>Press <kbd>zi</kbd> to zoom the timeline, or <kbd>:sep 1</kbd> to jump to a date. Put a number before a motion: <kbd>3H</kbd>.</li>
-        <li>Switch to 80 columns. The versions pane folds away.</li>
+        <li>Press <kbd>H</kbd> (or <kbd>←</kbd>) a few times. You step through versions of <b>src/</b>, and the preview marks lines that changed in each version with <b>+</b>.</li>
+        <li>Press <kbd>Tab</kbd> to switch the preview to a diff against disk. <kbd>J</kbd> <kbd>K</kbd> scroll it.</li>
+        <li>Press <kbd>Space</kbd> on two files, then <kbd>y</kbd> to yank them and <kbd>p</kbd> to restore them next to the originals. <kbd>P</kbd> overwrites instead.</li>
+        <li>Press <kbd>z</kbd> or <kbd>c</kbd> and wait: a popup lists what can follow.</li>
+        <li>Type <kbd>s</kbd> <kbd>legacy</kbd> <kbd>⏎</kbd> <kbd>⏎</kbd> to find a deleted file and jump to its last snapshot.</li>
+        <li>Press <kbd>f</kbd> to filter the listing, <kbd>⏎</kbd> on a file for all its versions, <kbd>d</kbd> for a full-screen diff.</li>
       </ol>
     </section>
     <section class="card">
       <h2>Keys</h2>
       <div class="keys">
         <div><button data-k="H">H</button><button data-k="L">L</button></div><span>Older / newer change in this folder (← →)</span>
-        <div><button data-k="[">[</button><button data-k="]">]</button></div><span>Step through every snapshot</span>
+        <div><button data-k="[">[</button><button data-k="]">]</button></div><span>Every snapshot</span>
         <div><button data-k="{">{</button><button data-k="}">}</button></div><span>Previous / next change of the selected item</span>
         <div><button data-k="j">j</button><button data-k="k">k</button></div><span>Move (gg G, Ctrl-d Ctrl-u)</span>
-        <div><button data-k="h">h</button><button data-k="l">l</button></div><span>Parent folder / open (- ⌫ / ⏎)</span>
-        <div><button data-k="v">v</button></div><span>Versions of the selected file</span>
-        <div><button data-k="d">d</button></div><span>Diff against disk, then ]c [c</span>
-        <div><button data-k="r">r</button><button data-k="y">y</button></div><span>Restore / yank snapshot:path</span>
-        <div><button data-k="z h">zh</button></div><span>Show or hide deleted items</span>
-        <div><button data-k="/">/</button><button data-k=":">:</button></div><span>Search folder / command (:find, :yesterday)</span>
-        <div><button data-k="z i">zi</button><button data-k="z o">zo</button></div><span>Zoom the timeline in / out</span>
-        <div><button data-k="?">?</button><button data-k="q">q</button></div><span>Help / back</span>
+        <div><button data-k="h">h</button><button data-k="l">l</button></div><span>Parent / open (a file opens its versions)</span>
+        <div><button data-k="Tab">⇥</button><button data-k="J">J</button><button data-k="K">K</button></div><span>Preview: content or diff, scroll</span>
+        <div><button data-k=" ">␣</button><button data-k="v">v</button></div><span>Select / visual select</span>
+        <div><button data-k="y">y</button><button data-k="p">p</button><button data-k="P">P</button></div><span>Yank, restore next to it, overwrite</span>
+        <div><button data-k="r">r</button><button data-k="d">d</button></div><span>Restore options / full diff</span>
+        <div><button data-k="c">c</button><button data-k="z">z</button><button data-k="g">g</button></div><span>Copy, view and go-to prefixes</span>
+        <div><button data-k="/">/</button><button data-k="f">f</button><button data-k="s">s</button></div><span>Search, filter, find in all snapshots</span>
+        <div><button data-k=".">.</button><button data-k=":">:</button><button data-k="?">?</button></div><span>Deleted items, command, help</span>
       </div>
     </section>
     <section class="card full">
@@ -217,14 +221,16 @@ function hunks(ops){const keep=new Uint8Array(ops.length);ops.forEach((o,k)=>{if
 
 // ---------- state ----------
 const startSnap=(()=>{const c=cps['src'];let best=c[0];c.forEach(i=>{if(Math.abs(i-ix(.72))<Math.abs(best-ix(.72)))best=i});return best})();
-const S={view:'main',dir:'src',snap:startSnap,sel:1,selKey:'f:main.go',ghosts:false,msg:null,hist:null,diff:null,find:null,dlg:null,help:false,
-  zoom:1,search:'',input:null,count:'',pend:null};
+const S={view:'main',dir:'src',snap:startSnap,sel:1,selKey:'f:main.go',ghosts:false,msg:null,hist:null,diff:null,find:null,dlg:null,confirm:null,help:false,
+  zoom:1,search:'',filter:'',input:null,count:'',pend:null,marks:new Set(),visual:null,yanked:null,pmode:'content',pscroll:null,pkey:null};
 let COLS=100;const ROWS=34;
-const LW=()=>COLS>=100?34:0;
 const ZOOMS=[1,2,4,8];
 const lastLE=(arr,i)=>{let r=-1;for(const x of arr)if(x<=i)r=x;return r};
 const dispDir=d=>ROOTD+(d?'/'+d:'');
 const absDir=d=>ROOT+(d?'/'+d:'');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+// pane layout: versions | listing | preview
+const layout=()=>COLS>=100?{V:[0,21],L:[23,57],P:[59,COLS-1]}:{V:null,L:[0,37],P:[39,COLS-1]};
 
 function entries(dir,i,ghosts){const list=[];let hidden=0;
   for(const sub of subdirs[dir]){if(dirExists(sub,i)){list.push({kind:'dir',name:base(sub),path:sub});continue}
@@ -236,11 +242,17 @@ function entries(dir,i,ghosts){const list=[];let hidden=0;
   list.sort((a,b)=>a.kind===b.kind?a.name.localeCompare(b.name):a.kind==='dir'?-1:1);
   return {list,hidden};}
 const rowKey=r=>r.kind[0]+':'+r.name;
-function mainRows(){const e=entries(S.dir,S.snap,S.ghosts);const rows=S.dir?[{kind:'up',name:'..'}]:[];return {rows:rows.concat(e.list),hidden:e.hidden};}
+function mainRows(){const e=entries(S.dir,S.snap,S.ghosts);let list=e.list;
+  if(S.filter){const q=S.filter.toLowerCase();list=list.filter(r=>r.name.toLowerCase().includes(q))}
+  const rows=S.dir?[{kind:'up',name:'..'}]:[];return {rows:rows.concat(list),hidden:e.hidden,total:e.list.length};}
 const matches=row=>!!S.search&&row.kind!=='up'&&row.name.toLowerCase().includes(S.search.toLowerCase());
+const markKey=row=>S.dir+'|'+rowKey(row);
+const isMarked=(idx,row)=>row.kind!=='up'&&(S.marks.has(markKey(row))||(S.visual!=null&&idx>=Math.min(S.visual,S.sel)&&idx<=Math.max(S.visual,S.sel)));
 function track(row){if(!row||row.kind==='up')return null;
   if(row.kind==='file'){const f=row.f;return {name:f.name,isChange:j=>f.state[j]!==(j?f.state[j-1]:-1),exists:j=>f.state[j]>=0,live:f.live!==f.state[LAST]}}
   const p=row.path;return {name:row.name+'/',isChange:j=>nonzero(counts[p][j]),exists:j=>dirExists(p,j),live:nonzero(liveC[p])};}
+function icon(row){if(row.kind==='dir')return ['▸','ic-dir'];
+  const t=row.f.t;return t==='go'?['◇','ic-go']:t==='md'?['¶','ic-md']:t==='sh'?['$','ic-sh']:t==='txt'?['≡','ic-txt']:['○','ic-cfg'];}
 
 // ---------- grid ----------
 let G,ACT;
@@ -248,27 +260,33 @@ function clear(){G=[];ACT=[null];for(let r=0;r<ROWS;r++){const row=[];for(let c=
 function put(r,c,text,cls='',act=null){let a=0;if(act){a=ACT.length;ACT.push(act)}
   for(const ch of Array.from(String(text))){if(r>=0&&r<ROWS&&c>=0&&c<COLS){const g=G[r][c];g.ch=ch;g.c=cls;g.a=a}c++}return c;}
 function fill(r,c0,c1,b,act=null){let a=0;if(act){a=ACT.length;ACT.push(act)}for(let c=c0;c<=c1&&c<COLS;c++){G[r][c].b=b;if(act)G[r][c].a=a}}
-function hline(r,c0=0,c1=COLS-1){for(let c=c0;c<=c1;c++)put(r,c,'─','dim2')}
+function vline(c,r0,r1){for(let r=r0;r<=r1;r++)put(r,c,'│','dim2')}
 function fit(s,w){s=String(s);return s.length>w?s.slice(0,Math.max(0,w-1))+'…':s}
 const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function serialize(){return G.map(row=>{let h='',run='',k=null;const flush=()=>{if(!run)return;const [c,b,a]=k.split('|');const cls=[c,b].filter(Boolean).join(' ');
     h+=`<span${cls?` class="${cls}"`:''}${a!=='0'?` data-a="${a}"`:''}>${esc(run)}</span>`;run=''};
   for(const g of row){const kk=`${g.c}|${g.b}|${g.a}`;if(kk!==k){flush();k=kk}run+=g.ch}flush();return `<div class="row">${h}</div>`}).join('');}
-function putCounts(r,c,x){const parts=[];if(x.a)parts.push(['+'+x.a,'add']);if(x.m)parts.push(['~'+x.m,'mod']);if(x.d)parts.push(['−'+x.d,'del']);
-  parts.forEach(([t,cl],k)=>{c=put(r,c,(k?' ':'')+t,cl)});return c;}
-function bar(right){fill(0,0,COLS-1,'bar');put(0,1,'restoric','b');put(0,11,COLS>=100?`repo ${REPO}   host bege-laptop`:`repo ${REPO}`,'');
-  const t=right||`${N} snapshots · cache warm`;put(0,COLS-1-t.length,t,'');}
-function keysRow(items){const r=ROWS-1;
-  if(S.input){let c=put(r,1,S.input.kind,'acc b');c=put(r,c,S.input.text,'');c=put(r,c,'█','acc');
-    const hint=S.input.kind===':'?'2026-09-01 · sep 1 · yesterday · 3d · find NAME · deleted':'type to search this folder · ⏎ keep · esc cancel';
+function countsParts(x){const p=[];if(x.a)p.push(['+'+x.a,'add']);if(x.m)p.push(['~'+x.m,'mod']);if(x.d)p.push(['−'+x.d,'del']);return p}
+function putCounts(r,c,x,gap=' '){countsParts(x).forEach(([t,cl],k)=>{c=put(r,c,(k?gap:'')+t,cl)});return c;}
+const countsLen=(x,gap=' ')=>{const p=countsParts(x);return p.reduce((s,[t])=>s+t.length,0)+Math.max(0,p.length-1)*gap.length};
+function header(parts,right){let c=put(0,1,'restoric','acc b');c+=2;for(const [t,cl,act] of parts)c=put(0,c,t,cl,act);
+  if(right){let rc=COLS-1-right.reduce((s,[t])=>s+t.length,0);for(const [t,cl,act] of right)rc=put(0,rc,t,cl,act)}}
+function status(mode,modeCls,mid,right){const r=ROWS-1;
+  if(S.input){const label={':':':','/':'/','f':'filter: '}[S.input.kind];let c=put(r,1,label,'acc b');c=put(r,c,S.input.text,'');c=put(r,c,'█','acc');
+    const hint=S.input.kind===':'?'sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo':S.input.kind==='f'?'type to filter · ⏎ keep · esc clear':'type to search this folder · ⏎ keep · esc cancel';
     if(c+2<COLS-1-hint.length)put(r,COLS-1-hint.length,hint,'dim');return}
-  if(S.msg)put(r,1,fit(S.msg.text,COLS-10),S.msg.cls||'acc');
-  else{let c=1;for(const [k,l,code] of items){if(c+k.length+l.length+3>COLS-7)break;c=put(r,c,k,'acc b',()=>keySeq(code));c=put(r,c,' '+l+'  ','dim',()=>keySeq(code))}}
-  const pc=(S.count||'')+(S.pend||'');if(pc)put(r,COLS-1-pc.length,pc,'acc b');}
+  fill(r,0,COLS-1,'sbar');let c=put(r,0,` ${mode} `,modeCls);c+=1;
+  const rt=right.concat([['  ? help','dim2',()=>key('?')]]);const rlen=rt.reduce((s,[t])=>s+t.length,0);const pc=(S.count||'')+(S.pend||'');
+  for(const [t,cl,act] of mid){if(c+t.length>COLS-rlen-pc.length-3)break;c=put(r,c,t,cl,act)}
+  let rc=COLS-1-rlen;if(pc)put(r,rc-pc.length-2,pc,'acc b');for(const [t,cl,act] of rt)rc=put(r,rc,t,cl,act);}
+function rbox(y,x,h,w,title,titleCls='b'){for(let r=y;r<y+h;r++)for(let c=x;c<x+w;c++){if(r<0||r>=ROWS||c<0||c>=COLS)continue;const g=G[r][c];g.ch=' ';g.c='';g.a=0;g.b='dlg'}
+  put(y,x,'╭'+'─'.repeat(w-2)+'╮','dlgb');put(y+h-1,x,'╰'+'─'.repeat(w-2)+'╯','dlgb');for(let r=y+1;r<y+h-1;r++){put(r,x,'│','dlgb');put(r,x+w-1,'│','dlgb')}
+  if(title)put(y,x+2,` ${title} `,titleCls);}
+function wrap(t,w){const out=[];let line='';for(const word of t.split(' ')){if(line&&(line+' '+word).length>w){out.push(line);line=word}else line=line?line+' '+word:word}if(line)out.push(line);return out}
 
-// tracks: rows of dots that share one time axis. Returns how many snapshots share the selected column.
+// tracks share one time axis; labels sit at the right edge. Returns how many snapshots share the selected column.
 function timeline(r,tracks,sel,onPick){
-  const t0=+snaps[0].t,t1=+snaps[LAST].t,X0=2,TW=COLS-12;
+  const t0=+snaps[0].t,t1=+snaps[LAST].t,X0=2,TW=COLS-26;
   const span=(t1-t0)/S.zoom;let a=+snaps[sel].t-span/2;a=Math.max(t0,Math.min(a,t1-span));const b=a+span;
   const col=t=>X0+Math.round((t-a)/(b-a)*(TW-1)),vis=t=>t>=a-1&&t<=b+1;
   const da=new Date(a);const first=S.zoom===1?M[da.getMonth()]+' 2026':fmtD(da);put(r,X0,first,'dim');let end=X0+first.length+1;
@@ -278,100 +296,133 @@ function timeline(r,tracks,sel,onPick){
   const by=new Map();for(let i=0;i<N;i++){const t=+snaps[i].t;if(!vis(t))continue;const c=col(t);if(!by.has(c))by.set(c,[]);by.get(c).push(i)}
   tracks.forEach((tr,k)=>{const rr=r+1+k;
     if(a>t0)put(rr,0,'‹','acc');if(b<t1)put(rr,X0+TW,'›','acc');put(rr,X0+TW+2,'┊','dim2');
-    if(!tr.isChange){put(rr,X0,tr.empty||'','dim');return}
+    if(!tr.isChange){put(rr,X0,tr.empty||'','dim2');return}
     for(const [c,l] of by){const ch=l.some(tr.isChange),ex=!tr.exists||l.some(tr.exists);
       const cls=l.includes(sel)&&(k===0||ch)?'mksel':ch?tr.cls:'dim2';
       put(rr,c,ch?tr.on:ex?'·':' ',cls,()=>onPick(l.find(tr.isChange)??l[0]));}
-    put(rr,X0+TW+4,tr.live?tr.on:'·',tr.live?'live':'dim2');});
+    put(rr,X0+TW+4,tr.live?tr.on:'·',tr.live?'live':'dim2');
+    put(rr,X0+TW+6,fit(tr.label,COLS-(X0+TW+6)-1),tr.labelCls||'dim');});
   const cr=r+1+tracks.length;put(cr,col(+snaps[sel].t),'▲','acc');
   const zc=COLS-9;let c=put(cr,zc,'−','acc b',()=>zoom(-1));c=put(cr,c+1,S.zoom+'×','dim');put(cr,c+1,'+','acc b',()=>zoom(1));
   return (by.get(col(+snaps[sel].t))||[]).length;}
-function zoom(d){const k=Math.max(0,Math.min(ZOOMS.length-1,ZOOMS.indexOf(S.zoom)+d));if(ZOOMS[k]===S.zoom)flash(d>0?'Fully zoomed in.':'Fully zoomed out.');S.zoom=ZOOMS[k];}
+function zoom(d){const k=clamp(ZOOMS.indexOf(S.zoom)+d,0,ZOOMS.length-1);if(ZOOMS[k]===S.zoom)flash(d>0?'Fully zoomed in.':'Fully zoomed out.');S.zoom=ZOOMS[k];}
+
+// ---------- preview ----------
+function previewHead(x0,x1,y,text,cls,sub,subCls){const W=x1-x0+1;const mode=S.pmode==='content'?'content':'vs disk';
+  put(y,x0,fit(text,W-mode.length-6),cls);put(y,x1-mode.length-3,'⇥','dim2',()=>key('Tab'));put(y,x1-mode.length-1,mode,'acc',()=>key('Tab'));
+  if(sub)put(y+1,x0,fit(sub,W),subCls||'dim');}
+function previewFile(x0,x1,y0,y1,f,v,pv){const W=x1-x0+1,top=y0,H=y1-top+1;
+  if(v<0){put(top,x0,'(no content in this snapshot)','dim');return}
+  if(S.pmode==='content'){const lines=f.versions[v].lines;const add=new Set(),del=new Set();
+    if(pv>=0){let nb=1;for(const o of diff(linesOf(f,pv),lines)){if(o.t==='+'){add.add(o.b);nb=o.b+1}else if(o.t===' ')nb=o.b+1;else del.add(nb)}}
+    const ch=[...add,...del];if(S.pscroll==null)S.pscroll=ch.length?Math.max(0,Math.min(...ch)-4):0;
+    S.pscroll=clamp(S.pscroll,0,Math.max(0,lines.length-H));
+    lines.slice(S.pscroll,S.pscroll+H).forEach((s,k)=>{const n=S.pscroll+k+1,r=top+k;const m=add.has(n)?['+','add b']:del.has(n)?['−','del b']:[' ',''];
+      put(r,x0,String(n).padStart(3),'dim2');put(r,x0+3,m[0],m[1]);put(r,x0+5,fit(s.replace(/\t/g,'  '),W-5),add.has(n)?'add':'');});
+    return}
+  const d=fdiff(f,v,f.live),hl=hunks(d.ops);
+  if(!hl.length){put(top,x0,f.live<0?'(the file is missing on disk)':'Identical to the file on disk.',f.live<0?'del':'add');return}
+  if(S.pscroll==null)S.pscroll=0;S.pscroll=clamp(S.pscroll,0,Math.max(0,hl.length-H));
+  hl.slice(S.pscroll,S.pscroll+H).forEach((o,k)=>{const r=top+k;if(o.hdr){put(r,x0,`┄ line ${o.line}`,'hl');return}
+    if(o.t!==' ')fill(r,x0,x1,o.t==='+'?'addbg':'delbg');put(r,x0,o.t,o.t==='+'?'add b':o.t==='-'?'del b':'dim2');
+    put(r,x0+2,fit(o.s.replace(/\t/g,'  '),W-2),o.t==='+'?'add':o.t==='-'?'del':'');});}
+function previewRow(x0,x1,y0,y1,row){
+  if(!row)return;
+  if(row.kind==='up'){put(y0,x0,'Parent folder','dim');put(y0+1,x0,fit(dispDir(parent(S.dir))+'/',x1-x0+1),'dir');return}
+  const gone=row.del||row.ghost,s=gone?row.last:S.snap;
+  if(row.kind==='dir'){put(y0,x0,fit(row.name+'/',x1-x0-12),'dir');put(y0,x1-10,gone?'deleted':'',gone?'del':'');
+    if(gone)put(y0+1,x0,`last seen ${fmt(snaps[row.last].t)}`,'del');
+    entries(row.path,s,false).list.slice(0,y1-y0-1).forEach((e,k)=>{const r=y0+2+k,[ic,icc]=icon(e);put(r,x0,ic,icc);
+      put(r,x0+2,fit(e.name+(e.kind==='dir'?'/':''),x1-x0-10),e.del?'del strike':e.kind==='dir'?'dir':'');
+      if(!e.del&&e.kind==='file'){const p=s?e.f.state[s-1]:-1;if(p<0)put(r,x1-1,'+','add');else if(p!==e.f.state[s])put(r,x1-1,'~','mod')}
+      else if(e.kind==='dir'&&!e.del){const x=counts[e.path][s];put(r,x1-countsLen(x,'')+1,'','');putCounts(r,x1-countsLen(x,'')+1,x,'')}});return}
+  const f=row.f,runs=fileRuns(f),ri=runs.findIndex(x=>s>=x.from&&s<=x.to),run=runs[ri],nver=runs.filter(x=>x.s>=0).length;
+  const k=runs.slice(ri).filter(x=>x.s>=0).length,older=runs[ri+1],pv=older?older.s:-1;
+  if(gone)previewHead(x0,x1,y0,`${f.name} · deleted`,'del b',`last version ${fmtD(snaps[run.from].t)}, gone ${fmtD(snaps[row.last+1].t)}`,'del');
+  else previewHead(x0,x1,y0,`${f.name} · v${k}/${nver} · ${hsize(f.versions[run.s].size)}`,'b',
+    run.from===S.snap?(pv<0?'new in this snapshot':'changed here · + new line · − removed'):`unchanged since ${fmt(snaps[run.from].t)}`,run.from===S.snap?'mod':'dim');
+  previewFile(x0,x1,y0+3,y1,f,run.s,pv);}
 
 // ---------- views ----------
+function crumbs(){const parts=S.dir?S.dir.split('/'):[];const out=[[ROOTD,parts.length?'acc':'b',parts.length?()=>goDir(''):null]];
+  parts.forEach((p,k)=>{const path=parts.slice(0,k+1).join('/'),last=k===parts.length-1;out.push(['/','dim']);out.push([p,last?'b':'acc',last?null:()=>goDir(path)])});return out}
 function renderMain(){
-  const dir=S.dir,i=S.snap,cp=cps[dir],cur=lastLE(cp,i),pos=cp.indexOf(i),L=LW();
-  const {rows,hidden}=mainRows();
+  const dir=S.dir,i=S.snap,cp=cps[dir],cur=lastLE(cp,i),pos=cp.indexOf(i),LY=layout();
+  const {rows,hidden,total}=mainRows();
   if(S.selKey){const k=rows.findIndex(r=>rowKey(r)===S.selKey);if(k>=0)S.sel=k}
-  S.sel=Math.max(0,Math.min(S.sel,rows.length-1));
-  bar();
-  const parts=dir?dir.split('/'):[];let c=1;
-  c=put(1,c,ROOTD,parts.length?'acc':'b',parts.length?()=>goDir(''):null);
-  parts.forEach((p,k)=>{c=put(1,c,'/','dim');const path=parts.slice(0,k+1).join('/');const last=k===parts.length-1;c=put(1,c,p,last?'b':'acc',last?null:()=>goDir(path))});
-  const label=pos>=0?`version ${pos+1} of ${cp.length}`:`between versions (${cp.length} total)`;
-  const rc=COLS-2-label.length-4;put(1,rc,'◀','acc b',()=>key('H'));put(1,rc+2,label,'');put(1,rc+3+label.length,'▶','acc b',()=>key('L'));
-  hline(2);
-  const dname=(dir?base(dir):'project')+'/',tr=track(rows[S.sel]);
-  const share=timeline(3,[{isChange:j=>nonzero(counts[dir][j]),live:nonzero(liveC[dir]),on:'●',cls:'mk'},
-    tr?{...tr,on:'•',cls:'mod'}:{empty:'select a file or folder to see its changes on this row'}],i,j=>{S.snap=j});
-  c=put(7,2,fmt(snaps[i].t),'b');c=put(7,c,'   snapshot ','dim');c=put(7,c,snaps[i].id,'acc');c=put(7,c,'   ','');
-  if(pos>=0){c=put(7,c,dname+'  ','dim');c=putCounts(7,c,counts[dir][i]);if(pos===0)c=put(7,c,'  (first appears)','dim')}
-  else c=put(7,c,`no changes in ${dname} since ${fmt(snaps[cur].t)}`,'dim');
-  if(share>1)c=put(7,c,`   ${share} snapshots in this column, zi zooms`,'dim');
-  const tn=tr?fit(tr.name,18):'';const leg=`● ${dname}`+(tr?`  • ${tn}`:'');
-  if(c+3<COLS-2-leg.length){let lc=put(7,COLS-2-leg.length,'●','mk');lc=put(7,lc,' '+dname,'dim');if(tr){lc=put(7,lc,'  •','mod');put(7,lc,' '+tn,'dim')}}
-  hline(8);if(L){put(8,L,'┬','dim2');put(8,1,' Versions ','b')}put(8,L+1,` ${dname} @ ${fmt(snaps[i].t)} `,'b');
-  const BT=9,BB=ROWS-3,BH=BB-BT+1;
-  if(L){for(let r=BT;r<=BB;r++)put(r,L,'│','dim2');
+  S.sel=clamp(S.sel,0,rows.length-1);const selRow=rows[S.sel];
+  const pk=`${dir}|${selRow?rowKey(selRow):''}|${i}|${S.pmode}`;if(pk!==S.pkey){S.pkey=pk;S.pscroll=null}
+  const label=pos>=0?`version ${pos+1} of ${cp.length}`:`between versions`;
+  header(crumbs(),[['◀ ','acc b',()=>key('H')],[label,''],[' ▶','acc b',()=>key('L')]]);
+  const dname=(dir?base(dir):'project')+'/',tr=track(selRow);
+  const share=timeline(1,[{isChange:j=>nonzero(counts[dir][j]),live:nonzero(liveC[dir]),on:'●',cls:'mk',label:dname,labelCls:'b'},
+    tr?{...tr,on:'•',cls:'mod',label:tr.name,labelCls:'mod'}:{empty:'select a file or folder to see its changes here'}],i,j=>{S.snap=j});
+  const T=6,B=ROWS-2,BH=B-T+1;
+  // versions column
+  if(LY.V){const [v0,v1]=LY.V;vline(v1+1,T,B);
     const V=[{live:true}];const lc=liveC[dir];
     for(let k=cp.length-1;k>=0;k--){const fold=k===cp.length-1?LAST-cp[k]:cp[k+1]-cp[k]-1;
       if(fold>0)V.push({fold,from:cp[k]+1,to:cp[k]+fold});V.push({cp:cp[k]});}
-    const selRow=V.findIndex(x=>x.cp===i||(x.fold&&i>=x.from&&i<=x.to));
-    const off=Math.max(0,Math.min(selRow-Math.floor(BH/2),V.length-BH));
-    V.slice(off,off+BH).forEach((x,k)=>{const r=BT+k;
-      if(x.live){let c=put(r,2,'now         ','live');if(nonzero(lc)){c=putCounts(r,c,lc);put(r,c,'  not backed up','dim')}else put(r,c,'same as latest','dim');return}
-      if(x.fold){const on=i>=x.from&&i<=x.to;put(r,1,on?'▶':' ','acc');put(r,4,`┄ ${x.fold} unchanged ┄`,on?'acc':'dim2',()=>{S.snap=x.to});return}
-      const on=x.cp===i;fill(r,1,L-1,on?'sel':'',()=>{S.snap=x.cp});
-      put(r,1,on?'▶':' ','acc');const c=put(r,3,fmt(snaps[x.cp].t),on?'b':'');putCounts(r,c+2,counts[dir][x.cp]);});}
-  const X=L?L+2:2,DX=COLS-9,MX=COLS-25,SE=COLS-27,NW=SE-8-X;
-  put(BT,X,'NAME','dim');put(BT,SE-4,'SIZE','dim');put(BT,MX,'MODIFIED','dim');put(BT,DX,'Δ','dim');
-  const RH=BH-2;const roff=Math.max(0,Math.min(S.sel-Math.floor(RH/2),rows.length-RH));
-  rows.slice(roff,roff+RH).forEach((row,k)=>{const r=BT+1+k,idx=roff+k,on=idx===S.sel;
+    const sr=V.findIndex(x=>x.cp===i||(x.fold&&i>=x.from&&i<=x.to));const off=clamp(sr-Math.floor(BH/2),0,Math.max(0,V.length-BH));
+    V.slice(off,off+BH).forEach((x,k)=>{const r=T+k;
+      if(x.live){const c=put(r,v0+1,'now  ','live');if(nonzero(lc)){const c2=putCounts(r,c,lc,'');put(r,c2,' unsaved','dim')}else put(r,c,'= latest','dim');return}
+      if(x.fold){const on=i>=x.from&&i<=x.to;put(r,v0,on?'▶':' ','acc');put(r,v0+3,`┄ ${x.fold} unchanged ┄`,on?'acc':'dim2',()=>{S.snap=x.to});return}
+      const on=x.cp===i;fill(r,v0,v1,on?'sel':'',()=>{S.snap=x.cp});put(r,v0,on?'▶':' ','acc');
+      put(r,v0+1,fmt(snaps[x.cp].t),on?'b':'');putCounts(r,v0+14,counts[dir][x.cp],'');});}
+  // listing
+  const [l0,l1]=LY.L,DX=l1-5,SE=l1-7,NW=SE-6-(l0+3);
+  const off=clamp(S.sel-Math.floor(BH/2),0,Math.max(0,rows.length-BH));
+  rows.slice(off,off+BH).forEach((row,k)=>{const r=T+k,idx=off+k,on=idx===S.sel;
     const act=()=>{if(S.sel===idx)openRow(row);else{S.sel=idx;S.selKey=rowKey(row)}};
-    fill(r,L?L+1:0,COLS-1,on?'sel':'',act);
-    if(row.kind==='up'){put(r,X,'..','dir');return}
-    const gone=row.del||row.ghost;let nameCls=row.ghost?'ghost':row.del?'del strike':row.kind==='dir'?'dir':'';if(matches(row))nameCls+=' match';
-    put(r,X,fit(row.name+(row.kind==='dir'?'/':''),NW),nameCls);
-    const goneTxt=row.ghost?'gone '+fmtD(snaps[row.last+1].t):row.del?'(deleted)':null;
-    if(goneTxt)put(r,MX,goneTxt,row.ghost?'ghost':'del');
-    if(row.kind==='file'){const ver=row.f.versions[row.f.state[gone?row.last:i]];
-      const s=hsize(ver.size);put(r,SE-s.length,s,gone?'dim':'');
-      if(!gone)put(r,MX,fmt(ver.mtime),'');
+    fill(r,l0,l1,on?'sel':'',act);
+    if(isMarked(idx,row))put(r,l0,'┃','mark');
+    if(row.kind==='up'){put(r,l0+3,'..','dir');return}
+    const [ic,icc]=icon(row);put(r,l0+1,ic,icc);
+    const gone=row.del||row.ghost;let nc=row.ghost?'ghost':row.del?'del strike':row.kind==='dir'?'dir':'';if(matches(row))nc+=' match';
+    put(r,l0+3,fit(row.name+(row.kind==='dir'?'/':''),NW),nc);
+    if(row.kind==='file'){const ver=row.f.versions[row.f.state[gone?row.last:i]];const s=hsize(ver.size);put(r,SE-s.length,s,gone?'dim':'');
       const prev=i?row.f.state[i-1]:-1;
-      if(row.del)put(r,DX,'−','del');else if(!row.ghost){if(prev<0)put(r,DX,'+','add');else if(prev!==row.f.state[i])put(r,DX,'~','mod')}}
-    else{put(r,SE-1,'–','dim');
-      if(!gone){const m=under[row.path].filter(f=>f.state[i]>=0).map(f=>+f.versions[f.state[i]].mtime);put(r,MX,fmt(new Date(Math.max(...m))),'')}
-      if(row.del)put(r,DX,'−','del');else if(!row.ghost)putCounts(r,DX,counts[row.path][i]);}});
-  if(hidden&&!S.ghosts)put(BB,X,`${hidden} deleted earlier · zh to show`,'dim',()=>keySeq('z h'));
-  else if(S.ghosts)put(BB,X,'showing deleted items · zh to hide','dim',()=>keySeq('z h'));
-  hline(ROWS-2);if(L)put(ROWS-2,L,'┴','dim2');
-  keysRow([['H L','change','H'],['[ ]','every snapshot','['],['{ }','item change','}'],['j k','move','j'],['h l','up/open','l'],['v','versions','v'],['d','diff','d'],['r','restore','r'],['/','search','/'],[':','cmd',':'],['?','help','?']]);
+      if(row.del)put(r,DX,'−','del');else if(row.ghost)put(r,DX,'gone','ghost');else if(prev<0)put(r,DX,'+','add');else if(prev!==row.f.state[i])put(r,DX,'~','mod');}
+    else{if(row.del)put(r,DX,'−','del');else if(row.ghost)put(r,DX,'gone','ghost');else putCounts(r,DX,counts[row.path][i],'');}});
+  if(hidden&&!S.ghosts&&rows.length<BH)put(B,l0+3,`${hidden} deleted · . to show`,'dim2',()=>key('.'));
+  // preview
+  const [p0,p1]=LY.P;vline(p0-1,T,B);previewRow(p0+1,p1,T,B,selRow);
+  // status
+  const mid=[[fmt(snaps[i].t),'b'],['  '],[snaps[i].id,'acc'],['  ']];
+  if(pos>=0){mid.push([dname+' ','dim']);countsParts(counts[dir][i]).forEach(([t,cl],k)=>mid.push([(k?' ':'')+t,cl]))}else mid.push([`unchanged since ${fmtD(snaps[cur].t)}`,'dim']);
+  if(share>1)mid.push([`  ${share} in column · zi`,'dim']);
+  if(S.filter)mid.push([`  filter "${S.filter}"`,'acc']);
+  if(S.yanked)mid.push([`  ${S.yanked.items.length} yanked`,'acc']);
+  const nm=rows.filter((r,k)=>isMarked(k,r)).length;
+  const right=[];if(selRow&&selRow.kind==='file'&&!(selRow.del||selRow.ghost)){const v=selRow.f.versions[selRow.f.state[i]];right.push([fmt(v.mtime)+'  ','dim'])}
+  right.push([`${S.dir?S.sel:S.sel+1}/${rows.length-(S.dir?1:0)}`,'']);
+  status(S.visual!=null?'VIS':nm?'SEL':'NOR',S.visual!=null||nm?'pillv':'pill',mid,right);
 }
 
 function renderHist(){
-  const {f}=S.hist,runs=fileRuns(f);S.hist.sel=Math.max(0,Math.min(S.hist.sel,runs.length-1));const sel=runs[S.hist.sel];
+  const {f}=S.hist,runs=fileRuns(f);S.hist.sel=clamp(S.hist.sel,0,runs.length-1);const sel=runs[S.hist.sel];
+  const pk=`h|${f.path}|${S.hist.sel}|${S.pmode}`;if(pk!==S.pkey){S.pkey=pk;S.pscroll=null}
   const nver=runs.filter(r=>r.s>=0).length;
-  bar(`${nver} version${nver===1?'':'s'} in ${N} snapshots`);
-  let c=put(1,1,'Versions  ','b');put(1,c,ROOTD+'/'+f.path,'acc');
-  hline(2);
-  timeline(3,[{isChange:j=>f.state[j]!==(j?f.state[j-1]:-1),exists:j=>f.state[j]>=0,live:f.live!==f.state[LAST],on:'●',cls:'mk'}],sel.from,
+  header([['Versions  ','b'],[ROOTD+'/'+f.path,'acc']],[[`${nver} version${nver===1?'':'s'} in ${N} snapshots`,'dim']]);
+  timeline(1,[{isChange:j=>f.state[j]!==(j?f.state[j-1]:-1),exists:j=>f.state[j]>=0,live:f.live!==f.state[LAST],on:'●',cls:'mk',label:f.name,labelCls:'b'}],sel.from,
     j=>{const k=runs.findIndex(r=>j>=r.from&&j<=r.to);if(k>=0)S.hist.sel=k});
-  c=put(6,2,fmt(snaps[sel.from].t),'b');if(sel.to>sel.from){c=put(6,c,' → ','dim');c=put(6,c,fmt(snaps[sel.to].t),'b')}
-  put(6,c,`   in ${sel.to-sel.from+1} snapshot${sel.to>sel.from?'s':''}  ${snaps[sel.from].id}${sel.to>sel.from?' … '+snaps[sel.to].id:''}`,'dim');
-  hline(7);
-  const BT=8,X=2;put(BT,X,'VERSION','dim');put(BT,X+22,'SIZE','dim');put(BT,X+29,'MODIFIED','dim');put(BT,X+45,'SNAPSHOTS','dim');put(BT,X+60,'COMPARED TO DISK','dim');
+  const T=5,B=ROWS-2,wide=COLS>=100,L1=wide?47:43,P0=L1+2;vline(L1+1,T,B);
+  put(T,1,'VERSION','dim2');put(T,17,'SIZE','dim2');put(T,23,'SNAPSHOTS','dim2');put(T,34,'VS DISK','dim2');
   const disk=f.live>=0?f.versions[f.live]:null;
-  put(BT+1,X,'on disk','live');if(disk){const s=hsize(disk.size);put(BT+1,X+26-s.length,s,'dim');put(BT+1,X+29,fmt(disk.mtime),'dim')}else put(BT+1,X+29,'(missing)','del');
-  const RH=ROWS-3-(BT+2)+1;const off=Math.max(0,Math.min(S.hist.sel-Math.floor(RH/2),runs.length-RH));
-  runs.slice(off,off+RH).forEach((run,k)=>{const r=BT+2+k,idx=off+k,on=idx===S.hist.sel;
-    fill(r,1,COLS-2,on?'sel':'',()=>{if(S.hist.sel===idx)key('d');else S.hist.sel=idx});
-    put(r,1,on?'▶':' ','acc');put(r,X,fmt(snaps[run.from].t),on?'b':'');
-    const n=run.to-run.from+1;put(r,X+45,`${n} snapshot${n>1?'s':''}`,'dim');
-    if(run.s<0){put(r,X+29,'deleted','del');return}
-    const v=f.versions[run.s];const s=hsize(v.size);put(r,X+26-s.length,s,'');put(r,X+29,fmt(v.mtime),'');
-    const d=fdiff(f,run.s,f.live);if(!d.add&&!d.del)put(r,X+60,'identical','add');else{const c=put(r,X+60,'+'+d.add,'add');put(r,c+1,'−'+d.del,'del')}});
-  hline(ROWS-2);
-  keysRow([['j k','version','j'],['⏎ d','diff vs disk','d'],['p','diff vs previous','p'],['r','restore','r'],['y','yank','y'],['q','back','q']]);
+  put(T+1,1,'on disk','live');if(disk){const s=hsize(disk.size);put(T+1,21-s.length,s,'dim')}else put(T+1,14,'missing','del');
+  const RH=B-(T+2)+1,off=clamp(S.hist.sel-Math.floor(RH/2),0,Math.max(0,runs.length-RH));
+  runs.slice(off,off+RH).forEach((run,k)=>{const r=T+2+k,idx=off+k,on=idx===S.hist.sel;
+    fill(r,0,L1,on?'sel':'',()=>{if(S.hist.sel===idx)key('d');else S.hist.sel=idx});
+    put(r,0,on?'▶':' ','acc');put(r,1,fmt(snaps[run.from].t),on?'b':'');
+    const n=run.to-run.from+1;put(r,23,`${n} snap${n>1?'s':''}`,'dim');
+    if(run.s<0){put(r,14,'deleted','del');return}
+    const s=hsize(f.versions[run.s].size);put(r,21-s.length,s,'');
+    const d=fdiff(f,run.s,f.live);if(!d.add&&!d.del)put(r,34,'identical','add');else{const c=put(r,34,'+'+d.add,'add');put(r,c+1,'−'+d.del,'del')}});
+  const older=runs[S.hist.sel+1];
+  if(sel.s<0)previewHead(P0,COLS-1,T,`${f.name} · deleted`,'del b',`in ${sel.to-sel.from+1} snapshots`,'del');
+  else previewHead(P0,COLS-1,T,`${f.name} · ${fmt(snaps[sel.from].t)}`,'b',`kept in ${sel.to-sel.from+1} snapshot${sel.to>sel.from?'s':''} · ${snaps[sel.from].id}`,'dim');
+  previewFile(P0,COLS-1,T+3,B,f,sel.s,older?older.s:-1);
+  status('NOR','pill',[[ROOTD+'/'+f.path,'dim']],[[`${S.hist.sel+1}/${runs.length}`,'']]);
 }
 
 function diffSides(){const {f,run,mode}=S.diff,runs=fileRuns(f),R0=runs[run];
@@ -380,45 +431,35 @@ function diffSides(){const {f,run,mode}=S.diff,runs=fileRuns(f),R0=runs[run];
 function diffLines(){const {f}=S.diff,{va,vb}=diffSides();const d=fdiff(f,va,vb);return {d,lines:hunks(d.ops)}}
 function renderDiff(){
   const {f}=S.diff,sd=diffSides(),{d,lines}=diffLines();
-  bar();
-  let c=put(1,1,f.name+'  ','b');c=put(1,c,sd.la,'del');c=put(1,c,'  →  ','dim');c=put(1,c,sd.lb,'add');
-  const st=`+${d.add} −${d.del}`,stx=COLS-2-st.length;
-  const note=S.diff.mode==='current'?'(what changed since this version)':'(what this version changed)';if(c+3+note.length<stx)put(1,c+3,note,'dim');
-  const ac=put(1,stx,'+'+d.add,'add');put(1,ac+1,'−'+d.del,'del');
-  hline(2);
-  const BT=3,BH=ROWS-3-BT+1;S.diff.scroll=Math.max(0,Math.min(S.diff.scroll,lines.length-BH));
-  if(!lines.length)put(BT+5,Math.floor(COLS/2)-24,'No differences. The two versions are identical.','dim');
-  lines.slice(S.diff.scroll,S.diff.scroll+BH).forEach((o,k)=>{const r=BT+k;
+  header([[f.name+'  ','b'],[sd.la,'del'],['  →  ','dim'],[sd.lb,'add']],[['+'+d.add,'add'],[' '],['−'+d.del,'del']]);
+  const T=2,B=ROWS-2,BH=B-T+1;S.diff.scroll=clamp(S.diff.scroll,0,Math.max(0,lines.length-BH));
+  put(1,1,S.diff.mode==='current'?'what changed since this version':'what this version changed','dim');
+  if(!lines.length)put(T+5,Math.floor(COLS/2)-24,'No differences. The two versions are identical.','dim');
+  lines.slice(S.diff.scroll,S.diff.scroll+BH).forEach((o,k)=>{const r=T+k;
     if(o.hdr){put(r,1,`┄┄ around line ${o.line} ┄┄`,'hl');return}
-    const bg=o.t==='+'?'addbg':o.t==='-'?'delbg':'';if(bg)fill(r,0,COLS-1,bg);
-    put(r,1,o.a?String(o.a).padStart(4):'    ','dim');put(r,6,o.b?String(o.b).padStart(4):'    ','dim');
+    if(o.t!==' ')fill(r,0,COLS-1,o.t==='+'?'addbg':'delbg');
+    put(r,1,o.a?String(o.a).padStart(4):'    ','dim2');put(r,6,o.b?String(o.b).padStart(4):'    ','dim2');
     put(r,12,o.t,o.t==='+'?'add b':o.t==='-'?'del b':'dim');put(r,14,fit(o.s.replace(/\t/g,'    '),COLS-16),o.t==='+'?'add':o.t==='-'?'del':'');});
-  hline(ROWS-2);
-  keysRow([['j k','scroll','j'],[']c [c','next/prev change','] c'],['H L','older/newer','H'],['c','vs disk','c'],['p','vs previous','p'],['r','restore','r'],['q','back','q']]);
+  status('DIFF','pillv',[[S.diff.mode==='current'?'vs disk (c)':'vs previous (p)','dim'],['  ]c [c changes · H L versions','dim2']],[[`${Math.min(lines.length,S.diff.scroll+1)}/${lines.length}`,'']]);
 }
 
 function renderFind(){
-  const F=S.find,res=F.res;F.sel=Math.max(0,Math.min(F.sel,res.length-1));
-  bar();let c=put(1,1,'Find  ','b');c=put(1,c,`"${F.q}"`,'acc');put(1,c,`   ${res.length} match${res.length===1?'':'es'} across all ${N} snapshots`,'dim');
-  hline(2);
+  const F=S.find,res=F.res;F.sel=clamp(F.sel,0,res.length-1);
+  header([['Find  ','b'],[`"${F.q}"`,'acc']],[[`${res.length} match${res.length===1?'':'es'} in ${N} snapshots`,'dim']]);
   const PX=2,FX=COLS-44,LX=COLS-30,SX=COLS-16;
-  put(3,PX,'PATH','dim');put(3,FX,'FIRST SEEN','dim');put(3,LX,'LAST SEEN','dim');put(3,SX,'NOW','dim');
-  if(!res.length)put(6,PX,'Nothing with that name in any snapshot.','dim');
-  const BT=4,RH=ROWS-3-BT+1,off=Math.max(0,Math.min(F.sel-Math.floor(RH/2),res.length-RH));
-  res.slice(off,off+RH).forEach((x,k)=>{const r=BT+k,idx=off+k,on=idx===F.sel;
+  put(2,PX,'PATH','dim2');put(2,FX,'FIRST SEEN','dim2');put(2,LX,'LAST SEEN','dim2');put(2,SX,'NOW','dim2');
+  if(!res.length)put(5,PX,'Nothing with that name in any snapshot.','dim');
+  const T=3,RH=ROWS-2-T+1,off=clamp(F.sel-Math.floor(RH/2),0,Math.max(0,res.length-RH));
+  res.slice(off,off+RH).forEach((x,k)=>{const r=T+k,idx=off+k,on=idx===F.sel;
     fill(r,0,COLS-1,on?'sel':'',()=>{if(F.sel===idx)key('Enter');else F.sel=idx});
-    put(r,1,on?'▶':' ','acc');
+    put(r,0,on?'▶':' ','acc');
     const p=x.path.split('/'),nm=p.pop()+(x.kind==='dir'?'/':'');const pre=p.length?p.join('/')+'/':'';
     const cc=put(r,PX,fit(pre,FX-PX-2-nm.length),'dim');put(r,cc,nm,x.kind==='dir'?'dir':x.onDisk?'b':'del');
     put(r,FX,fmt(snaps[x.first].t),'');put(r,LX,fmt(snaps[x.last].t),'');
     if(x.onDisk)put(r,SX,'on disk','add');else put(r,SX,x.last<LAST?'gone '+fmtD(snaps[x.last+1].t):'missing','del');});
-  hline(ROWS-2);
-  keysRow([['j k','move','j'],['⏎','go to last snapshot that has it','Enter'],['q','back','q']]);
+  status('FIND','pillc',[['⏎ jumps to the last snapshot that has it','dim']],[[`${res.length?F.sel+1:0}/${res.length}`,'']]);
 }
 
-function box(y,x,h,w,title){for(let r=y;r<y+h;r++)for(let c=x;c<x+w;c++){const g=G[r][c];g.ch=' ';g.c='';g.a=0;g.b='dlg'}
-  put(y,x,'┌'+'─'.repeat(w-2)+'┐','dlgb');put(y+h-1,x,'└'+'─'.repeat(w-2)+'┘','dlgb');for(let r=y+1;r<y+h-1;r++){put(r,x,'│','dlgb');put(r,x+w-1,'│','dlgb')}
-  put(y,x+2,` ${title} `,'b');}
 function restoreOpts(d){const t=d.t,isDir=t.kind==='dir',st=stamp(snaps[t.snap].t),nm=t.name+(isDir?'/':'');
   return [
     [d.onDisk?'Overwrite original':'Restore to original location',d.onDisk?t.disp:t.disp+' (missing now)'],
@@ -426,33 +467,46 @@ function restoreOpts(d){const t=d.t,isDir=t.kind==='dir',st=stamp(snaps[t.snap].
     ['Restore to ~/Restored/','→ ~/Restored/'+st+'/'+nm],
     isDir?['Write a tar archive','→ '+t.name+'-'+st+'.tar']:['Show in $PAGER','read only, writes nothing']];}
 function renderDlg(){const d=S.dlg,t=d.t,w=Math.min(78,COLS-2),h=d.confirm?15:14,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2)-1;
-  box(y,x,h,w,'Restore');
+  rbox(y,x,h,w,'Restore');
   let c=put(y+2,x+3,t.name+(t.kind==='dir'?'/':''),'b');c=put(y+2,c,'  @ '+fmt(snaps[t.snap].t)+'  ','');put(y+2,c,snaps[t.snap].id,'acc');
   put(y+3,x+3,fit('from '+t.abs,w-6),'dim');
   restoreOpts(d).forEach(([l,det],k)=>{const r=y+5+k,on=d.sel===k;const act=()=>{if(d.sel===k)key('Enter');else{d.sel=k;d.confirm=false}};
     put(r,x+3,`${k+1} `,'dim',act);put(r,x+5,on?'(•) ':'( ) ',on?'acc b':'dim',act);put(r,x+9,l,on?'b':'',act);put(r,x+40,fit(det,w-43),'dim',act);});
   if(d.confirm)put(y+10,x+3,'This replaces what is on disk now. Press ⏎ again to confirm.','warn');
-  const by=y+h-2;put(by,x+3,'[ Restore ]','acc b',()=>key('Enter'));put(by,x+17,'[ Cancel ]','dim',()=>key('Escape'));put(by,x+w-29,'j k choose  ⏎ restore  esc','dim');}
+  const by=y+h-2;put(by,x+3,'[ Restore ]','acc b',()=>key('Enter'));put(by,x+17,'[ Cancel ]','dim',()=>key('Escape'));put(by,x+w-29,'j k choose  ⏎ restore  esc','dim');
+  status('RST','pillr',[['choose where the restored copy goes','dim']],[]);}
+function renderConfirm(){const c=S.confirm,lines=wrap(c.text,50),w=56,h=lines.length+5,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2)-2;
+  rbox(y,x,h,w,'Overwrite?','warn');lines.forEach((l,k)=>put(y+2+k,x+3,l,''));
+  const by=y+h-2;put(by,x+3,'[y] Overwrite','warn',()=>key('y'));put(by,x+19,'[n] Cancel','dim',()=>key('n'));}
+const WK={main:{g:[['gg','top of list'],['gh','backup root'],['G','bottom (no prefix)']],
+  z:[['zh','show / hide deleted'],['zi','zoom timeline in'],['zo','zoom timeline out']],
+  c:[['cc','copy snapshot:path'],['cd','copy folder path'],['cf','copy file name']]},
+  hist:{g:[['gg','newest version']]},diff:{g:[['gg','top']],']':[[']c','next change']],'[':[['[c','previous change']]},find:{g:[['gg','top']]}};
+function renderWhichKey(){const items=(WK[S.view]||{})[S.pend];if(!items)return;const w=34,h=items.length+2,x=COLS-w-1,y=ROWS-2-h;
+  rbox(y,x,h,w,S.pend,'acc b');items.forEach(([k,l],n)=>{put(y+1+n,x+2,k.padEnd(4),'acc b',()=>keySeq(k.split('').join(' ')));put(y+1+n,x+7,l,'')});}
+function renderToast(){if(!S.msg)return;const w=Math.min(50,COLS-4),lines=wrap(S.msg.text,w-4),h=lines.length+2,x=COLS-w-1,y=6;
+  rbox(y,x,h,w,'');lines.forEach((l,k)=>put(y+1+k,x+2,l,S.msg.cls||''));}
 function renderHelp(){
-  const L=[['Folder view',''],['j k  ↓ ↑','move'],['gg G  C-d C-u','top, bottom, half page'],['h l  - ⏎','parent folder / open'],
-    ['H L  ← →','older / newer change in this folder'],['[ ]','every snapshot, changed or not'],['{ }','older / newer change of the selected item'],
-    ['v  d','versions of the file / diff against disk'],['r  y','restore / yank snapshot:path'],['/  n N','search this folder / next, previous match'],
-    ['zh  .','show deleted items'],['zi zo','zoom the timeline'],['3H  5j','counts work with motions'],['',''],
-    ['Commands',''],[':sep 1  :2026-09-01','jump to a date (also :yesterday :3d :2w)'],[':find NAME','search every snapshot for a name'],
-    [':latest  :oldest',''],['',''],['Diff','  ]c [c or n N changes, c vs disk, p vs previous']];
-  const w=Math.min(74,COLS-4),h=L.length+4,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2);box(y,x,h,w,'Help');
-  L.forEach(([k,l],n)=>{if(!l&&k){put(y+2+n,x+3,k,'b');return}if(k==='Diff')return;put(y+2+n,x+3,k,'acc b');put(y+2+n,x+26,l,'')});
-  put(y+2+L.length-1,x+3,'Diff','b');put(y+2+L.length-1,x+8,'  ]c [c or n N changes, c vs disk, p vs previous','');
+  const L=[['Folder view',''],['j k  gg G  C-d C-u','move, top, bottom, half page'],['h l  - ⏎','parent / open (a file opens its versions)'],
+    ['H L  ← →','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
+    ['⇥  J K','preview: content or diff vs disk, scroll'],['␣  v','select / visual select'],['y  p  P','yank, restore next to it, overwrite'],
+    ['r  d','restore options / full-screen diff'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
+    ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
+    ['Commands',''],[':sep 1  :2026-09-01','jump to a date (:yesterday :3d :2w)'],[':find NAME   s','search every snapshot for a name'],
+    [':latest :oldest :undo',''],['',''],['Diff','']];
+  const w=Math.min(74,COLS-4),h=L.length+4,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2);rbox(y,x,h,w,'Help');
+  L.forEach(([k,l],n)=>{if(!k)return;if(!l){put(y+2+n,x+3,k,'b');return}put(y+2+n,x+3,k,'acc b');put(y+2+n,x+26,l,'')});
+  put(y+2+L.length-1,x+9,']c [c or n N changes · c vs disk · p vs previous','');
   put(y+h-2,x+3,'Press any key to close','dim');}
 
 function render(){clear();
   ({main:renderMain,hist:renderHist,diff:renderDiff,find:renderFind})[S.view]();
-  if(S.dlg)renderDlg();if(S.help)renderHelp();
+  if(S.dlg)renderDlg();if(S.confirm)renderConfirm();if(S.pend)renderWhichKey();renderToast();if(S.help)renderHelp();
   term.innerHTML=serialize();renderCmds();}
 
 // ---------- actions ----------
 function flash(text,cls){S.msg={text,cls}}
-function goDir(p){S.dir=p;S.selKey=null;S.sel=p?1:0;}
+function goDir(p){S.dir=p;S.selKey=null;S.sel=p?1:0;S.marks.clear();S.visual=null;S.filter='';}
 function goUp(){if(!S.dir){flash('Already at the top of the backup.');return}const from=S.dir;goDir(parent(from));S.selKey='d:'+base(from);}
 function openRow(row){if(!row)return;if(row.kind==='up')return goUp();
   if(row.kind==='dir'){if(row.del||row.ghost){S.snap=row.last;flash(`Jumped to ${fmt(snaps[row.last].t)}, the last snapshot that has ${row.name}/`)}goDir(row.path);return}
@@ -466,26 +520,40 @@ function openFind(q){const ql=q.toLowerCase(),res=[];
   files.forEach(f=>{if(!f.path.toLowerCase().includes(ql))return;const [a,b]=span(i=>f.state[i]>=0);if(a>=0)res.push({kind:'file',f,path:f.path,first:a,last:b,onDisk:f.live>=0})});
   res.sort((x,y)=>x.path.localeCompare(y.path));S.find={q,sel:0,res,from:S.view==='find'?'main':S.view};S.view='find';}
 function goFind(x){if(!x)return;S.snap=x.last;S.view='main';
-  if(x.kind==='file'){S.dir=x.f.dir;S.selKey='f:'+x.f.name}else{S.dir=parent(x.path);S.selKey='d:'+base(x.path)}
+  if(x.kind==='file'){goDir(x.f.dir);S.selKey='f:'+x.f.name}else{goDir(parent(x.path));S.selKey='d:'+base(x.path)}
   const nm=base(x.path)+(x.kind==='dir'?'/':'');
   flash(x.last===LAST?`Showing ${nm} in the latest snapshot.`:`Jumped to ${fmt(snaps[x.last].t)}, the last snapshot that has ${nm}`);}
+function targetOfRow(row){if(!row||row.kind==='up')return null;const snap=row.del||row.ghost?row.last:S.snap;
+  if(row.kind==='dir')return {kind:'dir',name:row.name,path:row.path,snap,disp:dispDir(row.path),abs:absDir(row.path),onDisk:dirLive(row.path)};
+  return {kind:'file',name:row.f.name,f:row.f,snap,disp:ROOTD+'/'+row.f.path,abs:ROOT+'/'+row.f.path,onDisk:row.f.live>=0};}
 function target(){
-  if(S.view==='main'){const {rows}=mainRows();const row=rows[S.sel];if(!row||row.kind==='up')return null;const snap=row.del||row.ghost?row.last:S.snap;
-    if(row.kind==='dir')return {kind:'dir',name:row.name,path:row.path,snap,disp:dispDir(row.path),abs:absDir(row.path),onDisk:dirLive(row.path)};
-    return {kind:'file',name:row.f.name,f:row.f,snap,disp:ROOTD+'/'+row.f.path,abs:ROOT+'/'+row.f.path,onDisk:row.f.live>=0};}
+  if(S.view==='main'){const {rows}=mainRows();return targetOfRow(rows[S.sel])}
   if(S.view==='find')return null;
   const f=S.view==='hist'?S.hist.f:S.diff.f,run=fileRuns(f)[S.view==='hist'?S.hist.sel:S.diff.run];
   if(run.s<0){flash('The file did not exist in these snapshots, so there is nothing to restore.');return null}
   return {kind:'file',name:f.name,f,snap:run.from,disp:ROOTD+'/'+f.path,abs:ROOT+'/'+f.path,onDisk:f.live>=0};}
+function selectedTargets(){if(S.view!=='main'){const t=target();return t?[t]:[]}
+  const {rows}=mainRows();const m=rows.filter((r,k)=>isMarked(k,r));return (m.length?m:[rows[S.sel]]).map(targetOfRow).filter(Boolean);}
+const desc=items=>items.length===1?items[0].name+(items[0].kind==='dir'?'/':''):`${items.length} items`;
+function yank(){const items=selectedTargets();if(!items.length){flash('Nothing to yank here.');return}
+  S.yanked={items};S.marks.clear();S.visual=null;
+  flash(`Yanked ${desc(items)} from ${fmt(snaps[items[0].snap].t)}. p restores next to the original, P overwrites.`);}
+function paste(over){const Y=S.yanked;if(!Y){flash('Nothing yanked. Press y on a file first.');return}
+  const items=Y.items,d=desc(items);
+  if(over){S.confirm={text:`Replace ${d} on disk with the version from ${fmt(snaps[items[0].snap].t)}? The current version is kept for :undo.`,
+    yes:()=>flash(`Overwrote ${d}. :undo puts the old version back. (mockup: nothing was written)`,'add')};return}
+  const one=items[0],st=stamp(snaps[one.snap].t);
+  flash((items.length>1?`Restored ${d} next to the originals`:one.onDisk?`Restored as ${one.name}.${st}`:`Restored ${one.name} to ${one.disp}`)+' (mockup: nothing was written)','add');}
+function copy(what){const t=target();if(!t){flash('Select a file or folder first.');return}
+  const s=what==='c'?`${snaps[t.snap].id}:${t.abs}`:what==='d'?(S.view==='main'?absDir(S.dir):ROOT+'/'+parent(t.f.path)):t.name;
+  try{navigator.clipboard.writeText(s).catch(()=>{})}catch(e){}flash('Copied '+s);}
 function openRestore(){const t=target();if(!t)return;S.dlg={t,sel:t.onDisk?1:0,confirm:false,onDisk:t.onDisk};}
 function doRestore(){const d=S.dlg,t=d.t,det=restoreOpts(d)[d.sel][1];
   const msgs=[`Restored ${t.name} to ${t.disp}`,`Restored as ${det.slice(2)}`,`Restored to ${det.slice(2)}`,t.kind==='dir'?`Wrote ${det.slice(2)}`:`Opened ${t.name} @ ${fmt(snaps[t.snap].t)} in $PAGER`];
-  flash(msgs[d.sel]+'   (mockup: nothing was written)','add');S.dlg=null;}
-function yank(){const t=target();if(!t)return;const s=`${snaps[t.snap].id}:${t.abs}`;
-  try{navigator.clipboard.writeText(s).catch(()=>{})}catch(e){}flash('Yanked '+s);}
+  flash(msgs[d.sel]+' (mockup: nothing was written)','add');S.dlg=null;}
 function searchStep(dir){const {rows}=mainRows();if(!S.search){flash('No search yet. Press / to search this folder.');return}
   for(let n=1;n<=rows.length;n++){const k=(S.sel+dir*n+rows.length*2)%rows.length;if(matches(rows[k])){S.sel=k;S.selKey=rowKey(rows[k]);return}}
-  flash(`No match for "${S.search}" in this folder. :find ${S.search} searches every snapshot.`);}
+  flash(`No match for "${S.search}" in this folder. Press s to search every snapshot.`);}
 function parseDate(t){if(t==='today')return TODAY;if(t==='yesterday')return addDays(TODAY,-1);
   let m=t.match(/^(\d+)([dw])$/);if(m)return addDays(TODAY,-(+m[1])*(m[2]==='w'?7:1));
   m=t.match(/^(?:(\d{4})-)?(\d{1,2})-(\d{1,2})$/);if(m)return new Date(+(m[1]||2026),+m[2]-1,+m[3]);
@@ -499,6 +567,7 @@ function runCmd(t){t=t.trim();if(!t)return;const tl=t.toLowerCase();
   if(/^q(uit)?!?$/.test(tl))return flash('In the real tool this quits restoric.');
   if(tl==='help'||tl==='h'){S.help=true;return}
   if(tl==='deleted'){S.ghosts=!S.ghosts;return flash(S.ghosts?'Showing deleted items.':'Hiding deleted items.')}
+  if(tl==='undo')return flash('Put back the version that was on disk before the last overwrite. (mockup)','add');
   if(/^f(ind)?\s+/.test(tl))return openFind(t.replace(/^\S+\s+/,''));
   if(tl==='latest'||tl==='last'||tl==='now')return jumpTo(LAST,'Latest snapshot.');
   if(tl==='oldest'||tl==='first')return jumpTo(0,'Oldest snapshot.');
@@ -506,30 +575,35 @@ function runCmd(t){t=t.trim();if(!t)return;const tl=t.toLowerCase();
   if(d){const end=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59);let idx=-1;for(let i=0;i<N;i++)if(snaps[i].t<=end)idx=i;
     if(idx<0)return flash(`No snapshots that early. The oldest is from ${fmt(snaps[0].t)}.`,'del');
     return jumpTo(idx,`Jumped to ${fmt(snaps[idx].t)}, the last snapshot on or before ${fmtD(d)}.`);}
-  flash(`Unknown command ":${t}". Try :sep 1, :yesterday, :3d, :find NAME, :deleted`,'del');}
+  flash(`Unknown command ":${t}". Try :sep 1, :yesterday, :3d, :find NAME, :undo`,'del');}
 
-const PREFIX={main:['g','z'],hist:['g'],diff:['g',']','['],find:['g']};
-const REP=new Set(['j','k','ArrowDown','ArrowUp','H','L','ArrowLeft','ArrowRight','[',']','{','}','n','N',']c','[c','C-d','C-u']);
+const PREFIX={main:['g','z','c'],hist:['g'],diff:['g',']','['],find:['g']};
+const REP=new Set(['j','k','ArrowDown','ArrowUp','H','L','ArrowLeft','ArrowRight','[',']','{','}','n','N',']c','[c','C-d','C-u','J','K']);
 function keySeq(s){s.split(' ').forEach(k=>key(k))}
 function key(k){
   if(S.help){S.help=false;render();return}
   if(S.input){inputKey(k);render();return}
   if(S.msg)S.msg=null;
+  if(S.confirm){if(k==='y'||k==='Enter'){const y=S.confirm.yes;S.confirm=null;y()}else if(k==='n'||k==='Escape'||k==='q')S.confirm=null;render();return}
   if(S.dlg){dlgKey(k);render();return}
   if(S.pend){k=S.pend+k;S.pend=null}
   else if(/^[1-9]$/.test(k)||(k==='0'&&S.count)){S.count+=k;render();return}
   else if((PREFIX[S.view]||[]).includes(k)){S.pend=k;render();return}
   const n=Math.min(99,parseInt(S.count||'1',10));S.count='';
   if(k===':'){S.input={kind:':',text:''};render();return}
-  if(k==='?'){S.help=true;render();return}
+  if(k==='s'){S.input={kind:':',text:'find '};render();return}
+  if(k==='?'||k==='~'){S.help=true;render();return}
+  if(k==='Tab'&&S.view!=='diff'&&S.view!=='find'){S.pmode=S.pmode==='content'?'diff':'content';render();return}
+  if((k==='J'||k==='K')&&(S.view==='main'||S.view==='hist')){S.pscroll=Math.max(0,(S.pscroll||0)+(k==='J'?3:-3)*n);render();return}
   const times=REP.has(k)?n:1;
   for(let t=0;t<times;t++){({main:stepMain,hist:stepHist,diff:stepDiff,find:stepFind})[S.view](k);if(S.msg)break}
   render();}
 function inputKey(k){const I=S.input;
-  const cancel=()=>{if(I.kind==='/'){S.search=I.prev;S.sel=I.origin;S.selKey=null}S.input=null};
+  const cancel=()=>{if(I.kind==='/'){S.search=I.prev;S.sel=I.origin;S.selKey=null}if(I.kind==='f')S.filter=I.prev;S.input=null};
   if(k==='Escape')return cancel();
-  if(k==='Enter'){S.input=null;if(I.kind===':')runCmd(I.text);else if(I.text&&!mainRows().rows.some(matches))flash(`No match for "${I.text}" in this folder. :find ${I.text} searches every snapshot.`);return}
+  if(k==='Enter'){S.input=null;if(I.kind===':')runCmd(I.text);else if(I.kind==='/'&&I.text&&!mainRows().rows.some(matches))flash(`No match for "${I.text}" in this folder. Press s to search every snapshot.`);return}
   if(k==='Backspace'){if(!I.text)return cancel();I.text=I.text.slice(0,-1)}else if(k.length===1)I.text+=k;else return;
+  if(I.kind==='f'){S.filter=I.text;S.selKey=null;S.sel=S.dir?1:0;return}
   if(I.kind==='/'){S.search=I.text;const {rows}=mainRows();if(!I.text){S.sel=I.origin;return}
     for(let n=0;n<rows.length;n++){const j=(I.origin+n)%rows.length;if(matches(rows[j])){S.sel=j;S.selKey=rowKey(rows[j]);break}}}}
 function dlgKey(k){const d=S.dlg;
@@ -538,7 +612,7 @@ function dlgKey(k){const d=S.dlg;
   else if(k==='Enter'){if(d.sel===0&&d.onDisk&&!d.confirm)d.confirm=true;else doRestore()}
   else if(k==='Escape'||k==='q')S.dlg=null;}
 function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
-  const mv=n=>{S.sel=Math.max(0,Math.min(rows.length-1,S.sel+n));S.selKey=rows[S.sel]?rowKey(rows[S.sel]):null};
+  const mv=n=>{S.sel=clamp(S.sel+n,0,rows.length-1);S.selKey=rows[S.sel]?rowKey(rows[S.sel]):null};
   switch(k){
     case 'H':case 'ArrowLeft':{const p=cp.filter(x=>x<S.snap);if(p.length)S.snap=p[p.length-1];else flash('This is the oldest version of this folder.');break}
     case 'L':case 'ArrowRight':{const n=cp.find(x=>x>S.snap);if(n!==undefined)S.snap=n;else if(S.snap<LAST)S.snap=LAST;else flash(nonzero(liveC[S.dir])?'Newest snapshot. Newer changes exist only on disk.':'Newest snapshot. Nothing changed on disk since.');break}
@@ -549,19 +623,22 @@ function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
       if(j>=0)S.snap=j;else flash(`No ${k==='{'?'older':'newer'} change to ${tr.name}.`);break}
     case 'Home':S.snap=cp[0];break;case 'End':S.snap=cp[cp.length-1];break;
     case 'j':case 'ArrowDown':mv(1);break;case 'k':case 'ArrowUp':mv(-1);break;
-    case 'C-d':case 'PageDown':mv(11);break;case 'C-u':case 'PageUp':mv(-11);break;
-    case 'gg':mv(-1e6);break;case 'G':mv(1e6);break;
-    case 'l':case 'Enter':openRow(rows[S.sel]);break;
+    case 'C-d':case 'PageDown':mv(13);break;case 'C-u':case 'PageUp':mv(-13);break;
+    case 'gg':mv(-1e6);break;case 'G':mv(1e6);break;case 'gh':goDir('');break;
+    case 'l':case 'Enter':case 'i':openRow(rows[S.sel]);break;
     case 'h':case '-':case 'Backspace':goUp();break;
-    case 'v':{const r=rows[S.sel];if(r&&r.kind==='file')openHist(r.f,r.del||r.ghost?r.last:S.snap);else openRow(r);break}
+    case ' ':{const r=rows[S.sel];if(r&&r.kind!=='up'){const mk=markKey(r);S.marks.has(mk)?S.marks.delete(mk):S.marks.add(mk)}mv(1);break}
+    case 'v':if(S.visual==null)S.visual=S.sel;else{const lo=Math.min(S.visual,S.sel),hi=Math.max(S.visual,S.sel);rows.slice(lo,hi+1).forEach(r=>{if(r.kind!=='up')S.marks.add(markKey(r))});S.visual=null}break;
     case 'd':{const r=rows[S.sel];if(r&&r.kind==='file'){const at=r.del||r.ghost?r.last:S.snap;openDiff(r.f,fileRuns(r.f).findIndex(x=>at>=x.from&&at<=x.to),'current','main')}else flash('Select a file to diff.');break}
     case 'r':openRestore();break;
-    case 'y':yank();break;
+    case 'y':yank();break;case 'p':paste(false);break;case 'P':paste(true);break;
+    case 'cc':copy('c');break;case 'cd':copy('d');break;case 'cf':copy('f');break;
     case 'zh':case '.':S.ghosts=!S.ghosts;break;
     case 'zi':zoom(1);break;case 'zo':zoom(-1);break;
     case '/':S.input={kind:'/',text:'',origin:S.sel,prev:S.search};break;
+    case 'f':S.input={kind:'f',text:S.filter,prev:S.filter};break;
     case 'n':searchStep(1);break;case 'N':searchStep(-1);break;
-    case 'Escape':S.search='';break;
+    case 'Escape':if(S.visual!=null)S.visual=null;else if(S.marks.size)S.marks.clear();else{S.search='';S.filter=''}break;
     case 'q':flash('q quits restoric in the real tool. This is the top level.');break;}}
 function stepHist(k){const runs=fileRuns(S.hist.f),H=S.hist;
   switch(k){case 'j':case 'ArrowDown':case 'H':case 'ArrowLeft':case '{':if(H.sel<runs.length-1)H.sel++;else flash('This is the oldest version.');break;
@@ -574,7 +651,7 @@ function stepHist(k){const runs=fileRuns(S.hist.f),H=S.hist;
     case 'Escape':case 'q':case 'h':case 'Backspace':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;}}
 function stepDiff(k){const D=S.diff,runs=fileRuns(D.f),{lines}=diffLines();const hdrs=lines.map((o,i)=>o.hdr?i:-1).filter(i=>i>=0);
   switch(k){case 'j':case 'ArrowDown':D.scroll++;break;case 'k':case 'ArrowUp':D.scroll=Math.max(0,D.scroll-1);break;
-    case 'C-d':case 'PageDown':case ' ':D.scroll+=14;break;case 'C-u':case 'PageUp':D.scroll=Math.max(0,D.scroll-14);break;
+    case 'C-d':case 'PageDown':case ' ':D.scroll+=15;break;case 'C-u':case 'PageUp':D.scroll=Math.max(0,D.scroll-15);break;
     case 'gg':D.scroll=0;break;case 'G':D.scroll=1e6;break;
     case ']c':case 'n':{const h=hdrs.find(i=>i>D.scroll);if(h!==undefined)D.scroll=h;else flash('No more changes below.');break}
     case '[c':case 'N':{const h=hdrs.filter(i=>i<D.scroll);if(h.length)D.scroll=h[h.length-1];else flash('No more changes above.');break}
@@ -596,24 +673,26 @@ function renderCmds(){const L=[];
       isDir?`restic restore ${id}:${t.abs} --target ${t.abs}.${st}`:`restic dump ${id} ${t.abs} > ${t.abs}.${st}`,
       `restic restore ${id} --include ${t.abs} --target ~/Restored/${st}`,
       isDir?`restic dump --archive tar ${id} ${t.abs} > ${t.name}-${st}.tar`:`restic dump ${id} ${t.abs} | $PAGER`][d.sel];
-    L.push([cmd,'The command for the selected restore option.']);
-    if(d.sel===0&&d.onDisk)L.push(['','Overwriting asks for confirmation. The tool could first copy the current file aside so this can be undone.']);}
-  else if(S.view==='main'){const i=S.snap,id=snaps[i].id,depth=S.dir?S.dir.split('/').length+4:4;
+    L.push([cmd,'The command for the selected restore option.']);}
+  else if(S.confirm||(S.yanked&&S.view==='main')){const Y=S.yanked;if(Y){const t=Y.items[0],id=snaps[t.snap].id;
+    L.push([`restic dump ${id} ${t.abs} > ${t.abs}.${stamp(snaps[t.snap].t)}   # p`,'p restores each yanked item next to the original (or to its original place if it is missing on disk).']);
+    L.push([`mv ${t.abs} ~/.local/share/restoric/undo/<time>/ && restic restore ${id} --include ${t.abs} --target /   # P`,'P keeps the current file for :undo, then overwrites.'])}}
+  if(!S.dlg&&S.view==='main'){const i=S.snap,id=snaps[i].id,depth=S.dir?S.dir.split('/').length+4:4;
     L.push([`restic snapshots --json --host bege-laptop --path ${ROOT}`,`Run once at startup, then cached. ${N} snapshots.`]);
-    L.push([`restic cat snapshot ${id}\nrestic cat blob <tree-id>   # ${depth}× down to ${absDir(S.dir)}`,`Read the folder's subtree id from each snapshot: ${treeId(S.dir,i)} here${i?`, ${treeId(S.dir,i-1)} in the previous snapshot`:''}. If the id matches the previous snapshot, nothing under the folder changed and the timeline skips it. ${cps[S.dir].length} of ${N} snapshots differ. Trees never change, so they can be cached on disk for good.`]);
-    L.push([`restic ls --json ${id} ${absDir(S.dir)}`,'Folder listing for the right-hand pane. The second timeline row reuses the same cached trees: the selected entry\'s node is compared across snapshots.']);}
-  else if(S.view==='hist'){const f=S.hist.f;
-    L.push([`# for each snapshot: node "${f.name}" in tree of ${absDir(f.dir)}`,`Reuses the trees cached for the folder view. Snapshots are grouped by the file's content blob list, giving ${fileRuns(f).filter(r=>r.s>=0).length} distinct versions with no file reads.`]);
-    L.push([`restic dump <id> ${ROOT}/${f.path} | wc -c`,'Only needed for the "compared to disk" column. It can load lazily or only for the selected row.']);}
-  else if(S.view==='find'){L.push([`restic find --json --path ${ROOT} '*${S.find.q}*'`,'Searches every snapshot. ⏎ jumps to the last snapshot that still lists the match, which answers "where did this file go?"']);}
-  else{const D=S.diff,runs=fileRuns(D.f),r0=runs[D.run],abs=ROOT+'/'+D.f.path;
+    L.push([`restic cat snapshot ${id}\nrestic cat blob <tree-id>   # ${depth}× down to ${absDir(S.dir)}`,`Read the folder's subtree id from each snapshot: ${treeId(S.dir,i)} here${i?`, ${treeId(S.dir,i-1)} in the previous snapshot`:''}. Same id means nothing below changed, so the timeline skips it. ${cps[S.dir].length} of ${N} snapshots differ.`]);
+    L.push([`restic ls --json ${id} ${absDir(S.dir)}`,'Listing for the middle column. The second timeline row reuses the cached trees.']);
+    const {rows}=mainRows(),r=rows[S.sel];if(r&&r.kind==='file')L.push([`restic dump ${id} ${ROOT}/${r.f.path} | head -c 64k`,'Preview. Loaded in the background and cached by content id, so moving the cursor stays instant.']);}
+  else if(!S.dlg&&S.view==='hist'){const f=S.hist.f;
+    L.push([`# for each snapshot: node "${f.name}" in tree of ${absDir(f.dir)}`,`Reuses the cached trees. Snapshots are grouped by the file's content blob list: ${fileRuns(f).filter(r=>r.s>=0).length} distinct versions with no file reads.`]);}
+  else if(!S.dlg&&S.view==='find'){L.push([`restic find --json --path ${ROOT} '*${S.find.q}*'`,'Searches every snapshot. ⏎ jumps to the last snapshot that still lists the match.']);}
+  else if(!S.dlg&&S.view==='diff'){const D=S.diff,runs=fileRuns(D.f),r0=runs[D.run],abs=ROOT+'/'+D.f.path;
     if(D.mode==='current')L.push([`restic dump ${snaps[r0.from].id} ${abs} | diff -u - ${abs}`,'Diff of the selected version against the file on disk.']);
     else{const o=runs[D.run+1];L.push([`diff -u <(restic dump ${o?snaps[o.from].id:'…'} ${abs}) <(restic dump ${snaps[r0.from].id} ${abs})`,'Diff against the previous distinct version.'])}}
   cmds.innerHTML=L.map(([c,n])=>`<li>${c?`<code>${esc(c)}</code>`:''}<small>${esc(n)}</small></li>`).join('');}
 
 // ---------- wiring ----------
 const term=document.getElementById('term'),cmds=document.getElementById('cmds'),fs=document.getElementById('focusState');
-const NAMED=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Escape','Backspace','Home','End','PageUp','PageDown'];
+const NAMED=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Escape','Backspace','Home','End','PageUp','PageDown','Tab'];
 term.addEventListener('click',e=>{const el=e.target.closest('[data-a]');term.focus({preventScroll:true});if(!el)return;const fn=ACT[+el.dataset.a];if(fn){fn();render()}});
 term.addEventListener('keydown',e=>{let k=e.key;if(e.metaKey||e.altKey)return;
   if(e.ctrlKey){if(!S.input&&(k==='d'||k==='u')){e.preventDefault();key('C-'+k)}return}
@@ -621,7 +700,7 @@ term.addEventListener('keydown',e=>{let k=e.key;if(e.metaKey||e.altKey)return;
   if(k.length!==1&&!NAMED.includes(k))return;e.preventDefault();key(k);});
 term.addEventListener('focus',()=>{fs.innerHTML='<b>Keyboard active.</b> Press ? for help.'});
 term.addEventListener('blur',()=>{fs.textContent='Click the terminal to use the keyboard.'});
-document.querySelectorAll('.keys button').forEach(b=>b.addEventListener('click',()=>{keySeq(b.dataset.k);term.focus({preventScroll:true})}));
+document.querySelectorAll('.keys button').forEach(b=>b.addEventListener('click',()=>{b.dataset.k===' '?key(' '):keySeq(b.dataset.k);term.focus({preventScroll:true})}));
 const wb={100:document.getElementById('w100'),80:document.getElementById('w80')};
 Object.entries(wb).forEach(([w,b])=>b.addEventListener('click',()=>{COLS=+w;Object.entries(wb).forEach(([x,y])=>y.setAttribute('aria-pressed',String(x===w)));render();term.focus({preventScroll:true})}));
 render();

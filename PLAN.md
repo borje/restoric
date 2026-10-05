@@ -1,6 +1,6 @@
 # restoric: plan
 
-restoric is a terminal UI for browsing and restoring files from a [restic](https://restic.net) repository, in the spirit of macOS Time Machine. It's written in Rust on top of [rustic_core](https://crates.io/crates/rustic_core).
+restoric is a terminal UI for browsing and restoring files from a [restic](https://restic.net) repository, in the spirit of macOS Time Machine, with a look borrowed from the [yazi](https://github.com/sxyazi/yazi) file manager. It's written in Rust on top of [rustic_core](https://crates.io/crates/rustic_core).
 
 The one feature no existing tool has:
 
@@ -33,8 +33,9 @@ This document holds everything decided so far: the research, the UX (with screen
 3. **Never destroy anything by default.** Restore puts the file next to the original unless you choose to overwrite, and overwriting asks for confirmation and can be undone.
 4. **The UI never waits on the network.** All repo access runs in the background, and the screen draws from caches.
 5. **Works with your existing restic setup.** It uses `RESTIC_REPOSITORY`, `RESTIC_PASSWORD_COMMAND` and so on, with no new config needed.
-6. **Vim first, arrows always.** Every action has a vim key and a plain key. The bottom row always shows the keys you can use.
+6. **Vim and yazi keys, arrows always.** Every action has a vim key and a plain key, and keys mean the same as in yazi where they can. Prefix keys pop up what can follow, and `?` lists everything.
 7. **No FUSE, no mount.** It reads the repository directly through rustic_core.
+8. **Looks at home next to yazi.** Three columns with a preview, a status bar with a mode badge, few lines, rounded popups, Nerd Font icons.
 
 ---
 
@@ -80,7 +81,9 @@ Folder counts need a tree diff. Only walk subtrees whose fingerprints differ.
 
 ## 3. UX specification
 
-Captures are 100×34 unless noted. The selected row is highlighted in the real UI; in these captures it's marked with `◂` at the end of the row. The sample data is invented.
+The look follows **[yazi](https://github.com/sxyazi/yazi)**: three columns, a preview on the right, a status bar with a mode badge, which-key popups for prefix keys, rounded popups, few lines, and Nerd Font icons. yazi is built on ratatui too. The **timeline** is restoric's own and stays at the top.
+
+Captures are 100×34 unless noted. The selected row is highlighted in the real UI; in these captures it's marked with `◂` at the end of the row (a row can carry several highlights, one per column). The sample data is invented. Icons are stand-ins (`▸ ◇ ¶ $ ≡ ○`) for Nerd Font glyphs.
 
 ### 3.1 Folder view (main screen)
 Starting `restoric` with no arguments opens the **current folder**, at the newest snapshot that changed it (the mockup starts mid-history to show more). This is the Time Machine move of "enter from this Finder window".
@@ -88,204 +91,369 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 <sub>`docs/screens/01-folder-view.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                            ◀ version 12 of 16 ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···· ·  •  ·· • · · · ··  · ··  · • · ·  · · · ··  •· • ·  · · ·  · · ·  ·   · ·  ┊ •
-                                                             ▲                             − 1× +
-  Sep 06 18:03   snapshot 9c3a7b4f   src/  +1 ~3 −1                              ● src/  • main.go
-─ Versions ───────────────────────┬ src/ @ Sep 06 18:03 ────────────────────────────────────────────
-  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
-    ┄ 2 unchanged ┄               │ ..
-   Sep 27 08:52  ~1               │ api/                                –  Sep 06 17:37    ~1
-    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
-   Sep 20 20:35  ~1               │ config.go                       737 B  Sep 06 17:04    ~
-    ┄ 2 unchanged ┄               │ legacy.go                       673 B  (deleted)       −
-   Sep 13 20:51  ~2               │ main.go                          1.3K  Sep 06 16:34    ~          ◂
-    ┄ 1 unchanged ┄               │ server.go                       845 B  Sep 06 15:17    +
-   Sep 09 19:23  ~1               │ util.go                         823 B  Jul 14 06:49
-    ┄ 1 unchanged ┄               │
- ▶ Sep 06 18:03  +1 ~3 −1         │                                                                   ◂
-    ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
-   Aug 22 11:59  ~2               │
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff
-```
+ restoric  ~/dev/project/src                                                   ◀ version 12 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                    ▲                                      − 1× +
 
-Layout, row by row:
+ now  ~1 unsaved      │   ..                              │ main.go · v5/6 · 1.3K        ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ changed here · + new line · − removed
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B  ~     │  27    var req CreateOrderRequest
+ Sep 20 20:35 ~1      │ ◇ legacy.go          673 B  −     │  28    id := chi.URLParam(r, "id")
+   ┄ 2 unchanged ┄    │ ◇ main.go             1.3K  ~     │  29    user, err := store.GetUser(ctx, …  ◂
+ Sep 13 20:51 ~2      │ ◇ server.go          845 B  +     │  30    cfg.Port = envInt("PORT", 8080)
+   ┄ 1 unchanged ┄    │ ◇ util.go            823 B        │  31  }
+ Sep 09 19:23 ~1      │                                   │  32
+   ┄ 1 unchanged ┄    │                                   │  33  func handleOrder(ctx context.Conte…
+▶Sep 06 18:03 +1~3−1  │                                   │  34    var req CreateOrderRequest         ◂
+   ┄ 2 unchanged ┄    │                                   │  35    return nil
+ Sep 02 20:16 ~1      │                                   │  36+   user, err := store.GetUser(ctx, …
+   ┄ 5 unchanged ┄    │                                   │  37    metrics.Requests.WithLabelValues…
+ Aug 22 11:59 ~2      │                                   │  38    cfg.Port = envInt("PORT", 8080)
+   ┄ 1 unchanged ┄    │                                   │  39  }
+ Aug 17 16:04 +1~1    │                                   │  40
+   ┄ 3 unchanged ┄    │                                   │  41  func handleUser(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  42    if err := validate(req); err != …
+   ┄ 1 unchanged ┄    │                                   │  43    ctx, cancel := context.WithTimeo…
+ Aug 07 08:15 +1      │                                   │  44    w.Header().Set("Content-Type", "…
+   ┄ 1 unchanged ┄    │                                   │  45    log.Printf("starting %s", name)
+ Aug 03 16:19 +1~1    │                                   │  46+   if len(args) == 0 { return errNo…
+   ┄ 2 unchanged ┄    │                                   │  47    defer cancel()
+ Jul 28 15:59 ~1      │                                   │  48+   for i := 0; i < retries; i++ { t…
+ Jul 26 11:57 ~1      │                                   │  49  }
+ Jul 24 12:16 ~1      │                                   │  50
+ NOR  Sep 06 18:03  9c3a7b4f  src/ +1 ~3 −1  2 in column · zi             Sep 06 16:34  5/7  ? help
+```
 
 | Rows | Content |
 |---|---|
-| 0 | Title bar: name, repo, host, snapshot count, cache status (`cache warm` / `indexing 120/430`) |
-| 1 | Breadcrumb (each part clickable) · `◀ version 12 of 16 ▶`, or `between versions (16 total)` when viewing an unchanged snapshot |
-| 3 | Timeline labels: months, or dates and day numbers when zoomed, plus `now` |
-| 4 | **Row 1, `●`: changes in the current folder.** `·` = snapshot without changes. Highlighted cell = the snapshot being viewed. |
-| 5 | **Row 2, `•`: changes in the selected entry.** `·` = exists but unchanged, blank = didn't exist. |
-| 6 | `▲` under the viewed snapshot · zoom control `− 1× +` |
-| 7 | Info: date, snapshot id, folder counts (or "no changes in src/ since …"), "N snapshots in this column", legend `● src/  • main.go` |
-| 8 | Pane headers |
-| 9–31 | Left: **Versions pane** (34 columns). Right: **listing**. |
-| 33 | Key hints, messages, or the `:`/`/` input line. Pending count or prefix at the far right. |
+| 0 | Header: `restoric`, clickable breadcrumb, and `◀ version 12 of 16 ▶` on the right (`between versions` when viewing an unchanged snapshot) |
+| 1 | Timeline labels: months, or dates and day numbers when zoomed, plus `now` |
+| 2 | **Row 1, `●`: changes in the current folder.** `·` = snapshot without changes. Highlighted cell = the snapshot being viewed. **Label at the right edge** (`src/`). |
+| 3 | **Row 2, `•`: changes in the selected entry.** `·` = exists but unchanged, blank = didn't exist. Label at the right edge (`main.go`). |
+| 4 | `▲` under the viewed snapshot · zoom control `− 1× +` |
+| 5 | Blank |
+| 6–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (35) · **preview** (the rest) |
+| 33 | **Status bar** (or the `:` / `/` / `f` input line) |
 
-**Versions pane:** the top row is `now`, showing what changed on disk since the last backup ("~1 not backed up", in purple). After that come the change points, newest first, each with its counts. Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot.
+**Versions column:** the top row is `now`, showing what changed on disk since the last backup ("~1 unsaved", in purple). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
 
-**Listing columns:** NAME (folders end in `/`, deleted names are crossed out), SIZE, MODIFIED (the file's modification time inside that snapshot), Δ. A deleted entry shows `(deleted)`. Items deleted earlier (shown with `zh`) are in italics with `gone Sep 06`.
+**Listing:** mark bar (`┃` for selected items), icon, name (folders end in `/`, a deleted name is crossed out), size, Δ (`+` added, `~` changed, `−` deleted in this snapshot, compact counts for folders, `gone` for items deleted earlier). No column headers. With items deleted earlier hidden, the bottom says `1 deleted · . to show`.
 
-**"now" column:** after `┊`, a dot in purple means there are changes on disk that haven't been backed up.
+**Preview** of the selected entry *as it was in this snapshot*:
+- **File:** a heading (`main.go · v5/6 · 1.3K`) and a second line saying whether it changed here ("changed here · + new line · − removed", "new in this snapshot", or "unchanged since Sep 09 19:23"). Below that, the content with line numbers. The margin marks `+` for lines that are new in this version and `−` where lines were removed, compared with the previous version. It scrolls to the first change automatically.
+- `⇥` (Tab) switches between **content** and **vs disk** (an inline diff against the file on disk). `J`/`K` scroll. The mode shows at the top right and is clickable.
+- **Folder:** its contents in that snapshot, with icons and change markers.
+- **Deleted item:** the last version, headed "deleted · last version Aug 22, gone Sep 06".
+- `..`: the parent folder's path.
 
-> **Proposed (from review):** the legend on row 7 was too subtle. Put short labels at the left edge of rows 4 and 5 instead, e.g. `src/` and `main.go`.
+**Status bar:** mode badge (`NOR`; `SEL` when items are selected; `VIS` in visual mode; `DIFF`, `FIND`, `RST` in those screens), then date · snapshot id · folder counts (or "unchanged since Sep 02"), then extra notes ("2 in column · zi", `filter "go"`, "2 yanked"). On the right: the selected file's modification time, position (`5/7`), any pending count or prefix key, and `? help`.
+
+**Messages** appear as a small rounded popup at the top right of the panes, like yazi's notifications, and disappear at the next key press.
 
 ### 3.2 The second timeline row
-After `}`, the view jumps to the next change of `main.go`:
+After `}`, the view jumps to the next change of `main.go`. A file changing means its folder changed too, so row 2 only has dots where row 1 does.
 
 <sub>`docs/screens/02-file-track.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                            ◀ version 13 of 16 ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···· ·  •  ·· • · · · ··  · ··  · • · ·  · · · ··  •· • ·  · · ·  · · ·  ·   · ·  ┊ •
-                                                                ▲                          − 1× +
-  Sep 09 19:23   snapshot 62c0e9c7   src/  ~1                                    ● src/  • main.go
-─ Versions ───────────────────────┬ src/ @ Sep 09 19:23 ────────────────────────────────────────────
-  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
-    ┄ 2 unchanged ┄               │ ..
-   Sep 27 08:52  ~1               │ api/                                –  Sep 06 17:37
-    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
-   Sep 20 20:35  ~1               │ config.go                       737 B  Sep 06 17:04
-    ┄ 2 unchanged ┄               │ main.go                          1.3K  Sep 09 18:25    ~          ◂
-   Sep 13 20:51  ~2               │ server.go                       845 B  Sep 06 15:17
-    ┄ 1 unchanged ┄               │ util.go                         823 B  Jul 14 06:49
- ▶ Sep 09 19:23  ~1               │                                                                   ◂
-    ┄ 1 unchanged ┄               │
-   Sep 06 18:03  +1 ~3 −1         │
-    ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
-   Aug 22 11:59  ~2               │
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │ 1 deleted earlier · zh to show
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │  26    return json.NewEncoder(w).Encode…
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │  27    var req CreateOrderRequest         ◂
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │  28    id := chi.URLParam(r, "id")
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │  29    user, err := store.GetUser(ctx, …
+   ┄ 1 unchanged ┄    │                                   │  30    cfg.Port = envInt("PORT", 8080)
+▶Sep 09 19:23 ~1      │                                   │  31  }                                    ◂
+   ┄ 1 unchanged ┄    │                                   │  32
+ Sep 06 18:03 +1~3−1  │                                   │  33  func handleOrder(ctx context.Conte…
+   ┄ 2 unchanged ┄    │                                   │  34    var req CreateOrderRequest
+ Sep 02 20:16 ~1      │                                   │  35    return nil
+   ┄ 5 unchanged ┄    │                                   │  36−   metrics.Requests.WithLabelValues…
+ Aug 22 11:59 ~2      │                                   │  37    cfg.Port = envInt("PORT", 8080)
+   ┄ 1 unchanged ┄    │                                   │  38  }
+ Aug 17 16:04 +1~1    │                                   │  39
+   ┄ 3 unchanged ┄    │                                   │  40  func handleUser(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  41    if err := validate(req); err != …
+   ┄ 1 unchanged ┄    │                                   │  42    ctx, cancel := context.WithTimeo…
+ Aug 07 08:15 +1      │                                   │  43    w.Header().Set("Content-Type", "…
+   ┄ 1 unchanged ┄    │                                   │  44    log.Printf("starting %s", name)
+ Aug 03 16:19 +1~1    │                                   │  45    if len(args) == 0 { return errNo…
+   ┄ 2 unchanged ┄    │                                   │  46    defer cancel()
+ Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
+ Jul 26 11:57 ~1      │                                   │  48  }
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
 ```
 
-Row 2 can only have a dot where row 1 has one, because a file changing means its folder changed too.
+### 3.3 Preview: diff against disk
+`⇥` switches the preview to an inline diff against the file on disk:
 
-### 3.3 Zoom
-`zi` / `zo` (or click `−`/`+`) zoom between 1×, 2×, 4× and 8×. The view centres on the selected snapshot, and `‹` `›` show there's more history to either side. When zoomed in, day labels (Mondays) appear.
-
-<sub>`docs/screens/03-zoomed.txt`</sub>
+<sub>`docs/screens/03-preview-diff.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                            ◀ version 13 of 16 ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Aug 30                         7                              14                           now
-‹         ·    ●  ·   ·         ●  ·          ●      ·         ●        ·       ·         › ┊ ●
-‹         ·    ·  ·   ·         •  ·          •      ·         ·        ·       ·         › ┊ •
-                                              ▲                                            − 4× +
-  Sep 09 19:23   snapshot 62c0e9c7   src/  ~1                                    ● src/  • main.go
-─ Versions ───────────────────────┬ src/ @ Sep 09 19:23 ────────────────────────────────────────────
-  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
-    ┄ 2 unchanged ┄               │ ..
-   Sep 27 08:52  ~1               │ api/                                –  Sep 06 17:37
-    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
-   Sep 20 20:35  ~1               │ config.go                       737 B  Sep 06 17:04
-    ┄ 2 unchanged ┄               │ main.go                          1.3K  Sep 09 18:25    ~          ◂
-   Sep 13 20:51  ~2               │ server.go                       845 B  Sep 06 15:17
-    ┄ 1 unchanged ┄               │ util.go                         823 B  Jul 14 06:49
- ▶ Sep 09 19:23  ~1               │                                                                   ◂
-    ┄ 1 unchanged ┄               │
-   Sep 06 18:03  +1 ~3 −1         │
-    ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
-   Aug 22 11:59  ~2               │
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │ 1 deleted earlier · zh to show
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │ ┄ line 18
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │     if err := validate(req); err != nil…  ◂
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │     if err := validate(req); err != nil…
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │     if err := validate(req); err != nil…
+   ┄ 1 unchanged ┄    │                                   │ -   return nil
+▶Sep 09 19:23 ~1      │                                   │ +   signal.Notify(stop, os.Interrupt, s…  ◂
+   ┄ 1 unchanged ┄    │                                   │     return nil
+ Sep 06 18:03 +1~3−1  │                                   │   }
+   ┄ 2 unchanged ┄    │                                   │
+ Sep 02 20:16 ~1      │                                   │
+   ┄ 5 unchanged ┄    │                                   │
+ Aug 22 11:59 ~2      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 17 16:04 +1~1    │                                   │
+   ┄ 3 unchanged ┄    │                                   │
+ Aug 10 15:44 ~1      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 07 08:15 +1      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 03 16:19 +1~1    │                                   │
+   ┄ 2 unchanged ┄    │                                   │
+ Jul 28 15:59 ~1      │                                   │
+ Jul 26 11:57 ~1      │                                   │
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
 ```
 
-### 3.4 Command line
-`:` opens the command line. Hints show at the right.
+### 3.4 Which-key popups
+Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can follow. Entries are clickable. The pending key also shows in the status bar.
 
-<sub>`docs/screens/04-command-line.txt`</sub>
+<sub>`docs/screens/04-which-key.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                            ◀ version 10 of 16 ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···· ·  •  ·· • · · · ··  · ··  · • · ·  · · · ··  •· • ·  · · ·  · · ·  ·   · ·  ┊ •
-                                            ▲                                              − 1× +
-  Aug 22 11:59   snapshot 6b0f6953   src/  ~2                                    ● src/  • main.go
-─ Versions ───────────────────────┬ src/ @ Aug 22 11:59 ────────────────────────────────────────────
-    ┄ 2 unchanged ┄               │ NAME                             SIZE  MODIFIED        Δ
-   Sep 20 20:35  ~1               │ ..
-    ┄ 2 unchanged ┄               │ api/                                –  Aug 17 13:17
-   Sep 13 20:51  ~2               │ models/                             –  Aug 17 14:53
-    ┄ 1 unchanged ┄               │ config.go                       634 B  Aug 03 14:07
-   Sep 09 19:23  ~1               │ legacy.go                       673 B  Aug 22 09:20    ~
-    ┄ 1 unchanged ┄               │ main.go                          1.2K  Aug 22 10:42    ~          ◂
-   Sep 06 18:03  +1 ~3 −1         │ util.go                         823 B  Jul 14 06:49
-    ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
- ▶ Aug 22 11:59  ~2               │                                                                   ◂
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │
-    ┄ 2 unchanged ┄               │
-   Jul 28 15:59  ~1               │
-   Jul 26 11:57  ~1               │
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- :find legacy█                            2026-09-01 · sep 1 · yesterday · 3d · find NAME · deleted
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │  26    return json.NewEncoder(w).Encode…
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │  27    var req CreateOrderRequest         ◂
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │  28    id := chi.URLParam(r, "id")
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │  29    user, err := store.GetUser(ctx, …
+   ┄ 1 unchanged ┄    │                                   │  30    cfg.Port = envInt("PORT", 8080)
+▶Sep 09 19:23 ~1      │                                   │  31  }                                    ◂
+   ┄ 1 unchanged ┄    │                                   │  32
+ Sep 06 18:03 +1~3−1  │                                   │  33  func handleOrder(ctx context.Conte…
+   ┄ 2 unchanged ┄    │                                   │  34    var req CreateOrderRequest
+ Sep 02 20:16 ~1      │                                   │  35    return nil
+   ┄ 5 unchanged ┄    │                                   │  36−   metrics.Requests.WithLabelValues…
+ Aug 22 11:59 ~2      │                                   │  37    cfg.Port = envInt("PORT", 8080)
+   ┄ 1 unchanged ┄    │                                   │  38  }
+ Aug 17 16:04 +1~1    │                                   │  39
+   ┄ 3 unchanged ┄    │                                   │  40  func handleUser(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  41    if err := validate(req); err != …
+   ┄ 1 unchanged ┄    │                                   │  42    ctx, cancel := context.WithTimeo…
+ Aug 07 08:15 +1      │                                   │  43    w.Header().Set("Content-Type", "…
+   ┄ 1 unchanged ┄    │                                   │  44  ╭─ z ────────────────────────────╮
+ Aug 03 16:19 +1~1    │                                   │  45  │ zh   show / hide deleted       │…
+   ┄ 2 unchanged ┄    │                                   │  46  │ zi   zoom timeline in          │
+ Jul 28 15:59 ~1      │                                   │  47  │ zo   zoom timeline out         │…
+ Jul 26 11:57 ~1      │                                   │  48  ╰────────────────────────────────╯
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                  z  Sep 09 18:25  4/6  ? help
 ```
 
-### 3.5 Find in all snapshots
+### 3.5 Select, yank, paste
+Restoring works like yazi's copy and paste, out of the past.
+- `Space` toggles selection and moves down. `v` starts visual mode (a range); pressing `v` again keeps the range selected. `esc` leaves visual mode, then clears the selection.
+- `y` yanks the selection (or the item under the cursor) from **this snapshot**.
+- `p` restores the yanked items **next to the originals** (`name.2026-09-09_1923`), or to their original place if they're missing on disk.
+- `P` **overwrites** the files on disk, after a confirmation. The current files are moved to the undo folder first, so `:undo` can put them back.
+
+<sub>`docs/screens/05-selection.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ unchanged since Sep 06 18:03
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │┃◇ config.go          737 B        │   1  package main
+ Sep 20 20:35 ~1      │┃◇ main.go             1.3K  ~     │   2
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │   3  import (                             ◂
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │   4    "context"
+   ┄ 1 unchanged ┄    │                                   │   5    "fmt"
+▶Sep 09 19:23 ~1      │                                   │   6    "net/http"                         ◂
+   ┄ 1 unchanged ┄    │                                   │   7  )
+ Sep 06 18:03 +1~3−1  │                                   │   8
+   ┄ 2 unchanged ┄    │                                   │   9  func mustEnv(ctx context.Context) …
+ Sep 02 20:16 ~1      │                                   │  10    if len(args) == 0 { return errNo…
+   ┄ 5 unchanged ┄    │                                   │  11    id := chi.URLParam(r, "id")
+ Aug 22 11:59 ~2      │                                   │  12    log.Printf("starting %s", name)
+   ┄ 1 unchanged ┄    │                                   │  13  }
+ Aug 17 16:04 +1~1    │                                   │  14
+   ┄ 3 unchanged ┄    │                                   │  15  func readSecret(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  16    if len(args) == 0 { return errNo…
+   ┄ 1 unchanged ┄    │                                   │  17    if len(args) == 0 { return errNo…
+ Aug 07 08:15 +1      │                                   │  18    ctx, cancel := context.WithTimeo…
+   ┄ 1 unchanged ┄    │                                   │  19  }
+ Aug 03 16:19 +1~1    │                                   │  20
+   ┄ 2 unchanged ┄    │                                   │  21  func startServer(ctx context.Conte…
+ Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
+ Jul 26 11:57 ~1      │                                   │  23    defer cancel()
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+ SEL  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 06 15:17  5/6  ? help
+```
+
+<sub>`docs/screens/06-yank-toast.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▸ api/                   │ Yanked 2 items from Sep 09 19:23. p restores   │
+ Sep 27 08:52 ~1      │ ▸ models/                │ next to the original, P overwrites.            │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 ╰────────────────────────────────────────────────╯
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │   2
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │   3  import (                             ◂
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │   4    "context"
+   ┄ 1 unchanged ┄    │                                   │   5    "fmt"
+▶Sep 09 19:23 ~1      │                                   │   6    "net/http"                         ◂
+   ┄ 1 unchanged ┄    │                                   │   7  )
+ Sep 06 18:03 +1~3−1  │                                   │   8
+   ┄ 2 unchanged ┄    │                                   │   9  func mustEnv(ctx context.Context) …
+ Sep 02 20:16 ~1      │                                   │  10    if len(args) == 0 { return errNo…
+   ┄ 5 unchanged ┄    │                                   │  11    id := chi.URLParam(r, "id")
+ Aug 22 11:59 ~2      │                                   │  12    log.Printf("starting %s", name)
+   ┄ 1 unchanged ┄    │                                   │  13  }
+ Aug 17 16:04 +1~1    │                                   │  14
+   ┄ 3 unchanged ┄    │                                   │  15  func readSecret(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  16    if len(args) == 0 { return errNo…
+   ┄ 1 unchanged ┄    │                                   │  17    if len(args) == 0 { return errNo…
+ Aug 07 08:15 +1      │                                   │  18    ctx, cancel := context.WithTimeo…
+   ┄ 1 unchanged ┄    │                                   │  19  }
+ Aug 03 16:19 +1~1    │                                   │  20
+   ┄ 2 unchanged ┄    │                                   │  21  func startServer(ctx context.Conte…
+ Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
+ Jul 26 11:57 ~1      │                                   │  23    defer cancel()
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1  2 yanked                           Sep 06 15:17  5/6  ? help
+```
+
+<sub>`docs/screens/07-confirm-overwrite.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ unchanged since Sep 06 18:03
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │   1  package main
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │   2
+   ┄ 2 unchanged ┄    ╭─ Overwrite? ─────────────────────────────────────────╮
+ Sep 13 20:51 ~2      │                                                      │
+   ┄ 1 unchanged ┄    │  Replace 2 items on disk with the version from Sep   │
+▶Sep 09 19:23 ~1      │  09 19:23? The current version is kept for :undo.    │
+   ┄ 1 unchanged ┄    │                                                      │
+ Sep 06 18:03 +1~3−1  │  [y] Overwrite   [n] Cancel                          │
+   ┄ 2 unchanged ┄    ╰──────────────────────────────────────────────────────╯ctx context.Context) …
+ Sep 02 20:16 ~1      │                                   │  10    if len(args) == 0 { return errNo…
+   ┄ 5 unchanged ┄    │                                   │  11    id := chi.URLParam(r, "id")
+ Aug 22 11:59 ~2      │                                   │  12    log.Printf("starting %s", name)
+   ┄ 1 unchanged ┄    │                                   │  13  }
+ Aug 17 16:04 +1~1    │                                   │  14
+   ┄ 3 unchanged ┄    │                                   │  15  func readSecret(ctx context.Contex…
+ Aug 10 15:44 ~1      │                                   │  16    if len(args) == 0 { return errNo…
+   ┄ 1 unchanged ┄    │                                   │  17    if len(args) == 0 { return errNo…
+ Aug 07 08:15 +1      │                                   │  18    ctx, cancel := context.WithTimeo…
+   ┄ 1 unchanged ┄    │                                   │  19  }
+ Aug 03 16:19 +1~1    │                                   │  20
+   ┄ 2 unchanged ┄    │                                   │  21  func startServer(ctx context.Conte…
+ Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
+ Jul 26 11:57 ~1      │                                   │  23    defer cancel()
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1  2 yanked                           Sep 06 15:17  5/6  ? help
+```
+
+### 3.6 Command line and find
+`:` opens the command line, and `s` opens it with `find ` already typed. Hints show at the right.
+
+<sub>`docs/screens/08-command-line.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src                                                   ◀ version 11 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · ·  · · · ·· ··  ···  · ·· · · · ···  · · · · · · · · · ·  · ·  ┊ · util.go
+                                                ▲                                          − 1× +
+
+ now  ~1 unsaved      │   ..                              │ util.go · v1/1 · 823 B       ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ unchanged since Jul 14 09:00
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          634 B        │   1  package main
+ Sep 20 20:35 ~1      │ ◇ legacy.go          673 B        │   2
+   ┄ 2 unchanged ┄    │ ◇ main.go             1.2K        │   3  import (
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │   4    "context"                          ◂
+   ┄ 1 unchanged ┄    │                                   │   5    "fmt"
+ Sep 09 19:23 ~1      │                                   │   6    "net/http"
+   ┄ 1 unchanged ┄    │                                   │   7  )
+ Sep 06 18:03 +1~3−1  │                                   │   8
+   ┄ 2 unchanged ┄    │                                   │   9  func retry(ctx context.Context) er…
+▶Sep 02 20:16 ~1      │                                   │  10    b, err := os.ReadFile(path)        ◂
+   ┄ 5 unchanged ┄    │                                   │  11    for i := 0; i < retries; i++ { t…
+ Aug 22 11:59 ~2      │                                   │  12    cache.Set(key, value, 10*time.Mi…
+   ┄ 1 unchanged ┄    │                                   │  13    conn, err := sql.Open("postgres"…
+ Aug 17 16:04 +1~1    │                                   │  14  }
+   ┄ 3 unchanged ┄    │                                   │  15
+ Aug 10 15:44 ~1      │                                   │  16  func loadConfig(ctx context.Contex…
+   ┄ 1 unchanged ┄    │                                   │  17    if err := validate(req); err != …
+ Aug 07 08:15 +1      │                                   │  18    for i := 0; i < retries; i++ { t…
+   ┄ 1 unchanged ┄    │                                   │  19    srv := &http.Server{Addr: cfg.Ad…
+ Aug 03 16:19 +1~1    │                                   │  20    return nil
+   ┄ 2 unchanged ┄    │                                   │  21  }
+ Jul 28 15:59 ~1      │                                   │  22
+ Jul 26 11:57 ~1      │                                   │  23  func mustEnv(ctx context.Context) …
+ Jul 24 12:16 ~1      │                                   │  24    total := order.Subtotal() + orde…
+ :find legacy█                               sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo
+```
+
 `:find NAME` searches every snapshot by path. It answers "where did this file go?"
 
-<sub>`docs/screens/05-find.txt`</sub>
+<sub>`docs/screens/09-find.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- Find  "legacy"   1 match across all 43 snapshots
-────────────────────────────────────────────────────────────────────────────────────────────────────
+ restoric  Find  "legacy"                                                   1 match in 43 snapshots
+
   PATH                                                  FIRST SEEN    LAST SEEN     NOW
- ▶src/legacy.go                                         Jul 14 09:00  Sep 04 08:08  gone Sep 06       ◂
+▶ src/legacy.go                                         Jul 14 09:00  Sep 04 08:08  gone Sep 06       ◂
 
 
 
@@ -313,144 +481,186 @@ Row 2 can only have a dot where row 1 has one, because a file changing means its
 
 
 
-────────────────────────────────────────────────────────────────────────────────────────────────────
- j k move  ⏎ go to last snapshot that has it  q back
+
+
+ FIND  ⏎ jumps to the last snapshot that has it                                         1/1  ? help
 ```
 
 `⏎` jumps to the **last snapshot that still had it**, in its folder, with it selected:
 
-<sub>`docs/screens/06-find-jump.txt`</sub>
+<sub>`docs/screens/10-find-jump.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                 ◀ between versions (16 total) ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···· •  ·  ·· · · · · ··  · ··  · • · ·  · · · ··  •                              ┊ ·
+ restoric  ~/dev/project/src                                                   ◀ between versions ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· • ·  · · · ·· ··  ···  · •· · · · ···  •                         ┊ · legacy.go
+                                                 ▲                                         − 1× +
+
+ now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▸ api/                   │ Jumped to Sep 04 08:08, the last snapshot that │
+ Sep 27 08:52 ~1      │ ▸ models/                │ has legacy.go                                  │
+   ┄ 2 unchanged ┄    │ ◇ config.go          634 ╰────────────────────────────────────────────────╯
+ Sep 20 20:35 ~1      │ ◇ legacy.go          673 B        │   5    "fmt"                              ◂
+   ┄ 2 unchanged ┄    │ ◇ main.go             1.2K        │   6    "net/http"
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │   7  )
+   ┄ 1 unchanged ┄    │                                   │   8
+ Sep 09 19:23 ~1      │                                   │   9  func flushCache(ctx context.Contex…
+   ┄ 1 unchanged ┄    │                                   │  10    ctx, cancel := context.WithTimeo…
+ Sep 06 18:03 +1~3−1  │                                   │  11    user, err := store.GetUser(ctx, …
+▶  ┄ 2 unchanged ┄    │                                   │  12    for i := 0; i < retries; i++ { t…
+ Sep 02 20:16 ~1      │                                   │  13    user, err := store.GetUser(ctx, …
+   ┄ 5 unchanged ┄    │                                   │  14  }
+ Aug 22 11:59 ~2      │                                   │  15
+   ┄ 1 unchanged ┄    │                                   │  16  func authMiddleware(ctx context.Co…
+ Aug 17 16:04 +1~1    │                                   │  17    cache.Set(key, value, 10*time.Mi…
+   ┄ 3 unchanged ┄    │                                   │  18    for i := 0; i < retries; i++ { t…
+ Aug 10 15:44 ~1      │                                   │  19    b, err := os.ReadFile(path)
+   ┄ 1 unchanged ┄    │                                   │  20  }
+ Aug 07 08:15 +1      │                                   │  21
+   ┄ 1 unchanged ┄    │                                   │  22  func migrate(ctx context.Context) …
+ Aug 03 16:19 +1~1    │                                   │  23    ctx, cancel := context.WithTimeo…
+   ┄ 2 unchanged ┄    │                                   │  24    if err := validate(req); err != …
+ Jul 28 15:59 ~1      │                                   │  25+   signal.Notify(stop, os.Interrupt…
+ Jul 26 11:57 ~1      │                                   │  26  }
+ Jul 24 12:16 ~1      │                                   │  27
+ NOR  Sep 04 08:08  c005272e  unchanged since Sep 02  2 in column · zi    Aug 22 09:20  4/6  ? help
+```
+
+### 3.7 Deleted items
+`.` (or `zh`) shows items deleted earlier, marked `gone` in Δ and in italics. Row 2 shows the item's history: dots up to the deletion, then blank. The preview shows the last version. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
+
+<sub>`docs/screens/11-deleted-shown.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src                                                   ◀ version 14 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· • ·  · · · ·· ··  ···  · •· · · · ···  •                         ┊ · legacy.go
                                                           ▲                                − 1× +
-  Sep 04 08:08   snapshot c005272e   no changes in src/ since Sep 02 20:16   2 snapshots in this col
-─ Versions ───────────────────────┬ src/ @ Sep 04 08:08 ────────────────────────────────────────────
-  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
-    ┄ 2 unchanged ┄               │ ..
-   Sep 27 08:52  ~1               │ api/                                –  Sep 02 18:05
-    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
-   Sep 20 20:35  ~1               │ config.go                       634 B  Aug 03 14:07
-    ┄ 2 unchanged ┄               │ legacy.go                       673 B  Aug 22 09:20               ◂
-   Sep 13 20:51  ~2               │ main.go                          1.2K  Aug 22 10:42
-    ┄ 1 unchanged ┄               │ util.go                         823 B  Jul 14 06:49
-   Sep 09 19:23  ~1               │
-    ┄ 1 unchanged ┄               │
-   Sep 06 18:03  +1 ~3 −1         │
- ▶  ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
-   Aug 22 11:59  ~2               │
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- Jumped to Sep 04 08:08, the last snapshot that has legacy.go
+
+ now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ last version Aug 22, gone Sep 06
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          789 B  ~     │   4    "context"
+ Sep 20 20:35 ~1      │ ◇ legacy.go          673 B  gone  │   5    "fmt"                              ◂
+   ┄ 2 unchanged ┄    │ ◇ main.go             1.3K        │   6    "net/http"
+▶Sep 13 20:51 ~2      │ ◇ server.go          845 B        │   7  )                                    ◂
+   ┄ 1 unchanged ┄    │ ◇ util.go            823 B        │   8
+ Sep 09 19:23 ~1      │                                   │   9  func flushCache(ctx context.Contex…
+   ┄ 1 unchanged ┄    │                                   │  10    ctx, cancel := context.WithTimeo…
+ Sep 06 18:03 +1~3−1  │                                   │  11    user, err := store.GetUser(ctx, …
+   ┄ 2 unchanged ┄    │                                   │  12    for i := 0; i < retries; i++ { t…
+ Sep 02 20:16 ~1      │                                   │  13    user, err := store.GetUser(ctx, …
+   ┄ 5 unchanged ┄    │                                   │  14  }
+ Aug 22 11:59 ~2      │                                   │  15
+   ┄ 1 unchanged ┄    │                                   │  16  func authMiddleware(ctx context.Co…
+ Aug 17 16:04 +1~1    │                                   │  17    cache.Set(key, value, 10*time.Mi…
+   ┄ 3 unchanged ┄    │                                   │  18    for i := 0; i < retries; i++ { t…
+ Aug 10 15:44 ~1      │                                   │  19    b, err := os.ReadFile(path)
+   ┄ 1 unchanged ┄    │                                   │  20  }
+ Aug 07 08:15 +1      │                                   │  21
+   ┄ 1 unchanged ┄    │                                   │  22  func migrate(ctx context.Context) …
+ Aug 03 16:19 +1~1    │                                   │  23    ctx, cancel := context.WithTimeo…
+   ┄ 2 unchanged ┄    │                                   │  24    if err := validate(req); err != …
+ Jul 28 15:59 ~1      │                                   │  25+   signal.Notify(stop, os.Interrupt…
+ Jul 26 11:57 ~1      │                                   │  26  }
+ Jul 24 12:16 ~1      │                                   │  27
+ NOR  Sep 13 20:51  25e5c7c8  src/ ~2  2 yanked                                         4/7  ? help
 ```
 
-### 3.6 Deleted items
-`zh` (or `.`) shows items deleted earlier. Selecting one shows its history on row 2: dots up to the deletion, then blank. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
+### 3.8 Filter
+`f` filters the listing as you type (yazi's `f`). `⏎` keeps the filter, and the status bar shows it. `esc` clears it. Changing folder clears it too.
 
-<sub>`docs/screens/07-deleted-shown.txt`</sub>
+<sub>`docs/screens/12-filter.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                            ◀ version 14 of 16 ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···· •  ·  ·· · · · · ··  · ··  · • · ·  · · · ··  •                              ┊ ·
-                                                                     ▲                     − 1× +
-  Sep 13 20:51   snapshot 25e5c7c8   src/  ~2                                  ● src/  • legacy.go
-─ Versions ───────────────────────┬ src/ @ Sep 13 20:51 ────────────────────────────────────────────
-  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
-    ┄ 2 unchanged ┄               │ ..
-   Sep 27 08:52  ~1               │ api/                                –  Sep 13 20:33    ~1
-    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
-   Sep 20 20:35  ~1               │ config.go                       789 B  Sep 13 20:13    ~
-    ┄ 2 unchanged ┄               │ legacy.go                       673 B  gone Sep 06                ◂
- ▶ Sep 13 20:51  ~2               │ main.go                          1.3K  Sep 09 18:25               ◂
-    ┄ 1 unchanged ┄               │ server.go                       845 B  Sep 06 15:17
-   Sep 09 19:23  ~1               │ util.go                         823 B  Jul 14 06:49
-    ┄ 1 unchanged ┄               │
-   Sep 06 18:03  +1 ~3 −1         │
-    ┄ 2 unchanged ┄               │
-   Sep 02 20:16  ~1               │
-    ┄ 5 unchanged ┄               │
-   Aug 22 11:59  ~2               │
-    ┄ 1 unchanged ┄               │
-   Aug 17 16:04  +1 ~1            │
-    ┄ 3 unchanged ┄               │
-   Aug 10 15:44  ~1               │
-    ┄ 1 unchanged ┄               │
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │ showing deleted items · zh to hide
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff
+ restoric  ~/dev/project/src                                                   ◀ between versions ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+                    • · ·· ··  ···  · ·· · · · ···  • · · • · · · · · ·  · ·  ┊ · config.go
+                                                                           ▲               − 1× +
+
+ now  ~1 unsaved      │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
+▶  ┄ 2 unchanged ┄    │ ◇ config.go          789 B        │ unchanged since Sep 13 20:51              ◂
+ Sep 27 08:52 ~1      │ ◇ main.go             1.3K        │
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │   9  func retry(ctx context.Context) er…
+ Sep 20 20:35 ~1      │ ◇ util.go            823 B        │  10    total := order.Subtotal() + orde…
+   ┄ 2 unchanged ┄    │                                   │  11    ctx, cancel := context.WithTimeo…
+ Sep 13 20:51 ~2      │                                   │  12    log.Printf("starting %s", name)
+   ┄ 1 unchanged ┄    │                                   │  13    if len(args) == 0 { return errNo…
+ Sep 09 19:23 ~1      │                                   │  14  }
+   ┄ 1 unchanged ┄    │                                   │  15
+ Sep 06 18:03 +1~3−1  │                                   │  16  func migrate(ctx context.Context) …
+   ┄ 2 unchanged ┄    │                                   │  17    b, err := os.ReadFile(path)
+ Sep 02 20:16 ~1      │                                   │  18    id := chi.URLParam(r, "id")
+   ┄ 5 unchanged ┄    │                                   │  19+   signal.Notify(stop, os.Interrupt…
+ Aug 22 11:59 ~2      │                                   │  20    if err := validate(req); err != …
+   ┄ 1 unchanged ┄    │                                   │  21    var req CreateOrderRequest
+ Aug 17 16:04 +1~1    │                                   │  22  }
+   ┄ 3 unchanged ┄    │                                   │  23
+ Aug 10 15:44 ~1      │                                   │  24  func startServer(ctx context.Conte…
+   ┄ 1 unchanged ┄    │                                   │  25    var req CreateOrderRequest
+ Aug 07 08:15 +1      │                                   │  26    w.Header().Set("Content-Type", "…
+   ┄ 1 unchanged ┄    │                                   │  27    id := chi.URLParam(r, "id")
+ Aug 03 16:19 +1~1    │                                   │  28    slog.Info("request done", "statu…
+   ┄ 2 unchanged ┄    │                                   │  29    cache.Set(key, value, 10*time.Mi…
+ Jul 28 15:59 ~1      │                                   │  30    if len(args) == 0 { return errNo…
+ Jul 26 11:57 ~1      │                                   │  31  }
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  32
+ filter: go█                                                    type to filter · ⏎ keep · esc clear
 ```
 
-### 3.7 Versions of a file (`v`)
-One row per **distinct version**, newest first. Deleted periods appear as their own rows. The `on disk` row is always first. "COMPARED TO DISK" shows lines added and removed, or `identical`.
+### 3.9 Versions of a file (`⏎`, `l` or `i` on a file)
+One row per **distinct version**, newest first, with deleted periods as their own rows. The `on disk` row is always first. "VS DISK" shows lines added and removed, or `identical`. The preview on the right shows the selected version, with its changes marked.
 
-<sub>`docs/screens/08-versions.txt`</sub>
+<sub>`docs/screens/13-versions.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop               6 versions in 43 snapshots
- Versions  ~/dev/project/src/main.go
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ···· ·  ●  ·· ● · · · ··  · ··  · ● · ·  · · · ··  ●· ● ·  · · ·  · · ·  ·   · ·  ┊ ●
-                                                                ▲                          − 1× +
-  Sep 09 19:23 → Oct 02 12:21   in 11 snapshots  62c0e9c7 … b41050ad
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  VERSION               SIZE   MODIFIED        SNAPSHOTS      COMPARED TO DISK
-  on disk               1.3K   Oct 05 09:58
- ▶Sep 09 19:23          1.3K   Sep 09 18:25    11 snapshots   +1 −1                                   ◂
-  Sep 06 18:03          1.3K   Sep 06 16:34    2 snapshots    +1 −2
-  Aug 22 11:59          1.2K   Aug 22 10:42    9 snapshots    +3 −2
-  Aug 03 16:19          1.3K   Aug 03 13:55    10 snapshots   +4 −4
-  Jul 28 15:59          1.3K   Jul 28 15:13    3 snapshots    +4 −5
-  Jul 14 09:00          1.3K   Jul 14 08:03    8 snapshots    +4 −4
+ restoric  Versions  ~/dev/project/src/main.go                           6 versions in 43 snapshots
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ··· · ●  · ● · ·· ··  ···  · ●· · · · ···  ● ● · · · · · · · ·  · ·  ┊ ● main.go
+                                                      ▲                                    − 1× +
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-────────────────────────────────────────────────────────────────────────────────────────────────────
- j k version  ⏎ d diff vs disk  p diff vs previous  r restore  y yank  q back
+ VERSION         SIZE  SNAPSHOTS  VS DISK       │main.go · Sep 09 19:23                  ⇥ content
+ on disk         1.3K                           │kept in 11 snapshots · 62c0e9c7
+▶Sep 09 19:23    1.3K  11 snaps   +1 −1         │                                                     ◂
+ Sep 06 18:03    1.3K  2 snaps    +1 −2         │ 25  func newRouter(ctx context.Context) error {
+ Aug 22 11:59    1.2K  9 snaps    +3 −2         │ 26    return json.NewEncoder(w).Encode(resp)
+ Aug 03 16:19    1.3K  10 snaps   +4 −4         │ 27    var req CreateOrderRequest
+ Jul 28 15:59    1.3K  3 snaps    +4 −5         │ 28    id := chi.URLParam(r, "id")
+ Jul 14 09:00    1.3K  8 snaps    +4 −4         │ 29    user, err := store.GetUser(ctx, id)
+                                                │ 30    cfg.Port = envInt("PORT", 8080)
+                                                │ 31  }
+                                                │ 32
+                                                │ 33  func handleOrder(ctx context.Context) error {
+                                                │ 34    var req CreateOrderRequest
+                                                │ 35    return nil
+                                                │ 36−   metrics.Requests.WithLabelValues(r.Method).…
+                                                │ 37    cfg.Port = envInt("PORT", 8080)
+                                                │ 38  }
+                                                │ 39
+                                                │ 40  func handleUser(ctx context.Context) error {
+                                                │ 41    if err := validate(req); err != nil { retur…
+                                                │ 42    ctx, cancel := context.WithTimeout(ctx, 5*t…
+                                                │ 43    w.Header().Set("Content-Type", "application…
+                                                │ 44    log.Printf("starting %s", name)
+                                                │ 45    if len(args) == 0 { return errNoArgs }
+                                                │ 46    defer cancel()
+                                                │ 47    for i := 0; i < retries; i++ { time.Sleep(b…
+                                                │ 48  }
+                                                │ 49
+ NOR  ~/dev/project/src/main.go                                                         1/6  ? help
 ```
 
-### 3.8 Diff (`d`)
+### 3.10 Full-screen diff (`d`)
 Two modes. `c` (the default): selected version → on disk, "what changed since this version". `p`: previous distinct version → selected version, "what this version changed". Unified diff with 3 lines of context, both line numbers, and `┄┄ around line N ┄┄` between changes.
 
-<sub>`docs/screens/09-diff.txt`</sub>
+<sub>`docs/screens/14-diff.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- main.go  Aug 22 11:59  →  on disk   (what changed since this version)                       +3 −2
-────────────────────────────────────────────────────────────────────────────────────────────────────
+ restoric  main.go  Aug 22 11:59  →  on disk                                                  +3 −2
+ what changed since this version
  ┄┄ around line 18 ┄┄
    18   18        if err := validate(req); err != nil { return err }
    19   19        if err := validate(req); err != nil { return err }
@@ -480,41 +690,42 @@ Two modes. `c` (the default): selected version → on disk, "what changed since 
 
 
 
-────────────────────────────────────────────────────────────────────────────────────────────────────
- j k scroll  ]c [c next/prev change  H L older/newer  c vs disk  p vs previous  r restore
+
+
+ DIFF  vs disk (c)  ]c [c changes · H L versions                                       1/19  ? help
 ```
 
-Binary files: show "binary file, 12.4K → 13.0K" instead of a diff. Files over 2 MB (configurable) are diffed only on request.
+Binary files: show "binary file, 12.4K → 13.0K" instead of a diff. Files over 2 MB (configurable) are diffed only on request. The preview has the same limits.
 
-### 3.9 Restore (`r`)
-Works on files and folders, from the folder view, the versions view and the diff.
+### 3.11 Restore options (`r`)
+For targets other than "next to it" and "overwrite". Works on files and folders, from the folder view, the versions view and the diff.
 
-<sub>`docs/screens/10-restore-dialog.txt`</sub>
+<sub>`docs/screens/15-restore-dialog.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- main.go  Aug 22 11:59  →  on disk   (what changed since this version)                       +3 −2
-────────────────────────────────────────────────────────────────────────────────────────────────────
+ restoric  main.go  Aug 22 11:59  →  on disk                                                  +3 −2
+ what changed since this version
  ┄┄ around line 18 ┄┄
    18   18        if err := validate(req); err != nil { return err }
    19   19        if err := validate(req); err != nil { return err }
    20   20        if err := validate(req); err != nil { return err }
    21       -     return nil
         21  +     signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-   22   22 ┌─ Restore ──────────────────────────────────────────────────────────────────┐
-   23   23 │                                                                            │
-   24   24 │  main.go  @ Aug 22 11:59  6b0f6953                                         │
- ┄┄ around │  from /home/bege/dev/project/src/main.go                                   │
-   42   42 │                                                                            │
-   43   43 │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
-   44   44 │  2 (•) Restore next to it             → main.go.2026-08-22_1159            │
-   45      │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-22_1159/main.…  │
-        45 │  4 ( ) Show in $PAGER                 read only, writes nothing            │
-   46   46 │                                                                            │
+   22   22        return nil
+   23   23 ╭─ Restore ──────────────────────────────────────────────────────────────────╮
+   24   24 │                                                                            │
+ ┄┄ around │  main.go  @ Aug 22 11:59  6b0f6953                                         │
+   42   42 │  from /home/bege/dev/project/src/main.go                                   │
+   43   43 │                                                                            │
+   44   44 │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
+   45      │  2 (•) Restore next to it             → main.go.2026-08-22_1159            │
+        45 │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-22_1159/main.…  │
+   46   46 │  4 ( ) Show in $PAGER                 read only, writes nothing            │
         47 │                                                                            │
    47   48 │                                                                            │
-   48   49 │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
-           └────────────────────────────────────────────────────────────────────────────┘
+   48   49 │                                                                            │
+           │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
+           ╰────────────────────────────────────────────────────────────────────────────╯
 
 
 
@@ -524,168 +735,179 @@ Works on files and folders, from the folder view, the versions view and the diff
 
 
 
-────────────────────────────────────────────────────────────────────────────────────────────────────
- j k scroll  ]c [c next/prev change  H L older/newer  c vs disk  p vs previous  r restore
+
+ RST  choose where the restored copy goesersions                                       1/19  ? help
 ```
 
 | # | Option | Behaviour |
 |---|---|---|
-| 1 | Overwrite original, or "Restore to original location" if it's missing on disk | **Asks for confirmation** when something exists on disk. First moves the current file to `~/.local/share/restoric/undo/<timestamp>/`, so `:undo` can reverse it. |
-| 2 | Restore next to it (**default**) | `name.2026-09-06_1803` or `dir.2026-09-06_1803/` |
+| 1 | Overwrite original, or "Restore to original location" if it's missing on disk | **Asks for confirmation** when something exists on disk. Moves the current file to `~/.local/share/restoric/undo/<timestamp>/` first (`:undo`). Same as `P`. |
+| 2 | Restore next to it (**default**) | `name.2026-09-06_1803` or `dir.2026-09-06_1803/`. Same as `p`. |
 | 3 | Restore to `~/Restored/` | `~/Restored/<stamp>/<name>` |
 | 4 | File: show in `$PAGER` · folder: write a tar archive | Read only / `name-<stamp>.tar` |
 
-The default is option 1 when nothing exists on disk. Keys: `j`/`k` or `1`–`4` to choose, `⏎` to restore, `esc` to cancel. Afterwards the bottom row confirms what happened, e.g. "Restored as server.go.2026-09-06_1803".
-
-### 3.10 Help (`?`)
-<sub>`docs/screens/11-help.txt`</sub>
+### 3.12 Help (`?` or `~`)
+<sub>`docs/screens/16-help.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
- ~/dev/project/src                                                 ◀ between versions (16 total) ▶
-────────────────────────────────────────────────────────────────────────────────────────────────────
-  Jul 2026           Aug                               Sep                                   now
-  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
-  • · ·   ···┌─ Help ─────────────────────────────────────────────────────────────────┐· ·  ┊ •
-             │                                                                        │  ▲ − 1× +
-  Oct 02 12:2│  Folder view                                                           │  • main.go
-─ Versions ──│  j k  ↓ ↑               move                                           │─────────────
-  now        │  gg G  C-d C-u          top, bottom, half page                         │    Δ
- ▶  ┄ 2 uncha│  h l  - ⏎               parent folder / open                           │
-   Sep 27 08:│  H L  ← →               older / newer change in this folder            │
-    ┄ 2 uncha│  [ ]                    every snapshot, changed or not                 │
-   Sep 20 20:│  { }                    older / newer change of the selected item      │
-    ┄ 2 uncha│  v  d                   versions of the file / diff against disk       │
-   Sep 13 20:│  r  y                   restore / yank snapshot:path                   │
-    ┄ 1 uncha│  /  n N                 search this folder / next, previous match      │
-   Sep 09 19:│  zh  .                  show deleted items                             │
-    ┄ 1 uncha│  zi zo                  zoom the timeline                              │
-   Sep 06 18:│  3H  5j                 counts work with motions                       │
-    ┄ 2 uncha│                                                                        │
-   Sep 02 20:│  Commands                                                              │
-    ┄ 5 uncha│  :sep 1  :2026-09-01    jump to a date (also :yesterday :3d :2w)       │
-   Aug 22 11:│  :find NAME             search every snapshot for a name               │
-    ┄ 1 uncha│  :latest  :oldest                                                      │
-   Aug 17 16:│                                                                        │
-    ┄ 3 uncha│  Diff   ]c [c or n N changes, c vs disk, p vs previous                 │
-   Aug 10 15:│  Press any key to close                                                │
-    ┄ 1 uncha└────────────────────────────────────────────────────────────────────────┘
-   Aug 07 08:15  +1               │
-    ┄ 1 unchanged ┄               │
-   Aug 03 16:19  +1 ~1            │ 1 deleted earlier · zh to show
-──────────────────────────────────┴─────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff
+ restoric  ~/dev/project/src                                                   ◀ between versions ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                                           ▲               − 1× +
+             ╭─ Help ─────────────────────────────────────────────────────────────────╮
+ now  ~1 unsa│                                                                        │  ⇥ content
+▶  ┄ 2 unchan│  Folder view                                                           │3
+ Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+   ┄ 2 unchan│  h l  - ⏎               parent / open (a file opens its versions)      │er(w).Encode…
+ Sep 20 20:35│  H L  ← →               older / newer change in this folder            │equest
+   ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │, "id")
+ Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │etUser(ctx, …
+   ┄ 1 unchan│  ␣  v                   select / visual select                         │ORT", 8080)
+ Sep 09 19:23│  y  p  P                yank, restore next to it, overwrite            │
+   ┄ 1 unchan│  r  d                   restore options / full-screen diff             │
+ Sep 06 18:03│  cc cd cf               copy snapshot:path, folder, name               │ontext.Conte…
+   ┄ 2 unchan│  / n N   f              search / next, previous / filter               │equest
+ Sep 02 20:16│  .  zh   zi zo          show deleted items / zoom timeline             │
+   ┄ 5 unchan│  gh   3H 5j             backup root / counts with motions              │hLabelValues…
+ Aug 22 11:59│                                                                        │ORT", 8080)
+   ┄ 1 unchan│  Commands                                                              │
+ Aug 17 16:04│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
+   ┄ 3 unchan│  :find NAME   s         search every snapshot for a name               │ntext.Contex…
+ Aug 10 15:44│  :latest :oldest :undo                                                 │eq); err != …
+   ┄ 1 unchan│                                                                        │xt.WithTimeo…
+ Aug 07 08:15│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │ent-Type", "…
+   ┄ 1 unchan│  Press any key to close                                                │ %s", name)
+ Aug 03 16:19╰────────────────────────────────────────────────────────────────────────╯return errNo…
+   ┄ 2 unchanged ┄    │                                   │  46    defer cancel()
+ Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
+ Jul 26 11:57 ~1      │                                   │  48  }
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+ NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  2 yanked            Sep 09 18:25  4/6  ? help
 ```
 
-### 3.11 Narrow terminals (80 columns)
-Below 100 columns the Versions pane folds away and the listing takes the full width. The timeline and other screens scale to the width. Below 80 columns: drop the MODIFIED column.
+### 3.13 Narrow terminals
+At **under 100 columns** the Versions column folds away, leaving listing and preview. **Under 80 columns** the preview goes too. The timeline scales to the width.
 
-<sub>`docs/screens/12-80-columns.txt`</sub>
+<sub>`docs/screens/17-80-columns.txt`</sub>
 
 ```text
- restoric  repo sftp:nas:/backup/restic               43 snapshots · cache warm
- ~/dev/project/src                             ◀ between versions (16 total) ▶
-────────────────────────────────────────────────────────────────────────────────
-  Jul 2026       Aug                       Sep                           now
-  ● ··  ·●● ● ●  · ● ·●· ●· · ·● · ●··  ·· ·●· ●· ●· ● · · ● ··  ● · ·  ┊ ●
-  • ··  ··· · •  · • ··· ·· · ·· · •··  ·· ··· •· •· · · · · ··  · · ·  ┊ •
-                                                                     ▲ − 1× +
-  Oct 02 12:21   snapshot b41050ad   no changes in src/ since Sep 27 08:52
-─ src/ @ Oct 02 12:21 ──────────────────────────────────────────────────────────
-  NAME                                           SIZE  MODIFIED        Δ
-  ..
-  api/                                              –  Sep 27 06:41
-  models/                                           –  Aug 17 14:53
-  config.go                                     789 B  Sep 13 20:13
-  main.go                                        1.3K  Sep 09 18:25               ◂
-  server.go                                     845 B  Sep 06 15:17
-  util.go                                       823 B  Jul 14 06:49
+ restoric  ~/dev/project/src                               ◀ between versions ▶
+  Jul 2026    Aug                 Sep                      now
+  ●· · ●·●●●  ·● ·●·●· ··● ·●·· ·· ●· ● ●· ●·· ●· · ● ··  ┊ ● src/
+  •· · ····•  ·• ····· ··· ·•·· ·· ·· • •· ··· ·· · · ··  ┊ • main.go
+                                                       ▲               − 1× +
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  1 deleted earlier · zh to show
-────────────────────────────────────────────────────────────────────────────────
- H L change  [ ] every snapshot  { } item change  j k move  h l up/open
+   ..                                 │ main.go · v6/6 · 1.3K        ⇥ content
+ ▸ api/                               │ unchanged since Sep 09 19:23
+ ▸ models/                            │
+ ◇ config.go             789 B        │  26    return json.NewEncoder(w).Encode…
+ ◇ main.go                1.3K        │  27    var req CreateOrderRequest         ◂
+ ◇ server.go             845 B        │  28    id := chi.URLParam(r, "id")
+ ◇ util.go               823 B        │  29    user, err := store.GetUser(ctx, …
+                                      │  30    cfg.Port = envInt("PORT", 8080)
+                                      │  31  }
+                                      │  32
+                                      │  33  func handleOrder(ctx context.Conte…
+                                      │  34    var req CreateOrderRequest
+                                      │  35    return nil
+                                      │  36−   metrics.Requests.WithLabelValues…
+                                      │  37    cfg.Port = envInt("PORT", 8080)
+                                      │  38  }
+                                      │  39
+                                      │  40  func handleUser(ctx context.Contex…
+                                      │  41    if err := validate(req); err != …
+                                      │  42    ctx, cancel := context.WithTimeo…
+                                      │  43    w.Header().Set("Content-Type", "…
+                                      │  44    log.Printf("starting %s", name)
+                                      │  45    if len(args) == 0 { return errNo…
+                                      │  46    defer cancel()
+                                      │  47    for i := 0; i < retries; i++ { t…
+                                      │  48  }
+   1 deleted · . to show              │  49
+ NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  Sep 09 18:25  4/6  ? help
 ```
 
-### 3.12 Keymap
+### 3.14 Keymap
 
 **Folder view**
 | Keys | Action |
 |---|---|
-| `j` `k` / `↓` `↑` | Move selection |
+| `j` `k` / `↓` `↑` | Move |
 | `gg` `G`, `Ctrl-d` `Ctrl-u`, `PgDn` `PgUp` | Top, bottom, half page |
 | `h` `-` `⌫` | Parent folder (selects the folder you came from) |
-| `l` `⏎` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
+| `l` `⏎` `i` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
+| `gh` | Backup root |
 | `H` `L` / `←` `→` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot. |
 | `[` `]` / `Shift-←` `Shift-→` | Every snapshot, changed or not |
 | `{` `}` | Older / newer change of the **selected item** |
 | `Home` `End` | Oldest / newest change |
-| `v` | Versions of the selected file |
-| `d` | Diff the selected file against disk |
-| `r` | Restore |
-| `y` | Copy `snapshotid:/abs/path` to the clipboard |
-| `zh` `.` | Show / hide deleted items |
+| `⇥` | Preview: content ↔ diff against disk |
+| `J` `K` | Scroll the preview |
+| `Space` / `v` | Select and move down / visual select |
+| `y` `p` `P` | Yank / restore next to the original / overwrite (with confirmation) |
+| `r` | Restore options |
+| `d` | Full-screen diff against disk |
+| `cc` `cd` `cf` | Copy `snapshotid:/abs/path` / folder path / file name |
+| `.` `zh` | Show / hide deleted items |
 | `zi` `zo` | Zoom the timeline |
-| `/` then `n` `N` | Search this folder as you type (jumps to the first match, highlights all), next / previous match |
+| `/` then `n` `N` | Search this folder as you type, next / previous match |
+| `f` | Filter the listing |
+| `s` | Find in every snapshot (opens `:find `) |
 | `:` | Command line |
-| `?` | Help (any key closes it) |
-| `esc` | Clear the search highlight |
+| `?` `~` | Help (any key closes it) |
+| `esc` | Leave visual mode, then clear the selection, then clear search and filter |
 | `q` | Quit |
-| *count* | `3H`, `5j`, … repeat a motion. Stops at the first boundary message. |
+| *count* | `3H`, `5j`, `2J`, … repeat a motion. Stops at the first boundary message. |
 
-**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `r` restore · `y` yank · `zi` `zo` · `q` `h` `esc` back.
+**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `y` yank · `zi` `zo` · `q` `h` `esc` back.
 
 **Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `y` · `q` `h` `esc` back.
 
 **Find view:** `j` `k` · `gg` `G` · `⏎` `l` go to the last snapshot with it · `q` `h` `esc` back.
 
-**Restore dialog:** `j` `k` / `1`–`4` · `⏎` (twice for overwrite) · `esc` `q`.
+**Restore dialog:** `j` `k` / `1`–`4` · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
 
-Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `◀ ▶`, `− +`, dialog options and key hints. Clicking a selected row opens it. Wheel scrolls lists.
+Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `◀ ▶`, `− +`, the preview mode, which-key entries, dialog options and `? help`. Clicking a selected row opens it. Wheel scrolls the column under the pointer.
 
-### 3.13 Commands
+**yazi alignment:** these keys mean the same as in yazi: `hjkl`, `gg` `G`, `Space`, `v`, `y`, `p`, `P`, `cc` `cd` `cf`, `.`, `/` `n` `N`, `f`, `s`, `J` `K`, `~`, `esc`. Differences: `H` `L` move through time, `[ ]` `{ }` step through snapshots, `d` diffs (yazi: delete; restoric never deletes), and `r` opens restore options (yazi: rename).
+
+### 3.15 Commands
 | Command | Effect |
 |---|---|
 | `:2026-09-01`, `:09-01`, `:sep 1`, `:september 1` | Jump to the last snapshot on or before that day |
 | `:today` `:yesterday` `:3d` `:2w` | Relative dates |
 | `:latest` `:now` / `:oldest` `:first` | Ends of the timeline |
-| `:find NAME` / `:f NAME` | Search every snapshot (path contains NAME, case-insensitive) |
-| `:deleted` | Same as `zh` |
-| `:host NAME`, `:tag T` | Change the snapshot filter *(new, not in the mockup)* |
-| `:set strict` / `:set nostrict` | Tree-id vs fingerprint change detection *(new)* |
-| `:undo` | Undo the last overwrite restore *(new)* |
+| `:find NAME` / `:f NAME` (or `s`) | Search every snapshot (path contains NAME, case-insensitive) |
+| `:deleted` | Same as `.` |
+| `:undo` | Undo the last overwrite (`P` or option 1) |
+| `:host NAME`, `:tag T` | Change the snapshot filter *(not in the mockup)* |
+| `:set strict` / `:set nostrict` | Tree-id vs fingerprint change detection *(not in the mockup)* |
 | `:q` `:quit` | Quit |
 | `:help` | Help |
 
-An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :find NAME, :deleted`.
+An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :find NAME, :undo`.
 
-### 3.14 Messages (copy the mockup's wording)
+### 3.16 Messages (copy the mockup's wording)
 - "This is the oldest version of this folder." / "Newest snapshot. Newer changes exist only on disk." / "Newest snapshot. Nothing changed on disk since."
 - "No older snapshot of this folder." · "No older change to main.go." · "Select a file or folder first."
 - "Jumped to Sep 04 08:08, the last snapshot that has legacy.go"
-- "No match for "x" in this folder. :find x searches every snapshot."
-- "Yanked 3e01f5b8:/home/bege/dev/project/src/util.go"
+- "Yanked 2 items from Sep 09 19:23. p restores next to the original, P overwrites."
+- "Nothing yanked. Press y on a file first."
+- "Restored as main.go.2026-09-09_1923" · "Restored 2 items next to the originals" · "Overwrote main.go. :undo puts the old version back."
+- "Copied 3e01f5b8:/home/bege/dev/project/src/util.go"
+- "No match for "x" in this folder. Press s to search every snapshot."
 - "The file did not exist in these snapshots, so there is nothing to restore."
 - "No snapshots that early. The oldest is from Jul 14 09:00."
 - "Already at the top of the backup."
 
-### 3.15 Colours
-Use the **16 ANSI colours** so the terminal's own theme applies. Respect `NO_COLOR`.
-- `+` added: green · `~` changed: blue · `−` deleted: red · not backed up: magenta · accent (current dot, `▶`, keys): yellow
-- Selection: reverse video, or a dim background when the terminal supports it
-- Folders: bold blue · deleted: red + strikethrough (where supported) · gone earlier: dim italic
+### 3.17 Look and colours
+- **Colours:** by default, the **16 ANSI colours**, so the terminal's theme applies. Respect `NO_COLOR`. Optionally (open question 8), read colours from the user's yazi theme so the two match.
+  - `+` added: green · `~` changed: blue · `−` deleted: red · not backed up: magenta · accent (current dot, `▶`, `NOR` badge, keys): yellow · `SEL`/`VIS`: blue badge · `FIND`/input: magenta badge · `RST`/overwrite: red badge
+  - Selection: a dim background bar across the column (reverse video when only 8 colours are available) · mark bar `┃`: accent
+  - Folders: bold blue · deleted: red + strikethrough (where supported) · gone earlier: dim italic
+- **Icons:** Nerd Font glyphs per file type (folder, language, markdown, shell, config…), coloured by type. `--no-icons` / config, and automatic fallback to the plain set used in the mockup.
+- **Lines:** only thin vertical `│` between columns. Popups (restore, confirmation, help, which-key, messages) have rounded corners `╭╮╰╯`.
 
 ---
 
@@ -707,7 +929,8 @@ Use the **16 ANSI colours** so the terminal's own theme applies. Respect `NO_COL
 | Threads | `crossbeam-channel` | No async runtime |
 | Errors / logs | `anyhow`, `thiserror`, `tracing` + `tracing-appender` (log to a file, never to the TUI) | |
 | Tests | `insta` (snapshot tests), ratatui `TestBackend`, `tempfile` | |
-| Later | `syntect` for diff highlighting, `trash` for undo via the system trash | |
+| Text width | `unicode-width` | Correct column widths for names with wide characters |
+| Later | `syntect` for highlighting in the preview and diff, `trash` for undo via the system trash | |
 
 ### 4.2 Module layout
 ```
@@ -733,14 +956,20 @@ restoric/
 │   ├── diff.rs        load both sides (size limit, binary detection), imara-diff, hunks
 │   ├── app/
 │   │   ├── mod.rs     App state, view stack (Folder, Versions, Diff, Find), overlays (Dialog, Help)
-│   │   ├── keys.rs    key parser: counts, prefixes (g, z, ], [), modes (normal, command, search, dialog)
+│   │   ├── keys.rs    key parser: counts, prefixes (g, z, c, ], [), modes (normal, visual, command, search, filter, dialog)
+│   │   ├── selection.rs  marks, visual range, yank register
 │   │   ├── cmdline.rs `:` parser, dates via jiff
 │   │   └── actions.rs one function per action, shared by keys and mouse
 │   └── ui/
-│       ├── timeline.rs  labels, tracks, zoom, ‹ ›, caret, clickable areas
-│       ├── folder.rs    versions pane + listing
-│       ├── versions.rs  diff.rs  find.rs  dialog.rs  help.rs  statusline.rs
+│       ├── timeline.rs  labels, tracks with right-edge labels, zoom, ‹ ›, caret, clickable areas
+│       ├── folder.rs    versions column + listing
+│       ├── preview.rs   file content with change marks, inline diff, folder contents
+│       ├── versions.rs  diff.rs  find.rs  statusbar.rs
+│       ├── popup.rs     restore dialog, confirmation, help, which-key, messages (rounded)
+│       ├── icons.rs     Nerd Font glyphs per file type + plain fallback
 │       └── theme.rs
+├── yazi-plugin/
+│   └── restoric.yazi/main.lua   opens restoric on the hovered folder (M8)
 └── tests/
     ├── fixtures/make_repo.sh   builds a real restic repo with a known history
     ├── index_*.rs              change points against the fixture
@@ -774,8 +1003,8 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 
 ### 4.5 Threads
 - **UI thread:** the event loop over `crossbeam::select!` between crossterm events, worker responses and a tick for spinners. It draws only from `App` state and never calls `Repo`.
-- **Worker pool** (N = number of CPUs, minimum 2): handles `Request` messages (`ChangePoints{path}`, `Listing{snap,path}`, `ItemTrack{snap_range,path}`, `Versions{path}`, `LoadFile{…}`, `Restore{…}`, `Find{q}`). Each request carries a **generation id**, and results from older generations are dropped, so fast scrolling stays snappy.
-- **Prefetch:** after a listing loads, prefetch the neighbouring change points (n±1) and the item track for the selection.
+- **Worker pool** (N = number of CPUs, minimum 2): handles `Request` messages (`ChangePoints{path}`, `Listing{snap,path}`, `ItemTrack{snap_range,path}`, `Versions{path}`, `Preview{snap,path}`, `LoadFile{…}`, `Restore{…}`, `Find{q}`). Each request carries a **generation id**, and results from older generations are dropped, so fast scrolling stays snappy.
+- **Prefetch:** after a listing loads, prefetch the neighbouring change points (n±1), the item track and the preview for the selection. Previews are cached by content id, so the same file version is only read once.
 - **Progress:** the title bar shows `indexing 120/430` while change points are computed. Partial results draw as they arrive, newest first.
 
 ### 4.6 Start-up
@@ -789,6 +1018,8 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 restoric [PATH]                       open the TUI at PATH (default: current folder)
   -r, --repo REPO       --password-command CMD     (plus all RESTIC_* env vars)
   --host HOST           --tag TAG                  --strict
+  --select NAME         start with NAME selected (used by the yazi plugin)
+  --no-icons
   --at DATE             start at a date (:sep 1 syntax)
 restoric log PATH [--json]            print the change points of PATH (no TUI)   (M1)
 restoric versions FILE [--json]       print the distinct versions of FILE        (M3)
@@ -819,39 +1050,48 @@ Throwaway binary `spike/`:
 
 ### M2: read-only folder view
 - Terminal setup and teardown (panic hook restores the terminal), event loop, worker, generation ids.
-- Title bar, breadcrumb, timeline row 1 (no zoom), info row, Versions pane with folding, listing with Δ, key hints, help.
-- Keys: `j k gg G C-d C-u h l - ⌫ ⏎ H L [ ] Home End q ?` and counts. Mouse clicks on rows, dots and breadcrumb.
-- 80-column layout.
-- **Done when:** insta snapshots of screens 01 and 12 (from FakeRepo) match, and it's usable on your real repo.
+- Header with breadcrumb, timeline row 1 with its label, Versions column with folding, listing with icons and Δ, status bar, message popups, help.
+- Keys: `j k gg G C-d C-u h l - ⌫ ⏎ gh H L [ ] Home End q ? ~` and counts. Which-key popup for `g`. Mouse clicks on rows, dots, breadcrumb.
+- Narrow layouts (under 100 and under 80 columns).
+- **Done when:** insta snapshots of screens 01 and 17 (from FakeRepo, preview column empty) match, and it's usable on your real repo.
 
-### M3: item track, versions, deleted items
-- Row 2, `{` `}`, legend or labels (§3.1 proposal).
-- Versions view (`v`) with on-disk row and compared-to-disk stats (computed lazily for visible rows).
-- Deleted items (`zh` `.`), jump on deleted items.
+### M3: preview, item track, versions, deleted items
+- Preview column: file content in the snapshot with `+`/`−` margin marks, folder contents, deleted items. `⇥` content / vs disk, `J` `K`. Loaded in the background and cached by content id.
+- Row 2 with its label, `{` `}`.
+- Versions view with on-disk row, compared-to-disk stats (computed lazily for visible rows) and preview.
+- Deleted items (`.` `zh`), jump on deleted items.
 - `restoric versions FILE`.
-- **Done when:** screens 02, 07 and 08 match.
+- **Done when:** screens 01, 02, 03, 11 and 13 match.
 
 ### M4: diff
-- Load both sides with a size limit and binary detection, imara-diff, hunks, `c`/`p` modes, `]c` `[c` `n` `N`, `H` `L` across versions.
-- **Done when:** screen 09 matches, and binary and large files are handled.
+- Full-screen diff: load both sides with a size limit and binary detection, imara-diff, hunks, `c`/`p` modes, `]c` `[c` `n` `N`, `H` `L` across versions. Which-key for `]` `[`.
+- **Done when:** screen 14 matches, and binary and large files are handled.
 
 ### M5: restore
-- Dialog with 4 options, confirmation, undo log, `:undo`, `y` yank (arboard, then OSC 52).
-- Files and folders, existing and deleted on disk.
-- **Done when:** screen 10 matches. Integration tests restore from the fixture into a temporary folder for every option, and overwrite then `:undo` gives back the original bytes.
+- `Space`, visual mode, `SEL`/`VIS` badges. `y` `p` `P`, confirmation popup, undo log, `:undo`.
+- `r` dialog with 4 options. `cc` `cd` `cf` (arboard, then the OSC 52 escape sequence over SSH).
+- Files and folders, existing and deleted on disk, several at once.
+- **Done when:** screens 05, 06, 07 and 15 match. Integration tests restore from the fixture into a temporary folder with every option, and `P` then `:undo` gives back the original bytes.
 
 ### M6: navigation extras
-- `/` search with highlighting, `n` `N`. `:` command line with dates, `:find`, `:latest`, `:oldest`, `:deleted`, `:host`, `:tag`, `:set strict`.
+- `/` search with highlighting, `n` `N`. `f` filter. `:` command line with dates, `:find` / `s`, `:latest`, `:oldest`, `:deleted`, `:host`, `:tag`, `:set strict`.
 - Find view and jump to the last snapshot with the match.
-- Zoom (`zi` `zo`, clickable), "N snapshots in this column".
-- **Done when:** screens 03, 04, 05, 06 and 11 match.
+- Zoom (`zi` `zo`, clickable), "N in column". Which-key for `z` and `c`.
+- **Done when:** screens 04, 08, 09, 10, 12 and 16 match.
 
 ### M7: polish and release
-- Config file (keymap overrides, colours, diff size limit, default host). `NO_COLOR`.
+- Config file (keymap overrides, colours, icons on/off, diff/preview size limit, default host). `NO_COLOR`.
+- Nerd Font icons per file type with fallback.
 - `restoric demo`.
 - Performance pass on a large repo (thousands of snapshots, deep trees).
 - README with screenshots. `cargo install`, GitHub release binaries (Linux x86_64/aarch64, macOS), AUR/deb later.
-- Optional: syntax highlighting in diffs, restore to the system trash.
+- Optional: syntax highlighting in the preview and diff (`syntect`), restore to the system trash.
+
+### M8: yazi plugin
+- A small Lua plugin, `restoric.yazi`, adds a key in yazi (suggested `T`) that suspends yazi, runs `restoric` on the hovered folder (or on a hovered file's folder with that file selected, via `--select`), and returns to yazi when restoric exits.
+- Optional: after `p`/`P`, yazi refreshes and shows the restored file.
+- Publish it for yazi's package manager (`ya pack`), with install instructions in the README.
+- **Done when:** in yazi, pressing the key over a folder opens restoric there, and `q` comes back to the same place in yazi.
 
 ---
 
@@ -874,6 +1114,8 @@ Throwaway binary `spike/`:
 | Restore overwrites something important | Default is "next to it", confirmation, undo folder |
 | Snapshots with different backup roots or hosts | Timeline set filter (§2.3), `:host`, `:tag`, clear message when the path isn't backed up |
 | Huge folders (100k entries) | Virtualised listing, counts computed lazily |
+| Preview slow over a remote backend | Load in the background, cache by content id, cap at 64 KB for the preview, show "loading…" without blocking |
+| No Nerd Font installed | Automatic fallback to the plain icon set, `--no-icons` |
 
 ---
 
@@ -881,10 +1123,13 @@ Throwaway binary `spike/`:
 1. **Which backend** does your repo use (local, sftp, S3, rclone, REST)? This decides what M0 tests.
 2. **How big** is the repo: number of snapshots, files per snapshot? Sets the performance targets.
 3. **Should a permission (mode) change count as a change?** The proposal is no by default, yes with `--strict`.
-4. **Labels on the timeline rows** instead of the legend (§3.1): yes?
-5. **License:** MIT/Apache-2.0 (like rustic)?
-6. **Is the name `restoric` free** on crates.io and GitHub? Check before publishing.
-7. **Snapshots from several hosts** of the same folder (e.g. a laptop and a desktop syncing a project): merge them into one timeline, or keep one host at a time (current plan)?
+4. **License:** MIT/Apache-2.0 (like rustic)?
+5. **Is the name `restoric` free** on crates.io and GitHub? Check before publishing.
+6. **Snapshots from several hosts** of the same folder (e.g. a laptop and a desktop syncing a project): merge them into one timeline, or keep one host at a time (current plan)?
+7. **Should `p` name the copy like yazi does** (`main_1.go` on conflict) or with the snapshot time (`main.go.2026-09-09_1923`, current plan)? The time tells you which version you got; yazi's form keeps the extension last, so editors still recognise the file type. A middle ground: `main.2026-09-09_1923.go`.
+8. **Read colours from the yazi theme?** It would make the two look the same out of the box. yazi's theme format first needs checking for how stable it is. The fallback is the 16 ANSI colours either way.
+
+Settled during review: labels at the right edge of the timeline rows replace the legend. `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
 
 ---
 

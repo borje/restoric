@@ -1,0 +1,34 @@
+ restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
+  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+                                                      ▲                                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
+   ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
+ Sep 27 08:52 ~1      │ ▸ models/                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │ ┄ line 18
+ Sep 20 20:35 ~1      │ ◇ main.go             1.3K  ~     │     if err := validate(req); err != nil…  ◂
+   ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │     if err := validate(req); err != nil…
+ Sep 13 20:51 ~2      │ ◇ util.go            823 B        │     if err := validate(req); err != nil…
+   ┄ 1 unchanged ┄    │                                   │ -   return nil
+▶Sep 09 19:23 ~1      │                                   │ +   signal.Notify(stop, os.Interrupt, s…  ◂
+   ┄ 1 unchanged ┄    │                                   │     return nil
+ Sep 06 18:03 +1~3−1  │                                   │   }
+   ┄ 2 unchanged ┄    │                                   │
+ Sep 02 20:16 ~1      │                                   │
+   ┄ 5 unchanged ┄    │                                   │
+ Aug 22 11:59 ~2      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 17 16:04 +1~1    │                                   │
+   ┄ 3 unchanged ┄    │                                   │
+ Aug 10 15:44 ~1      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 07 08:15 +1      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
+ Aug 03 16:19 +1~1    │                                   │
+   ┄ 2 unchanged ┄    │                                   │
+ Jul 28 15:59 ~1      │                                   │
+ Jul 26 11:57 ~1      │                                   │
+ Jul 24 12:16 ~1      │   1 deleted · . to show           │
+ NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
