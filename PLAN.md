@@ -68,7 +68,7 @@ fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 ### 2.3 What gets computed
 | Name | Definition | Used for |
 |---|---|---|
-| Timeline set | Snapshots of **this machine** (§2.4) whose backup paths include the browsed folder, sorted by time | Every view |
+| Timeline set | Snapshots of **this machine** (§2.4) that hold the browsed folder, sorted by time. A snapshot holds it when one of its backup paths is the folder, above it, or below it (`restic backup dir/a.log dir/b.csv` holds `dir`, since the snapshot tree has the folders above each backup path) | Every view |
 | Change points of folder P | Snapshots where `fingerprint(P)` differs from the previous snapshot in the timeline set (or P first appears or disappears) | Row 1 of the timeline, the Versions pane, `H`/`L` |
 | Item track | The same as change points, for the selected entry | Row 2 of the timeline, `{`/`}` |
 | Entry change marker | The entry's node at snapshot n compared with n−1: `+` added, `~` changed, `−` deleted | Δ column |
@@ -1055,7 +1055,7 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 ### 4.6 Start-up
 1. Read the repository and password from `--repo` / `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE` and `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic, or `--insecure-no-password` for a repository without one. Then the config file.
 2. Open the repo (read only). Load the snapshot list from the cache, then fetch new ones in the background.
-3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) whose `paths` contain that path.
+3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) with a backup path at, above, or below that path (§2.3).
 4. If this machine has no snapshots at all: show the hostnames that do have snapshots, explain how to set `host` (§2.4), and stop.
 5. If the path isn't in any of this machine's snapshots: show a clear message listing the paths this machine backs up.
 
@@ -1212,6 +1212,7 @@ Settled during review:
 - Only snapshots from this machine are shown (§2.4).
 - Repository size: any. Design rules, test repos and targets are in §4.8.
 - Repositories without a password (`restic init --insecure-no-password`) are supported with `--insecure-no-password`, as in restic (§4.7).
+- A snapshot belongs to a folder's timeline set when a backup path is the folder, above it, or below it. Backups that name files (`restic backup dir/a.log dir/b.csv`) open at `dir` (§2.3).
 
 ---
 

@@ -24,11 +24,20 @@ impl Filter {
     }
 }
 
-/// This machine's snapshots whose backup paths include `path`, oldest first.
+/// Whether snapshot `s` holds `path`: a backup path is `path`, above it, or
+/// below it. Below counts because the snapshot's tree has the folders above
+/// each backup path, so `restic backup dir/a.log dir/b.csv` holds `dir` (§2.3).
+pub fn covers(s: &SnapshotInfo, path: &Path) -> bool {
+    s.paths
+        .iter()
+        .any(|p| path.starts_with(p) || p.starts_with(path))
+}
+
+/// This machine's snapshots that hold `path` ([`covers`]), oldest first.
 pub fn timeline_set(snaps: &[SnapshotInfo], filter: &Filter, path: &Path) -> Vec<SnapshotInfo> {
     let mut set: Vec<SnapshotInfo> = snaps
         .iter()
-        .filter(|s| filter.matches(s) && s.paths.iter().any(|p| path.starts_with(p)))
+        .filter(|s| filter.matches(s) && covers(s, path))
         .cloned()
         .collect();
     set.sort_by_key(|s| s.time);
@@ -120,5 +129,37 @@ impl Index {
             prev = *r;
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repo::{SnapshotId, TreeId};
+
+    fn snap(paths: &[&str]) -> SnapshotInfo {
+        SnapshotInfo {
+            id: SnapshotId::default(),
+            time: jiff::Timestamp::UNIX_EPOCH,
+            host: "h".into(),
+            paths: paths.iter().map(PathBuf::from).collect(),
+            tags: vec![],
+            tree: TreeId::default(),
+        }
+    }
+
+    #[test]
+    fn covers_the_backup_path_and_what_is_above_and_below_it() {
+        let s = snap(&["/home/u/trading/a.log", "/home/u/trading/b.csv"]);
+        assert!(covers(&s, Path::new("/home/u/trading")));
+        assert!(covers(&s, Path::new("/home/u")));
+        assert!(covers(&s, Path::new("/home/u/trading/a.log")));
+        assert!(!covers(&s, Path::new("/home/u/other")));
+        assert!(!covers(&s, Path::new("/home/u/trading/c.log")));
+        // Components, not string prefixes.
+        assert!(!covers(&s, Path::new("/home/u/trad")));
+
+        let s = snap(&["/home/u/proj"]);
+        assert!(covers(&s, Path::new("/home/u/proj/src")));
     }
 }

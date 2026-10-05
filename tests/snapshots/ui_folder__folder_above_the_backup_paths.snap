@@ -1,0 +1,24 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 20)"
+---
+ restoric  ~/trading                                                             ◀ version 2 of 2 ▶
+  Sep 2026                                                                     now
+  ●                                                                        ●  ┊ · trading/
+  •                                                                        •  ┊ · logs/
+                                                                           ▲               − 1× +
+
+ now  = latest        │ ▸ logs/                     ~1    │ logs/
+▶Sep 02 10:00 ~1      │                                   │
+ Sep 01 10:00 +1      │                                   │ ≡ run.log                             ~
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+ NOR  Sep 02 10:00  afde6ef6  trading/ ~1                                               1/1  ? help

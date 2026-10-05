@@ -22,7 +22,7 @@ use crate::index::fingerprint::{self, Fp};
 use crate::index::folder::Counts;
 use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
-use crate::index::timeline::{Filter, explain_empty};
+use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
 use crate::index::{Mode, ModeSwitch};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
@@ -488,7 +488,7 @@ impl App {
         let mut set: Vec<SnapshotInfo> = self
             .all
             .iter()
-            .filter(|s| s.paths.iter().any(|p| path.starts_with(p)))
+            .filter(|s| covers(s, path))
             .cloned()
             .collect();
         set.sort_by_key(|s| s.time);
@@ -1775,11 +1775,7 @@ impl App {
             .filter(|s| f.matches(s))
             .cloned()
             .collect();
-        let covers = |p: &Path| {
-            mine.iter()
-                .any(|s| s.paths.iter().any(|b| p.starts_with(b)))
-        };
-        if !covers(&self.folder) {
+        if !mine.iter().any(|s| covers(s, &self.folder)) {
             self.message = Some(explain_empty(&self.everything, &f, &self.folder));
             return;
         }

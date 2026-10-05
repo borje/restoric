@@ -202,3 +202,19 @@ fn item_changes_and_versions_keys() {
     assert!(matches!(h.app.view, restoric::app::View::Folder));
     assert_eq!(h.app.selected().unwrap().node.name, "main.go");
 }
+
+/// Backups that name files, not their folder (`restic backup trading/a.log …`):
+/// the folder above them still opens (PLAN.md §2.3).
+#[test]
+fn folder_above_the_backup_paths() {
+    let dsl = "\
+host bege-laptop
+root /home/bege/trading/logs
+snapshot 2026-09-01 10:00
+  write run.log one\\n
+snapshot 2026-09-02 10:00
+  append run.log two\\n
+";
+    let mut h = Harness::with(dsl, "/home/bege/trading");
+    insta::assert_snapshot!(h.screen(100, 20));
+}
