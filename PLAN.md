@@ -1271,6 +1271,6 @@ Tick milestones here as they're done, with the commit.
 - [x] M3: preview, item track, versions, deleted items — 3be44ca
 - [x] M4: diff — 34dc9c5
 - [x] M5: restore — adf677b
-- [x] M6: navigation extras — COMMIT
+- [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
 - [ ] M8: yazi plugin
