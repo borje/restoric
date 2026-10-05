@@ -1,0 +1,38 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  main.go  Aug 17 16:04  →  on disk                                                  +4 −0
+ what changed since this version
+ ┄┄ around line 6 ┄┄
+    6    6    // flags
+    7    7    // middleware
+    8    8    // feature flag
+         9  + // signals
+        10  + // serve
+        11  + // shutdown
+        12  + // unsaved edit
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ DIFF  vs disk (c)  ]c [c changes · H L versions                                        1/8  ? help

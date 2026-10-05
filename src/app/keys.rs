@@ -5,7 +5,7 @@ use ratatui::crossterm::event::{
 };
 use ratatui::layout::{Position, Rect};
 
-use super::{Action, App};
+use super::{Action, App, View};
 
 /// Where things are on screen, from the last draw.
 #[derive(Clone, Debug, Default)]
@@ -30,9 +30,36 @@ impl Hits {
     }
 }
 
-/// The action for a key with prefix `prefix` (or none).
-fn action(prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
+/// Keys that mean something else in the diff and versions views.
+fn view_action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
     use Action::*;
+    match view {
+        View::Diff(_) => match (prefix, k.code) {
+            (Some(']'), KeyCode::Char('c')) => Some(NextHunk),
+            (Some('['), KeyCode::Char('c')) => Some(PrevHunk),
+            (None, KeyCode::Char(']')) => Some(Prefix(']')),
+            (None, KeyCode::Char('[')) => Some(Prefix('[')),
+            (None, KeyCode::Char('n')) => Some(NextHunk),
+            (None, KeyCode::Char('N')) => Some(PrevHunk),
+            (None, KeyCode::Char(' ')) => Some(HalfDown),
+            (None, KeyCode::Char('c')) => Some(Diff),
+            (None, KeyCode::Char('p')) => Some(DiffPrevious),
+            _ => None,
+        },
+        View::Versions(_) => match (prefix, k.code) {
+            (None, KeyCode::Char('p')) => Some(DiffPrevious),
+            _ => None,
+        },
+        View::Folder => None,
+    }
+}
+
+/// The action for a key with prefix `prefix` (or none).
+fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
+    use Action::*;
+    if let Some(a) = view_action(view, prefix, k) {
+        return Some(a);
+    }
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     let shift = k.modifiers.contains(KeyModifiers::SHIFT);
     if let Some(p) = prefix {
@@ -100,7 +127,7 @@ impl App {
         if k.code == KeyCode::Esc {
             let pending = self.prefix.take().is_some() || !self.count.is_empty();
             self.count.clear();
-            if !pending && matches!(self.view, super::View::Versions(_)) {
+            if !pending && self.view != View::Folder {
                 self.act(Action::Back);
             }
             return;
@@ -108,7 +135,7 @@ impl App {
         let prefix = self.prefix.take();
         let n = self.count.parse().unwrap_or(1);
         self.count.clear();
-        if let Some(a) = action(prefix, &k) {
+        if let Some(a) = action(&self.view.clone(), prefix, &k) {
             self.act_n(a, n);
         }
     }

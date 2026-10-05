@@ -10,6 +10,23 @@ pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let (cols, r) = (g.cols(), g.rows() - 1);
     g.fill(r, 0, cols - 1, t.status_bar);
+    if let View::Diff(d) = &app.view {
+        let c = g.put(0, r, " DIFF ", t.badge_blue) + 1;
+        let mode = match d.mode {
+            crate::app::DiffMode::Disk => "vs disk (c)",
+            crate::app::DiffMode::Previous => "vs previous (p)",
+        };
+        let mid = vec![
+            (mode.to_string(), t.dim),
+            ("  ]c [c changes · H L versions".to_string(), t.dim2),
+        ];
+        let right = super::diffview::position(app, d)
+            .map(|p| (p, t.text, None))
+            .into_iter()
+            .collect();
+        finish(app, g, c, mid, right);
+        return;
+    }
     let c = g.put(0, r, " NOR ", t.badge) + 1;
 
     let mut mid: Vec<(String, Style)> = Vec::new();

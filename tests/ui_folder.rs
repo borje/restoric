@@ -1,130 +1,22 @@
 //! Snapshot tests of the folder view (PLAN.md §3.1, §3.4, §3.12, §3.13),
 //! driven by FakeRepo with tests/fixtures/project.dsl. Times are in UTC.
 
+mod common;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::KeyCode;
 use ratatui::layout::Rect;
 
+use common::{Harness, PROJECT, SRC};
 use restoric::app::{Action, App};
-use restoric::cache::Cache;
-use restoric::index::{Index, Mode};
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::ui;
 use restoric::ui::theme::Theme;
-use restoric::worker::{Ctx, handle};
-
-const PROJECT: &str = include_str!("fixtures/project.dsl");
-
-struct Harness {
-    app: App,
-    ctx: Ctx,
-}
-
-impl Harness {
-    fn new(folder: &str) -> Self {
-        let repo = Arc::new(FakeRepo::parse(PROJECT).unwrap());
-        let snaps = repo.snapshots().unwrap();
-        let disk = Arc::new(repo.disk());
-        let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 24);
-        let app = App::new(
-            snaps,
-            PathBuf::from(folder),
-            TimeZone::UTC,
-            Some(PathBuf::from("/home/bege")),
-        );
-        let mut h = Harness {
-            app,
-            ctx: Ctx { index, disk },
-        };
-        h.pump();
-        h
-    }
-
-    /// Runs every request the app has made, until it makes no more.
-    fn pump(&mut self) {
-        while !self.app.outbox.is_empty() {
-            let reqs = std::mem::take(&mut self.app.outbox);
-            let mut out = Vec::new();
-            for r in reqs {
-                handle(&self.ctx, r, &mut |resp| out.push(resp));
-            }
-            for r in out {
-                self.app.apply(r);
-            }
-        }
-        self.app.bumped = false;
-    }
-
-    fn act(&mut self, a: Action) -> &mut Self {
-        self.app.act(a);
-        self.pump();
-        self
-    }
-
-    fn keys(&mut self, keys: &str) -> &mut Self {
-        for c in keys.chars() {
-            self.key(KeyCode::Char(c));
-        }
-        self
-    }
-
-    fn key(&mut self, code: KeyCode) -> &mut Self {
-        self.app.key(KeyEvent::new(code, KeyModifiers::NONE));
-        self.pump();
-        self
-    }
-
-    /// Views the snapshot taken at `when` (`2026-09-06 18:03`).
-    fn at(&mut self, when: &str) -> &mut Self {
-        let set = self.app.set();
-        let i = set
-            .iter()
-            .position(|s| ui::fmt::time(s.time, &TimeZone::UTC) == fmt_like(when))
-            .unwrap_or_else(|| panic!("no snapshot at {when}"));
-        self.act(Action::GoSnapshot(i))
-    }
-
-    fn select(&mut self, name: &str) -> &mut Self {
-        let rows = self.app.rows();
-        let i = rows
-            .iter()
-            .position(|r| {
-                self.app
-                    .entry(*r)
-                    .is_some_and(|e| e.node.name.to_string_lossy() == name)
-            })
-            .unwrap_or_else(|| panic!("no row {name}"));
-        let sel = self.app.sel;
-        if i > sel {
-            self.act(Action::Down(i - sel))
-        } else {
-            self.act(Action::Up(sel - i))
-        }
-    }
-
-    fn screen(&mut self, cols: u16, rows: u16) -> String {
-        let area = Rect::new(0, 0, cols, rows);
-        let mut buf = Buffer::empty(area);
-        ui::draw(&mut self.app, &mut buf, area, &Theme::new(false));
-        ui::text(&buf)
-    }
-}
-
-/// `2026-09-06 18:03` → `Sep 06 18:03`
-fn fmt_like(when: &str) -> String {
-    let dt: jiff::civil::DateTime = when.replace(' ', "T").parse().unwrap();
-    ui::fmt::time(
-        dt.to_zoned(TimeZone::UTC).unwrap().timestamp(),
-        &TimeZone::UTC,
-    )
-}
-
-const SRC: &str = "/home/bege/dev/project/src";
 
 #[test]
 fn starts_at_the_newest_change() {

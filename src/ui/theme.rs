@@ -25,6 +25,8 @@ pub struct Theme {
     pub marker: Style,
     pub status_bar: Style,
     pub badge: Style,
+    /// The DIFF, SEL and VIS badges.
+    pub badge_blue: Style,
     pub popup: Style,
     pub popup_border: Style,
 }
@@ -50,6 +52,7 @@ impl Theme {
                 marker: plain.add_modifier(Modifier::REVERSED),
                 status_bar: plain,
                 badge: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
+                badge_blue: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 popup: plain,
                 popup_border: plain,
             };
@@ -73,6 +76,10 @@ impl Theme {
             status_bar: Style::default(),
             badge: Style::default()
                 .bg(Color::Yellow)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+            badge_blue: Style::default()
+                .bg(Color::Blue)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
             popup: Style::default(),

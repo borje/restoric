@@ -1,0 +1,14 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  same.txt  Jul 01 10:00  →  on disk                                                 +0 −0
+ what changed since this version
+
+
+
+
+
+                          No differences. The two versions are identical.
+
+ DIFF  vs disk (c)  ]c [c changes · H L versions                                        0/0  ? help

@@ -1,0 +1,38 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  main.go  Sep 02 20:16  →  Sep 06 18:03                                             +1 −0
+ what this version changed
+ ┄┄ around line 7 ┄┄
+    7    7    // middleware
+    8    8    // feature flag
+    9    9    // signals
+        10  + // serve
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ DIFF  vs previous (p)  ]c [c changes · H L versions                                    1/5  ? help

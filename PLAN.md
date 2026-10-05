@@ -720,7 +720,7 @@ Two modes. `c` (the default): selected version → on disk, "what changed since 
  DIFF  vs disk (c)  ]c [c changes · H L versions                                       1/19  ? help
 ```
 
-Binary files: show "binary file, 12.4K → 13.0K" instead of a diff. Files over 2 MB (configurable) are diffed only on request. The preview has the same limits.
+Binary files: show "binary file, 12.4K → 13.0K" instead of a diff. Files over 2 MB (configurable) are diffed only on request: the view says how big the file is, and `⏎` diffs it anyway (reading up to 256 MB). The preview reads at most 64 KB of each side. Both sides are read and diffed in the background. When every remaining change is already on screen, `]c` says "No more changes below." Line-number columns widen for files over 9 999 lines.
 
 ### 3.11 Restore options (`r`)
 For targets other than "next to it" and "overwrite". Works on files and folders, from the folder view, the versions view and the diff.
@@ -997,7 +997,7 @@ restoric/
 │       ├── timeline.rs  labels, tracks with right-edge labels, zoom, ‹ ›, caret, clickable areas
 │       ├── folder.rs    versions column + listing
 │       ├── preview.rs   file content with change marks, inline diff, folder contents
-│       ├── versions.rs  diff.rs  find.rs  statusbar.rs
+│       ├── versions.rs  diffview.rs  find.rs  statusbar.rs
 │       ├── popup.rs     restore dialog, confirmation, help, which-key, messages (rounded)
 │       ├── fmt.rs       dates, sizes, paths, fitting and wrapping text
 │       ├── icons.rs     Nerd Font glyphs per file type + plain fallback
@@ -1261,7 +1261,7 @@ Tick milestones here as they're done, with the commit.
 - [x] M1: index and `restoric log` — 6bfcf81
 - [x] M2: read-only folder view — cbd4b73
 - [x] M3: preview, item track, versions, deleted items — 3be44ca
-- [ ] M4: diff
+- [x] M4: diff — COMMIT
 - [ ] M5: restore
 - [ ] M6: navigation extras
 - [ ] M7: polish and release

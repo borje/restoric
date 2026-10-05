@@ -1,0 +1,16 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(90, 12)"
+---
+ restoric  big.log  Jul 01 10:00  →  Jul 02 10:00
+ what this version changed
+
+ This file is 2.9M, more than the 2.0M limit. Press ⏎ to diff it anyway.
+
+
+
+
+
+
+
+ DIFF  vs previous (p)  ]c [c changes · H L versions                               ? help

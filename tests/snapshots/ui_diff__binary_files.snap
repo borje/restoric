@@ -1,0 +1,16 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(80, 12)"
+---
+ restoric  image.bin  Jul 01 10:00  →  Jul 02 10:00
+ what this version changed
+
+ binary file, 7 B → 9 B
+
+
+
+
+
+
+
+ DIFF  vs previous (p)  ]c [c changes · H L versions                     ? help

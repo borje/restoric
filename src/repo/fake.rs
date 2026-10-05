@@ -17,6 +17,7 @@
 //!   link src/current -> main.go
 //!   rm src/legacy.go               # files or whole folders
 //!   mv src/a.go src/b.go
+//!   fill logs/big.log 3000000      # a text file of that many bytes
 //!
 //! disk                             # optional: how the files look on disk now
 //!   append src/main.go // unsaved\n
@@ -24,7 +25,7 @@
 //!
 //! Each snapshot starts from the previous one's files, and the disk from the
 //! last snapshot's. Text after `write` and `append` takes `\n` and `\t`
-//! escapes.
+//! escapes, and `\0` for a NUL byte.
 
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
@@ -82,6 +83,7 @@ fn unescape(s: &str) -> Vec<u8> {
         if c == '\\' {
             match chars.next() {
                 Some('n') => out.push('\n'),
+                Some('0') => out.push('\0'),
                 Some('t') => out.push('\t'),
                 Some('\\') => out.push('\\'),
                 Some(o) => {
@@ -249,6 +251,29 @@ impl FakeRepo {
                             );
                         }
                     }
+                }
+                "fill" => {
+                    let (path, size) = rest.split_once(' ').with_context(err)?;
+                    let size: usize = size.trim().parse().with_context(err)?;
+                    let mut data = Vec::with_capacity(size);
+                    let mut n = 0;
+                    while data.len() < size {
+                        data.extend(format!("line {n}\n").bytes());
+                        n += 1;
+                    }
+                    data.truncate(size);
+                    let p = parts(path);
+                    let (name, parent) = p.split_last().with_context(err)?;
+                    dir_mut(&mut files, parent).with_context(err)?.insert(
+                        name.clone(),
+                        Entry::File {
+                            data,
+                            mode: 0o644,
+                            uid: 1000,
+                            gid: 1000,
+                            mtime,
+                        },
+                    );
                 }
                 "touch" => match entry_mut(&mut files, rest.trim()).with_context(err)? {
                     Entry::File { mtime: m, .. } => *m = mtime,

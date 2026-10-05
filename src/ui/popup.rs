@@ -7,6 +7,9 @@ use crate::app::{Action, App, View};
 fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Action)] {
     match (view, prefix) {
         (View::Versions(_), 'g') => &[("gg", "newest version", Action::Top)],
+        (View::Diff(_), 'g') => &[("gg", "top", Action::Top)],
+        (View::Diff(_), ']') => &[("]c", "next change", Action::NextHunk)],
+        (View::Diff(_), '[') => &[("[c", "previous change", Action::PrevHunk)],
         (_, 'z') => &[("zh", "show / hide deleted", Action::ToggleDeleted)],
         (_, 'g') => &[
             ("gg", "top of list", Action::Top),

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 
+use crate::diff::{DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, SideKey};
 use crate::index::NodeRef;
 use crate::index::fingerprint::{self, Fp};
 use crate::index::folder::Counts;
@@ -21,7 +22,7 @@ use crate::index::timeline::{ChangeKind, ChangePoint};
 use crate::index::versions::{Run, run_at};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
 use crate::ui::fmt;
-use crate::worker::{Request, Response};
+use crate::worker::{Request, Response, Side};
 
 /// What's known about one path over time: the current folder, or the
 /// selected entry (its "item track").
@@ -111,11 +112,34 @@ pub struct VersionsView {
     pub sel: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiffMode {
+    /// The selected version → the file on disk (`c`).
+    Disk,
+    /// The version before → the selected version (`p`).
+    Previous,
+}
+
+/// The full-screen diff (PLAN.md §3.10).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiffView {
+    pub path: PathBuf,
+    /// Index into the runs, newest first; always a version that exists.
+    pub run: usize,
+    pub mode: DiffMode,
+    pub scroll: usize,
+    /// Read past the size limit (asked for with ⏎).
+    pub force: bool,
+    /// Back to the versions view rather than the folder.
+    pub from_versions: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum View {
     #[default]
     Folder,
     Versions(VersionsView),
+    Diff(DiffView),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -147,8 +171,12 @@ pub enum Action {
     /// Scroll the preview by this many lines.
     Scroll(isize),
     ToggleDeleted,
-    /// Diff against disk (`d`, and `⏎` in the versions view): M4.
+    /// Full-screen diff against disk (`d`; `⏎` in the versions view).
     Diff,
+    /// Full-screen diff against the previous version (`p` in versions and diff).
+    DiffPrevious,
+    NextHunk,
+    PrevHunk,
     Back,
     Help,
     Prefix(char),
@@ -171,6 +199,8 @@ impl Action {
                 | Action::OlderItemChange
                 | Action::NewerItemChange
                 | Action::Scroll(_)
+                | Action::NextHunk
+                | Action::PrevHunk
         )
     }
 }
@@ -190,6 +220,7 @@ enum Pending {
     Node(PathBuf, usize),
     /// Asked once per folder; never forgotten.
     Counts(PathBuf),
+    Diff(DiffKey),
 }
 
 impl Pending {
@@ -229,6 +260,8 @@ pub struct App {
     pub disk_stats: RefCell<HashMap<(Fp, PathBuf), DiskStat>>,
     /// Nodes at (path, snapshot index in the path's set).
     pub nodes: HashMap<(PathBuf, usize), Option<Node>>,
+    /// Full-screen diffs.
+    pub diffs: HashMap<DiffKey, Arc<FileDiff>>,
     pending: HashSet<Pending>,
     /// Show items deleted earlier (`.`).
     pub ghosts: bool,
@@ -289,6 +322,7 @@ impl App {
             disk_files: HashMap::new(),
             disk_stats: RefCell::new(HashMap::new()),
             nodes: HashMap::new(),
+            diffs: HashMap::new(),
             pending: HashSet::new(),
             ghosts: false,
             preview: PreviewMode::Content,
@@ -585,6 +619,7 @@ impl App {
         match self.view.clone() {
             View::Folder => self.ensure_selected(),
             View::Versions(v) => self.ensure_versions(&v),
+            View::Diff(d) => self.ensure_diff(&d),
         }
 
         let key = self.preview_key();
@@ -660,6 +695,112 @@ impl App {
         }
     }
 
+    /// The two sides of a diff and their labels, once their nodes are known.
+    pub fn diff_sides(&self, d: &DiffView) -> Option<(DiffKey, Side, Side, String, String)> {
+        let t = self.tracks.get(&d.path).filter(|t| t.loaded())?;
+        let runs: Vec<Run> = t.runs.iter().rev().copied().collect();
+        let r0 = runs.get(d.run)?;
+        let node = |r: &Run| -> Option<Node> { self.nodes.get(&(d.path.clone(), r.from))?.clone() };
+        let label = |r: &Run| fmt::time(t.set[r.from].time, &self.tz);
+        let repo_side = |n: Node| (SideKey::Content(fingerprint::content(&n)), Side::Repo(n));
+        let ((ok, os, ol), (nk, ns, nl)) = match d.mode {
+            DiffMode::Disk => {
+                let (k, s) = repo_side(node(r0)?);
+                (
+                    (k, s, label(r0)),
+                    (
+                        SideKey::Disk(d.path.clone()),
+                        Side::Disk(d.path.clone()),
+                        "on disk".to_string(),
+                    ),
+                )
+            }
+            DiffMode::Previous => {
+                let older = runs[d.run + 1..].iter().find(|r| r.exists);
+                let old = match older {
+                    Some(r) => {
+                        let (k, s) = repo_side(node(r)?);
+                        (k, s, label(r))
+                    }
+                    None => (SideKey::Nothing, Side::Nothing, "(nothing)".to_string()),
+                };
+                let (k, s) = repo_side(node(r0)?);
+                (old, (k, s, label(r0)))
+            }
+        };
+        let limit = if d.force { FORCED_LIMIT } else { DIFF_LIMIT };
+        let key = DiffKey {
+            old: ok,
+            new: nk,
+            limit,
+        };
+        Some((key, os, ns, ol, nl))
+    }
+
+    fn ensure_diff(&mut self, d: &DiffView) {
+        let path = d.path.clone();
+        self.want_track(&path, false);
+        let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
+            return;
+        };
+        let runs: Vec<Run> = t.runs.iter().rev().copied().collect();
+        let mut wanted = Vec::new();
+        if let Some(r0) = runs.get(d.run) {
+            wanted.push(r0.from);
+        }
+        if let Some(r) = runs
+            .get(d.run + 1..)
+            .and_then(|r| r.iter().find(|r| r.exists))
+        {
+            wanted.push(r.from);
+        }
+        for s in wanted {
+            self.want_node(&path, s);
+        }
+        if let Some((key, old, new, _, _)) = self.diff_sides(d)
+            && !self.diffs.contains_key(&key)
+        {
+            let (old, new) = (Box::new(old), Box::new(new));
+            self.request(Pending::Diff(key.clone()), Request::Diff { key, old, new });
+        }
+    }
+
+    /// Opens the full-screen diff at the version `run` (newest first) or
+    /// the next older one that exists.
+    fn open_diff(
+        &mut self,
+        path: PathBuf,
+        run: usize,
+        mode: DiffMode,
+        from_versions: bool,
+    ) -> bool {
+        let runs: Vec<Run> = self
+            .tracks
+            .get(&path)
+            .map(|t| t.runs.iter().rev().copied().collect())
+            .unwrap_or_default();
+        let Some(k) = (run..runs.len()).find(|&k| runs[k].exists) else {
+            self.message = Some("No saved version of this file to compare.".into());
+            return false;
+        };
+        // Look at the file on disk afresh.
+        let disk = SideKey::Disk(path.clone());
+        self.diffs
+            .retain(|key, _| key.old != disk && key.new != disk);
+        self.disk_files.remove(&path);
+        self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
+        self.view = View::Diff(DiffView {
+            path,
+            run: k,
+            mode,
+            scroll: 0,
+            force: false,
+            from_versions,
+        });
+        self.moved_on();
+        true
+    }
+
     fn preview_key(&self) -> String {
         match &self.view {
             View::Folder => format!(
@@ -670,6 +811,7 @@ impl App {
                 self.preview
             ),
             View::Versions(v) => format!("v|{}|{}|{:?}", v.path.display(), v.sel, self.preview),
+            View::Diff(d) => format!("d|{}|{}|{:?}", d.path.display(), d.run, d.mode),
         }
     }
 
@@ -762,6 +904,10 @@ impl App {
                 }
                 self.ensure();
             }
+            Response::Diff { key, diff } => {
+                self.pending.remove(&Pending::Diff(key.clone()));
+                self.diffs.insert(key, diff);
+            }
             Response::Error(e) => self.message = Some(e),
         }
     }
@@ -852,8 +998,10 @@ impl App {
 
     /// Does an action. Returns false if it stopped at a boundary (with a message).
     pub fn act(&mut self, a: Action) -> bool {
-        if let View::Versions(v) = self.view.clone() {
-            return self.act_versions(v, a);
+        match self.view.clone() {
+            View::Versions(v) => return self.act_versions(v, a),
+            View::Diff(d) => return self.act_diff(d, a),
+            View::Folder => {}
         }
         let rows = self.rows().len();
         let i = self.idx();
@@ -1048,8 +1196,22 @@ impl App {
                 self.moved_on();
             }
             Action::Diff => {
-                return fail(self, "The diff view isn't available yet.".into());
+                let Some(e) = self.selected().cloned().filter(|e| !e.is_dir()) else {
+                    return fail(self, "Select a file to diff.".into());
+                };
+                let path = self.folder.join(&e.node.name);
+                let id = self.set()[self.entry_snapshot(&e)].id;
+                self.want_track(&path, false);
+                let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
+                    return true;
+                };
+                let run = t
+                    .index_of(id)
+                    .and_then(|s| run_at(&t.runs, s))
+                    .map_or(0, |(k, _)| t.runs.len() - 1 - k);
+                return self.open_diff(path, run, DiffMode::Disk, false);
             }
+            Action::DiffPrevious | Action::NextHunk | Action::PrevHunk => {}
             Action::TogglePreview => self.toggle_preview(),
             Action::Scroll(n) => self.scroll_by(n),
             Action::Help => self.help = true,
@@ -1110,7 +1272,7 @@ impl App {
             Action::HalfUp => sel = sel.saturating_sub(10),
             Action::ClickVersion(k) => {
                 if k == sel {
-                    return self.act_versions(v, Action::Diff);
+                    return self.open_diff(v.path, sel, DiffMode::Disk, true);
                 }
                 sel = k.min(runs.saturating_sub(1));
             }
@@ -1123,7 +1285,10 @@ impl App {
                 }
             }
             Action::Open | Action::Diff => {
-                return fail(self, "The diff view isn't available yet.");
+                return self.open_diff(v.path, sel, DiffMode::Disk, true);
+            }
+            Action::DiffPrevious => {
+                return self.open_diff(v.path, sel, DiffMode::Previous, true);
             }
             Action::Back | Action::Parent | Action::Quit => {
                 self.view = View::Folder;
@@ -1139,6 +1304,106 @@ impl App {
         if sel != v.sel {
             self.view = View::Versions(VersionsView { sel, ..v });
             self.moved_on();
+        }
+        true
+    }
+
+    /// Lines in the diff being shown, and where its hunks start.
+    fn diff_lines(&self, d: &DiffView) -> Option<(usize, Vec<usize>)> {
+        let (key, ..) = self.diff_sides(d)?;
+        match self.diffs.get(&key)?.as_ref() {
+            FileDiff::Text { lines, .. } => Some((
+                lines.len(),
+                lines
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, l)| matches!(l, HunkLine::Header(_)))
+                    .map(|(i, _)| i)
+                    .collect(),
+            )),
+            _ => Some((0, Vec::new())),
+        }
+    }
+
+    fn act_diff(&mut self, d: DiffView, a: Action) -> bool {
+        let (len, headers) = self.diff_lines(&d).unwrap_or_default();
+        let page = self.page.max(2);
+        let max = len.saturating_sub(page);
+        let runs: Vec<Run> = self
+            .tracks
+            .get(&d.path)
+            .map(|t| t.runs.iter().rev().copied().collect())
+            .unwrap_or_default();
+        let fail = |app: &mut App, msg: &str| {
+            app.message = Some(msg.into());
+            false
+        };
+        let mut next = d.clone();
+        match a {
+            Action::Down(n) => next.scroll = (d.scroll + n).min(max),
+            Action::Up(n) => next.scroll = d.scroll.saturating_sub(n),
+            Action::HalfDown => next.scroll = (d.scroll + 15).min(max),
+            Action::HalfUp => next.scroll = d.scroll.saturating_sub(15),
+            Action::Top => next.scroll = 0,
+            Action::Bottom => next.scroll = max,
+            // A hunk that's already on screen below can't be scrolled to.
+            Action::NextHunk => match headers.iter().find(|&&h| h > d.scroll && d.scroll < max) {
+                Some(&h) => next.scroll = h.min(max),
+                None => return fail(self, "No more changes below."),
+            },
+            Action::PrevHunk => match headers.iter().rev().find(|&&h| h < d.scroll) {
+                Some(&h) => next.scroll = h,
+                None => return fail(self, "No more changes above."),
+            },
+            Action::OlderChange | Action::OlderItemChange => {
+                match (d.run + 1..runs.len()).find(|&k| runs[k].exists) {
+                    Some(k) => {
+                        next.run = k;
+                        next.scroll = 0;
+                    }
+                    None => return fail(self, "This is the oldest version."),
+                }
+            }
+            Action::NewerChange | Action::NewerItemChange => {
+                match (0..d.run).rev().find(|&k| runs[k].exists) {
+                    Some(k) => {
+                        next.run = k;
+                        next.scroll = 0;
+                    }
+                    None => return fail(self, "This is the newest saved version."),
+                }
+            }
+            Action::Diff => {
+                next.mode = DiffMode::Disk;
+                next.scroll = 0;
+            }
+            Action::DiffPrevious => {
+                next.mode = DiffMode::Previous;
+                next.scroll = 0;
+            }
+            Action::Open => next.force = true,
+            Action::Back | Action::Parent | Action::Quit => {
+                self.view = if d.from_versions {
+                    View::Versions(VersionsView {
+                        path: d.path,
+                        sel: d.run,
+                    })
+                } else {
+                    View::Folder
+                };
+                self.moved_on();
+                return true;
+            }
+            Action::Help => self.help = true,
+            Action::Prefix(c) => self.prefix = Some(c),
+            _ => {}
+        }
+        if next != d {
+            let reload = next.run != d.run || next.mode != d.mode || next.force != d.force;
+            self.view = View::Diff(next);
+            if reload {
+                self.moved_on();
+            }
         }
         true
     }

@@ -2,6 +2,7 @@
 //! here reads the repository. Layout follows the mockup cell by cell, so
 //! drawing works on a grid of cells rather than with ratatui widgets.
 
+pub mod diffview;
 pub mod fmt;
 pub mod folder;
 pub mod icons;
@@ -167,13 +168,17 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
         return g.hits;
     }
     app.page = (g.rows() - TOP - 1) as usize;
-    timeline::header(app, &mut g);
     match app.view.clone() {
         View::Folder => {
+            timeline::header(app, &mut g);
             timeline::draw_folder(app, &mut g);
             folder::draw(app, &mut g);
         }
-        View::Versions(v) => versions::draw(app, &mut g, &v),
+        View::Versions(v) => {
+            timeline::header(app, &mut g);
+            versions::draw(app, &mut g, &v);
+        }
+        View::Diff(d) => diffview::draw(app, &mut g, &d),
     }
     statusbar::draw(app, &mut g);
     popup::which_key(app, &mut g);

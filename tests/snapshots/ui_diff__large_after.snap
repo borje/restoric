@@ -1,0 +1,16 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(90, 12)"
+---
+ restoric  big.log  Jul 01 10:00  →  Jul 02 10:00                                   +9 −1
+ what this version changed
+ ┄┄ around line 259257 ┄┄
+ 259257 259257    line 259256
+ 259258 259258    line 259257
+ 259259 259259    line 259258
+ 259260         - li
+        259260  + line 259259
+        259261  + line 259260
+        259262  + line 259261
+        259263  + line 259262
+ DIFF  vs previous (p)  ]c [c changes · H L versions                         1/14  ? help

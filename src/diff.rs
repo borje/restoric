@@ -152,6 +152,61 @@ pub fn hunks(d: &LineDiff, context: usize) -> Vec<HunkLine> {
     out
 }
 
+/// Most of a file the full-screen diff reads unless asked (PLAN.md §3.10).
+pub const DIFF_LIMIT: u64 = 2 * 1024 * 1024;
+
+/// What "diff it anyway" reads at most.
+pub const FORCED_LIMIT: u64 = 256 * 1024 * 1024;
+
+/// One side of a diff.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SideKey {
+    /// A file in the repository, by content.
+    Content([u8; 32]),
+    Disk(std::path::PathBuf),
+    /// No file: everything is added (or removed).
+    Nothing,
+}
+
+/// A diff to show, by its two sides and how much of them to read.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DiffKey {
+    pub old: SideKey,
+    pub new: SideKey,
+    pub limit: u64,
+}
+
+/// The full-screen diff's content.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileDiff {
+    Text {
+        old: Vec<String>,
+        new: Vec<String>,
+        lines: Vec<HunkLine>,
+        added: usize,
+        removed: usize,
+    },
+    /// At least one side is binary: sizes of both.
+    Binary { old: u64, new: u64 },
+    /// A side is bigger than the limit (its size).
+    TooBig(u64),
+    /// The file on disk is missing or unreadable, or isn't a file.
+    Missing,
+}
+
+impl FileDiff {
+    pub fn text(old: &str, new: &str) -> Self {
+        let d = diff(old, new);
+        FileDiff::Text {
+            lines: hunks(&d, 3),
+            added: d.added,
+            removed: d.removed,
+            old: lines(old).into_iter().map(str::to_string).collect(),
+            new: lines(new).into_iter().map(str::to_string).collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_channel::{Receiver, Sender};
 
+use crate::diff::{self, DiffKey, FileDiff};
 use crate::disk::Disk;
 use crate::index::fingerprint::{self, Fp};
 use crate::index::folder::Counts;
@@ -73,6 +74,20 @@ pub enum Request {
         path: PathBuf,
         snaps: Vec<usize>,
     },
+    /// A full-screen diff: read both sides up to `key.limit` and diff them.
+    Diff {
+        key: DiffKey,
+        old: Box<Side>,
+        new: Box<Side>,
+    },
+}
+
+/// Where a side of a diff comes from.
+#[derive(Clone, Debug)]
+pub enum Side {
+    Repo(Node),
+    Disk(PathBuf),
+    Nothing,
 }
 
 impl Request {
@@ -131,6 +146,10 @@ pub enum Response {
     Nodes {
         path: PathBuf,
         nodes: Vec<(usize, Option<Node>)>,
+    },
+    Diff {
+        key: DiffKey,
+        diff: Arc<FileDiff>,
     },
     Error(String),
 }
@@ -216,6 +235,13 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 }
                 send(Response::Nodes { path, nodes });
             }
+            Request::Diff { key, old, new } => {
+                let diff = file_diff(ctx, &old, &new, key.limit)?;
+                send(Response::Diff {
+                    key,
+                    diff: Arc::new(diff),
+                });
+            }
         }
         index.flush()?;
         Ok(())
@@ -224,6 +250,40 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
         tracing::warn!("worker: {e:#}");
         send(Response::Error(format!("{e:#}")));
     }
+}
+
+/// Reads both sides (unless one is over `limit`) and diffs them.
+fn file_diff(ctx: &Ctx, old: &Side, new: &Side, limit: u64) -> anyhow::Result<FileDiff> {
+    let size = |s: &Side| -> Option<u64> {
+        match s {
+            Side::Repo(n) => Some(n.size),
+            Side::Disk(p) => ctx.disk.stat(p).map(|d| d.size),
+            Side::Nothing => Some(0),
+        }
+    };
+    let (Some(old_size), Some(new_size)) = (size(old), size(new)) else {
+        return Ok(FileDiff::Missing);
+    };
+    if old_size.max(new_size) > limit {
+        return Ok(FileDiff::TooBig(old_size.max(new_size)));
+    }
+    let read = |s: &Side| -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(match s {
+            Side::Repo(n) => Some(ctx.index.repo().read_file(n, limit)?.data),
+            Side::Disk(p) => ctx.disk.read(p, limit),
+            Side::Nothing => Some(Vec::new()),
+        })
+    };
+    let (Some(a), Some(b)) = (read(old)?, read(new)?) else {
+        return Ok(FileDiff::Missing);
+    };
+    Ok(match (diff::text(&a), diff::text(&b)) {
+        (Some(a), Some(b)) => FileDiff::text(&a, &b),
+        _ => FileDiff::Binary {
+            old: old_size,
+            new: new_size,
+        },
+    })
 }
 
 /// A request and the generation it was sent in.
