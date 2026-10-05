@@ -11,6 +11,11 @@ fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Ac
         (View::Diff(_), ']') => &[("]c", "next change", Action::NextHunk)],
         (View::Diff(_), '[') => &[("[c", "previous change", Action::PrevHunk)],
         (_, 'z') => &[("zh", "show / hide deleted", Action::ToggleDeleted)],
+        (_, 'c') => &[
+            ("cc", "copy snapshot:path", Action::Copy('c')),
+            ("cd", "copy folder path", Action::Copy('d')),
+            ("cf", "copy file name", Action::Copy('f')),
+        ],
         (_, 'g') => &[
             ("gg", "top of list", Action::Top),
             ("gh", "backup root", Action::Root),
@@ -115,4 +120,78 @@ pub fn help(app: &App, g: &mut Grid) {
         );
     }
     g.put_to(x + 3, y + h - 2, "Press any key to close", t.dim, end);
+}
+
+/// The restore dialog (PLAN.md §3.11).
+pub fn restore_dialog(app: &App, g: &mut Grid) {
+    let Some(d) = &app.dialog else { return };
+    let t = g.theme.clone();
+    let (cols, rows) = (g.cols(), g.rows());
+    let w = 78.min(cols.saturating_sub(2));
+    let h = if d.confirm { 15 } else { 14 };
+    let x = (cols - w) / 2;
+    let y = ((rows.saturating_sub(h)) / 2).saturating_sub(1);
+    g.rbox(x, y, w, h, "Restore", t.bold);
+    let tg = &d.target;
+    let mut name = tg.name();
+    if tg.node.is_dir() {
+        name.push('/');
+    }
+    let c = g.put(x + 3, y + 2, &name, t.bold);
+    let c = g.put(
+        c,
+        y + 2,
+        &format!("  @ {}  ", fmt::time(tg.snapshot.time, &app.tz)),
+        t.text,
+    );
+    g.put(c, y + 2, &tg.snapshot.id.0.short(), t.accent);
+    let from = format!("from {}", tg.path.display());
+    g.put(x + 3, y + 3, &fmt::fit(&from, (w - 6) as usize), t.dim);
+    for (k, (label, detail)) in app.dialog_options(d).iter().enumerate() {
+        let r = y + 5 + k as u16;
+        let on = d.sel == k;
+        g.put(x + 3, r, &format!("{} ", k + 1), t.dim);
+        let radio = if on { "(•) " } else { "( ) " };
+        g.put(
+            x + 5,
+            r,
+            radio,
+            if on { t.accent.patch(t.bold) } else { t.dim },
+        );
+        g.put_to(x + 9, r, label, if on { t.bold } else { t.text }, x + 39);
+        g.put(x + 40, r, &fmt::fit(detail, (w - 43) as usize), t.dim);
+        g.hit(x + 1, x + w - 1, r, Action::DialogOption(k));
+    }
+    if d.confirm {
+        let msg = "This replaces what is on disk now. Press ⏎ again to confirm.";
+        g.put_to(x + 3, y + 10, msg, t.warn, x + w - 1);
+    }
+    let by = y + h - 2;
+    g.put_act(
+        x + 3,
+        by,
+        "[ Restore ]",
+        t.accent.patch(t.bold),
+        Action::DialogRestore,
+    );
+    g.put_act(x + 17, by, "[ Cancel ]", t.dim, Action::DialogCancel);
+    g.put(x + w - 29, by, "j k choose  ⏎ restore  esc", t.dim);
+}
+
+/// The confirmation before overwriting.
+pub fn confirm(app: &App, g: &mut Grid) {
+    let Some(c) = &app.confirm else { return };
+    let t = g.theme.clone();
+    let lines = fmt::wrap(&c.text, 50);
+    let w = 56.min(g.cols());
+    let h = lines.len() as u16 + 5;
+    let x = (g.cols() - w) / 2;
+    let y = ((g.rows().saturating_sub(h)) / 2).saturating_sub(2);
+    g.rbox(x, y, w, h, "Overwrite?", t.warn);
+    for (k, l) in lines.iter().enumerate() {
+        g.put(x + 3, y + 2 + k as u16, l, t.text);
+    }
+    let by = y + h - 2;
+    g.put_act(x + 3, by, "[y] Overwrite", t.warn, Action::ConfirmYes);
+    g.put_act(x + 19, by, "[n] Cancel", t.dim, Action::ConfirmNo);
 }

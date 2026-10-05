@@ -2,7 +2,9 @@
 //! draws from this; repository and disk work goes out as [`Request`]s in
 //! `outbox` and comes back through [`App::apply`].
 
+pub mod cmdline;
 pub mod keys;
+pub mod selection;
 
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
@@ -21,8 +23,22 @@ use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
 use crate::index::versions::{Run, run_at};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
+use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
 use crate::worker::{Request, Response, Side};
+use cmdline::Input;
+use selection::{Confirm, Dialog};
+
+/// Things the event loop does outside the app: they need the terminal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Effect {
+    Clipboard(String),
+    /// Show a file in `$PAGER`.
+    Pager {
+        name: String,
+        bytes: Vec<u8>,
+    },
+}
 
 /// What's known about one path over time: the current folder, or the
 /// selected entry (its "item track").
@@ -178,6 +194,23 @@ pub enum Action {
     NextHunk,
     PrevHunk,
     Back,
+    ToggleMark,
+    Visual,
+    Yank,
+    Paste,
+    PasteOver,
+    RestoreDialog,
+    /// `cc` `cd` `cf`
+    Copy(char),
+    CommandLine,
+    /// `esc`: leave visual mode, then clear the selection.
+    Escape,
+    /// A click on a restore dialog option: select it, or restore if selected.
+    DialogOption(usize),
+    DialogRestore,
+    DialogCancel,
+    ConfirmYes,
+    ConfirmNo,
     Help,
     Prefix(char),
     Quit,
@@ -289,6 +322,20 @@ pub struct App {
     pub bumped: bool,
     /// Rows in the listing pane, from the last draw (for half-page moves).
     pub page: usize,
+    /// Selected names in the current folder (`Space`, `v`).
+    pub marks: HashSet<OsString>,
+    /// Visual mode's anchor row.
+    pub visual: Option<usize>,
+    /// What `y` yanked, for `p` and `P`.
+    pub yanked: Option<Vec<Target>>,
+    pub dialog: Option<Dialog>,
+    pub confirm: Option<Confirm>,
+    /// The `:` line being typed.
+    pub input: Option<Input>,
+    pub effects: Vec<Effect>,
+    pub places: Places,
+    /// Whether paths exist on disk (for the restore dialog).
+    pub exists: HashMap<PathBuf, bool>,
 }
 
 impl App {
@@ -307,7 +354,7 @@ impl App {
             .cloned()
             .unwrap_or_else(|| folder.clone());
         let mut app = App {
-            tz,
+            tz: tz.clone(),
             home,
             all,
             root,
@@ -341,6 +388,15 @@ impl App {
             outbox: Vec::new(),
             bumped: false,
             page: 20,
+            marks: HashSet::new(),
+            visual: None,
+            yanked: None,
+            dialog: None,
+            confirm: None,
+            input: None,
+            effects: Vec::new(),
+            places: Places::default_for(tz.clone()),
+            exists: HashMap::new(),
         };
         let set = app.set_for(&folder);
         if let Some(last) = set.last() {
@@ -908,6 +964,70 @@ impl App {
                 self.pending.remove(&Pending::Diff(key.clone()));
                 self.diffs.insert(key, diff);
             }
+            Response::Restored { how, done } => {
+                let home = self.home.clone();
+                let show = |p: &Path| fmt::path(p, home.as_deref());
+                let base = |p: &Path| {
+                    p.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default()
+                };
+                self.message = Some(match (how, done.as_slice()) {
+                    (How::Overwrite, [d]) => {
+                        format!(
+                            "Overwrote {}. :undo puts the old version back.",
+                            base(&d.target)
+                        )
+                    }
+                    (How::Overwrite, ds) => {
+                        format!(
+                            "Overwrote {} items. :undo puts the old versions back.",
+                            ds.len()
+                        )
+                    }
+                    (How::NextTo, [d]) if d.dest == d.target => {
+                        format!("Restored {} to {}", base(&d.target), show(&d.target))
+                    }
+                    (How::NextTo, [d]) => format!("Restored as {}", base(&d.dest)),
+                    (How::NextTo, ds) => {
+                        format!("Restored {} items next to the originals", ds.len())
+                    }
+                    (How::RestoreDir, [d]) => format!("Restored to {}", show(&d.dest)),
+                    (How::RestoreDir, ds) => format!(
+                        "Restored {} items to {}",
+                        ds.len(),
+                        show(ds[0].dest.parent().unwrap_or(&ds[0].dest))
+                    ),
+                    (How::Tar, ds) => {
+                        let names: Vec<String> = ds.iter().map(|d| base(&d.dest)).collect();
+                        format!("Wrote {}", names.join(", "))
+                    }
+                });
+                self.disk_changed();
+            }
+            Response::Undone(paths) => {
+                self.message = Some(match paths.as_slice() {
+                    [p] => format!(
+                        "Put back {}.",
+                        p.file_name()
+                            .map(|n| n.to_string_lossy())
+                            .unwrap_or_default()
+                    ),
+                    ps => format!("Put back {} items.", ps.len()),
+                });
+                self.disk_changed();
+            }
+            Response::Exists(found) => {
+                self.exists.extend(found);
+                // The dialog's default depends on it.
+                if let Some(d) = &mut self.dialog
+                    && self.exists.get(&d.target.path) == Some(&false)
+                    && d.sel == 1
+                {
+                    d.sel = 0;
+                }
+            }
+            Response::Pager { name, bytes } => self.effects.push(Effect::Pager { name, bytes }),
             Response::Error(e) => self.message = Some(e),
         }
     }
@@ -972,6 +1092,8 @@ impl App {
         }
         self.sel_name = select;
         self.sel = usize::from(self.folder != self.root);
+        self.marks.clear();
+        self.visual = None;
         self.restore_selection();
         self.moved_on();
     }
@@ -998,6 +1120,50 @@ impl App {
 
     /// Does an action. Returns false if it stopped at a boundary (with a message).
     pub fn act(&mut self, a: Action) -> bool {
+        match a {
+            Action::Yank => return self.yank(),
+            Action::Paste => return self.paste(false),
+            Action::PasteOver => return self.paste(true),
+            Action::RestoreDialog => return self.open_dialog(),
+            Action::Copy(c) => return self.copy(c),
+            Action::CommandLine => {
+                self.input = Some(Input::default());
+                return true;
+            }
+            Action::DialogOption(k) => {
+                if let Some(d) = &mut self.dialog {
+                    if d.sel == k {
+                        self.dialog_enter();
+                    } else {
+                        d.sel = k;
+                        d.confirm = false;
+                    }
+                }
+                return true;
+            }
+            Action::DialogRestore => {
+                self.dialog_enter();
+                return true;
+            }
+            Action::DialogCancel => {
+                self.dialog = None;
+                return true;
+            }
+            Action::ConfirmYes => {
+                if let Some(c) = self.confirm.take() {
+                    self.outbox.push(Request::Restore {
+                        targets: c.targets,
+                        how: How::Overwrite,
+                    });
+                }
+                return true;
+            }
+            Action::ConfirmNo => {
+                self.confirm = None;
+                return true;
+            }
+            _ => {}
+        }
         match self.view.clone() {
             View::Versions(v) => return self.act_versions(v, a),
             View::Diff(d) => return self.act_diff(d, a),
@@ -1212,6 +1378,24 @@ impl App {
                 return self.open_diff(path, run, DiffMode::Disk, false);
             }
             Action::DiffPrevious | Action::NextHunk | Action::PrevHunk => {}
+            Action::ToggleMark => self.toggle_mark(),
+            Action::Visual => self.toggle_visual(),
+            Action::Escape => {
+                if self.visual.take().is_none() {
+                    self.marks.clear();
+                }
+            }
+            Action::Yank
+            | Action::Paste
+            | Action::PasteOver
+            | Action::RestoreDialog
+            | Action::Copy(_)
+            | Action::CommandLine
+            | Action::DialogOption(_)
+            | Action::DialogRestore
+            | Action::DialogCancel
+            | Action::ConfirmYes
+            | Action::ConfirmNo => unreachable!("handled above"),
             Action::TogglePreview => self.toggle_preview(),
             Action::Scroll(n) => self.scroll_by(n),
             Action::Help => self.help = true,
@@ -1290,7 +1474,7 @@ impl App {
             Action::DiffPrevious => {
                 return self.open_diff(v.path, sel, DiffMode::Previous, true);
             }
-            Action::Back | Action::Parent | Action::Quit => {
+            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
                 self.view = View::Folder;
                 self.moved_on();
                 return true;
@@ -1382,7 +1566,7 @@ impl App {
                 next.scroll = 0;
             }
             Action::Open => next.force = true,
-            Action::Back | Action::Parent | Action::Quit => {
+            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
                 self.view = if d.from_versions {
                     View::Versions(VersionsView {
                         path: d.path,

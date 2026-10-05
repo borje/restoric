@@ -10,6 +10,23 @@ pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let (cols, r) = (g.cols(), g.rows() - 1);
     g.fill(r, 0, cols - 1, t.status_bar);
+    if let Some(input) = &app.input {
+        let c = g.put(1, r, ":", t.accent.patch(t.bold));
+        let c = g.put(c, r, &input.text, t.text);
+        let c = g.put(c, r, "█", t.accent);
+        let hint = "sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo";
+        let hx = cols.saturating_sub(1 + fmt::width(hint) as u16);
+        if c + 2 < hx {
+            g.put(hx, r, hint, t.dim);
+        }
+        return;
+    }
+    if app.dialog.is_some() {
+        let c = g.put(0, r, " RST ", t.badge_red) + 1;
+        let mid = vec![("choose where the restored copy goes".to_string(), t.dim)];
+        finish(app, g, c, mid, Vec::new());
+        return;
+    }
     if let View::Diff(d) = &app.view {
         let c = g.put(0, r, " DIFF ", t.badge_blue) + 1;
         let mode = match d.mode {
@@ -27,7 +44,13 @@ pub fn draw(app: &App, g: &mut Grid) {
         finish(app, g, c, mid, right);
         return;
     }
-    let c = g.put(0, r, " NOR ", t.badge) + 1;
+    let c = if app.visual.is_some() {
+        g.put(0, r, " VIS ", t.badge_blue)
+    } else if !app.marks.is_empty() {
+        g.put(0, r, " SEL ", t.badge_blue)
+    } else {
+        g.put(0, r, " NOR ", t.badge)
+    } + 1;
 
     let mut mid: Vec<(String, Style)> = Vec::new();
     let mut right: Vec<(String, Style, Option<Action>)> = Vec::new();
@@ -81,6 +104,9 @@ pub fn draw(app: &App, g: &mut Grid) {
         if share > 1 {
             mid.push((format!("  {share} in column · zi"), t.dim));
         }
+    }
+    if let Some(y) = &app.yanked {
+        mid.push((format!("  {} yanked", y.len()), t.accent));
     }
 
     if let Some(e) = app.selected()

@@ -67,6 +67,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
             ('g', KeyCode::Char('g')) => Some(Top),
             ('g', KeyCode::Char('h')) => Some(Root),
             ('z', KeyCode::Char('h')) => Some(ToggleDeleted),
+            ('c', KeyCode::Char(c @ ('c' | 'd' | 'f'))) => Some(Copy(c)),
             _ => None,
         };
     }
@@ -98,6 +99,14 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('K') => Scroll(-3),
         KeyCode::Char('.') => ToggleDeleted,
         KeyCode::Char('d') => Diff,
+        KeyCode::Char(' ') => ToggleMark,
+        KeyCode::Char('v') => Visual,
+        KeyCode::Char('y') => Yank,
+        KeyCode::Char('p') => Paste,
+        KeyCode::Char('P') => PasteOver,
+        KeyCode::Char('r') => RestoreDialog,
+        KeyCode::Char('c') => Prefix('c'),
+        KeyCode::Char(':') => CommandLine,
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
         KeyCode::Char('q') => Quit,
         _ => return None,
@@ -105,6 +114,26 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
 }
 
 impl App {
+    /// Typing on the `:` line.
+    fn input_key(&mut self, k: KeyEvent) {
+        let Some(input) = &mut self.input else { return };
+        match k.code {
+            KeyCode::Esc => self.input = None,
+            KeyCode::Enter => {
+                let text = std::mem::take(&mut input.text);
+                self.input = None;
+                self.run_command(&text);
+            }
+            KeyCode::Backspace => {
+                if input.text.pop().is_none() {
+                    self.input = None;
+                }
+            }
+            KeyCode::Char(c) => input.text.push(c),
+            _ => {}
+        }
+    }
+
     pub fn key(&mut self, k: KeyEvent) {
         if k.kind == KeyEventKind::Release {
             return;
@@ -115,6 +144,42 @@ impl App {
             return;
         }
         self.message = None;
+        if self.input.is_some() {
+            self.input_key(k);
+            return;
+        }
+        if self.confirm.is_some() {
+            match k.code {
+                KeyCode::Char('y') | KeyCode::Enter => {
+                    self.act(Action::ConfirmYes);
+                }
+                KeyCode::Char('n') | KeyCode::Char('q') | KeyCode::Esc => {
+                    self.act(Action::ConfirmNo);
+                }
+                _ => {}
+            }
+            return;
+        }
+        if let Some(d) = &mut self.dialog {
+            match k.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    d.sel = (d.sel + 1) % 4;
+                    d.confirm = false;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    d.sel = (d.sel + 3) % 4;
+                    d.confirm = false;
+                }
+                KeyCode::Char(c @ '1'..='4') => {
+                    d.sel = c as usize - '1' as usize;
+                    d.confirm = false;
+                }
+                KeyCode::Enter => self.dialog_enter(),
+                KeyCode::Esc | KeyCode::Char('q') => self.dialog = None,
+                _ => {}
+            }
+            return;
+        }
         if self.prefix.is_none()
             && let KeyCode::Char(c @ '0'..='9') = k.code
             && (c != '0' || !self.count.is_empty())
@@ -127,8 +192,8 @@ impl App {
         if k.code == KeyCode::Esc {
             let pending = self.prefix.take().is_some() || !self.count.is_empty();
             self.count.clear();
-            if !pending && self.view != View::Folder {
-                self.act(Action::Back);
+            if !pending {
+                self.act(Action::Escape);
             }
             return;
         }

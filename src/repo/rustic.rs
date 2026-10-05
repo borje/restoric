@@ -1,18 +1,18 @@
 //! [`Repo`] on top of rustic_core. The only file that sees rustic types.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, anyhow, bail};
 use rustic_backend::BackendOptions;
 use rustic_core::repofile::{Node as RNode, NodeType, SnapshotFile};
 use rustic_core::{
-    CommandInput, CredentialOptions, Credentials, IndexedFullStatus, IndexedIdsStatus, Repository,
-    RepositoryBackends, RepositoryOptions,
+    CommandInput, CredentialOptions, Credentials, IndexedFullStatus, IndexedIdsStatus,
+    LocalDestination, LsOptions, Repository, RepositoryBackends, RepositoryOptions, RestoreOptions,
 };
 use sha2::{Digest, Sha256};
 
-use super::{BlobId, FileBytes, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
+use super::{BlobId, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
 
 /// Names the cache's backend version: a new rustic_core starts a new cache.
 pub const BACKEND: &str = "rustic_core 0.13.0";
@@ -25,6 +25,8 @@ pub struct OpenOptions {
     pub password: Option<String>,
     pub password_file: Option<PathBuf>,
     pub password_command: Option<String>,
+    /// The repository has no password (`restic init --insecure-no-password`).
+    pub no_password: bool,
     /// rustic's own cache (index, snapshots, tree packs); default is rustic's.
     pub cache_dir: Option<PathBuf>,
 }
@@ -59,7 +61,15 @@ impl RusticRepo {
         };
 
         let mut cred = CredentialOptions::default();
-        if let Some(p) = &o.password {
+        let given =
+            o.password.is_some() || o.password_file.is_some() || o.password_command.is_some();
+        if o.no_password && given {
+            bail!("--insecure-no-password can't be used together with a password");
+        }
+        if o.no_password {
+            // restic encrypts the key with an empty password then.
+            cred = cred.password(String::new());
+        } else if let Some(p) = &o.password {
             cred = cred.password(p.clone());
         } else if let Some(f) = &o.password_file {
             cred = cred.password_file(f.clone());
@@ -70,7 +80,8 @@ impl RusticRepo {
             );
         }
         let credentials = cred.credentials().map_err(|e| anyhow!("{e}"))?.context(
-            "no password given: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE or RESTIC_PASSWORD_COMMAND",
+            "no password given: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE or RESTIC_PASSWORD_COMMAND, \
+             or pass --insecure-no-password for a repository without one",
         )?;
 
         let mut opts = RepositoryOptions::default();
@@ -194,7 +205,7 @@ impl Repo for RusticRepo {
         }))
     }
 
-    fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes> {
+    fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>> {
         if node.kind != NodeKind::File {
             bail!("not a file");
         }
@@ -202,13 +213,43 @@ impl Repo for RusticRepo {
         let open = repo
             .open_file(&rnode_from(node))
             .map_err(|e| anyhow!("{e}"))?;
-        let len = node.size.min(limit) as usize;
+        let len = node.size.saturating_sub(offset).min(len) as usize;
         let data = repo
-            .read_file_at(&open, 0, len)
+            .read_file_at(&open, offset as usize, len)
             .map_err(|e| anyhow!("{e}"))?;
-        Ok(FileBytes {
-            data: data.to_vec(),
-            size: node.size,
-        })
+        Ok(data.to_vec())
+    }
+
+    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()> {
+        if dest.symlink_metadata().is_ok() {
+            bail!("{} already exists", dest.display());
+        }
+        let repo = self.full()?;
+        let tree = rustic_core::TreeId::from(rustic_core::Id::new(snap.tree.0.0));
+        let rel: PathBuf = path.components().skip(1).collect();
+        let node = repo
+            .node_from_path(tree, &rel)
+            .map_err(|e| anyhow!("{e}"))?;
+        let is_dir = node.is_dir();
+        // RestoreOptions is `non_exhaustive`: no struct literal.
+        #[allow(clippy::field_reassign_with_default)]
+        let opts = {
+            let mut o = RestoreOptions::default();
+            o.no_ownership = !super::is_root();
+            o
+        };
+        let dest_str = dest
+            .to_str()
+            .context("restoring to a path that isn't UTF-8 isn't supported")?;
+        let dest = LocalDestination::new(dest_str, true, !is_dir).map_err(|e| anyhow!("{e}"))?;
+        let ls = repo
+            .ls(&node, &LsOptions::default())
+            .map_err(|e| anyhow!("{e}"))?;
+        let plan = repo
+            .prepare_restore(&opts, ls.clone(), &dest, false)
+            .map_err(|e| anyhow!("{e}"))?;
+        repo.restore(plan, &opts, ls, &dest)
+            .map_err(|e| anyhow!("{e}"))?;
+        Ok(())
     }
 }

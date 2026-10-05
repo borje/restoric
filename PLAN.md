@@ -771,6 +771,8 @@ For targets other than "next to it" and "overwrite". Works on files and folders,
 | 3 | Restore to `~/Restored/` | `~/Restored/<stamp>/<name>` |
 | 4 | File: show in `$PAGER` · folder: write a tar archive | Read only / `name-<stamp>.tar` |
 
+How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restorer, which keeps mode, modification time and symlinks; owner and group are set only when running as root. Folder tar archives are written by restoric from the trees. An overwrite moves what's on disk into `undo/<time>/files/<absolute path>` with a `manifest.json`. If the restore fails, the old version is moved back. `:undo` undoes the newest overwrite, all of its items at once. Moves fall back to copy and delete across file systems. The dialog's "next to it" name comes without the `-2` a clash would add, because the UI doesn't look at the disk; the message after the restore gives the real name. The `:` line handles `:undo`, `:q`, `:help`, `:deleted`, `:latest`/`:now` and `:oldest`/`:first`; the rest of §3.15 comes in M6.
+
 ### 3.12 Help (`?` or `~`)
 <sub>`docs/screens/16-help.txt`</sub>
 
@@ -985,7 +987,7 @@ restoric/
 │   ├── disk.rs        Disk trait: the real file system (never follows symlinks), faked in tests
 │   ├── worker.rs      background pool, Request/Response enums, generation ids
 │   ├── tui.rs         terminal setup/teardown, panic hook, event loop
-│   ├── restore.rs     restore/dump/tar, undo log
+│   ├── restore.rs     next to / overwrite / restore folder / tar, undo log (writes nothing else)
 │   ├── diff.rs        imara-diff line diffs, binary detection, margin marks, hunks
 │   ├── app/
 │   │   ├── mod.rs     App state, view stack (Folder, Versions, Diff, Find), overlays (Dialog, Help)
@@ -1020,8 +1022,8 @@ pub trait Repo: Send + Sync {
     fn snapshots(&self) -> Result<Vec<SnapshotInfo>>;          // id, time, host, paths, tags, root tree
     fn tree(&self, id: &TreeId) -> Result<Arc<Tree>>;           // nodes: name, kind, size, mode, owner, mtime, content ids, subtree id, raw hash
     fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes>;
-    fn restore(&self, snap: &SnapshotId, path: &Path, dest: &Path, opts: RestoreOpts) -> Result<RestoreReport>;   // M5
-    fn dump_tar(&self, snap: &SnapshotId, path: &Path, out: &mut dyn Write) -> Result<()>;                      // M5
+    fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>>;   // read_file is built on it
+    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()>;   // dest must not exist
 }
 ```
 Everything in `index/` is written against this trait and holds no rustic types. A node's `raw` hash covers everything restic stored for it; `--strict` compares that.
@@ -1047,7 +1049,7 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 - **Progress:** the title bar shows `indexing 120/430` while change points are computed. Partial results draw as they arrive, newest first.
 
 ### 4.6 Start-up
-1. Read the repository and password from `--repo` / `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE` and `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic. Then the config file.
+1. Read the repository and password from `--repo` / `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE` and `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic, or `--insecure-no-password` for a repository without one. Then the config file.
 2. Open the repo (read only). Load the snapshot list from the cache, then fetch new ones in the background.
 3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) whose `paths` contain that path.
 4. If this machine has no snapshots at all: show the hostnames that do have snapshots, explain how to set `host` (§2.4), and stop.
@@ -1058,6 +1060,7 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 restoric [PATH]                       open the TUI at PATH (default: current folder)
   -r, --repo REPO       --repository-file FILE
   --password-file FILE  --password-command CMD     (plus RESTIC_REPOSITORY, _FILE, RESTIC_PASSWORD, _FILE, _COMMAND)
+  --insecure-no-password  a repository made with `restic init --insecure-no-password` (empty password; can't be combined with a password)
   --host HOST           --tag TAG                  --strict
   --select NAME         start with NAME selected (used by the yazi plugin)
   --no-icons
@@ -1202,6 +1205,7 @@ Settled during review:
 - Name: `restoric` is free on crates.io and the AUR, and the GitHub account name `restoric` is free. One existing GitHub repo has the same name: [leaanthony/restoric](https://github.com/leaanthony/restoric), "A PoC Restic GUI using the Wails Framework" (12 stars, no license, last push January 2023). It's an abandoned proof of concept, but it's in the same space, so expect some confusion in search results.
 - Only snapshots from this machine are shown (§2.4).
 - Repository size: any. Design rules, test repos and targets are in §4.8.
+- Repositories without a password (`restic init --insecure-no-password`) are supported with `--insecure-no-password`, as in restic (§4.7).
 
 ---
 
@@ -1262,7 +1266,7 @@ Tick milestones here as they're done, with the commit.
 - [x] M2: read-only folder view — cbd4b73
 - [x] M3: preview, item track, versions, deleted items — 3be44ca
 - [x] M4: diff — 34dc9c5
-- [ ] M5: restore
+- [x] M5: restore — COMMIT
 - [ ] M6: navigation extras
 - [ ] M7: polish and release
 - [ ] M8: yazi plugin

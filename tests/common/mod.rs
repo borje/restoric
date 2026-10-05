@@ -3,6 +3,8 @@
 
 #![allow(dead_code)]
 
+pub mod fixture;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -47,9 +49,19 @@ impl Harness {
             TimeZone::UTC,
             Some(PathBuf::from("/home/bege")),
         );
+        let mut app = app;
+        app.places.restore_dir = PathBuf::from("/home/bege/Restored");
         let mut h = Harness {
             app,
-            ctx: Ctx { index, disk },
+            ctx: Ctx {
+                index,
+                disk,
+                places: restoric::restore::Places {
+                    restore_dir: PathBuf::from("/home/bege/Restored"),
+                    undo_dir: std::env::temp_dir().join("restoric-test-undo"),
+                    tz: TimeZone::UTC,
+                },
+            },
         };
         h.pump();
         h

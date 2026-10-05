@@ -61,6 +61,9 @@ struct RepoArgs {
     /// Command that prints the password
     #[arg(long, global = true, env = "RESTIC_PASSWORD_COMMAND")]
     password_command: Option<String>,
+    /// Open a repository that has no password (restic's --insecure-no-password)
+    #[arg(long, global = true)]
+    insecure_no_password: bool,
 }
 
 #[derive(Args)]
@@ -99,6 +102,7 @@ fn open(args: &RepoArgs, view: &ViewArgs) -> Result<(Index, Filter)> {
         password: std::env::var("RESTIC_PASSWORD").ok(),
         password_file: args.password_file.clone(),
         password_command: args.password_command.clone(),
+        no_password: args.insecure_no_password,
         cache_dir: None,
     })?;
     let cache = match Cache::default_path(repo.id()) {
@@ -189,9 +193,11 @@ fn run(cli: Cli) -> Result<()> {
             let app = App::new(mine, folder, jiff::tz::TimeZone::system(), home);
             let (tx, rx) = crossbeam_channel::unbounded();
             let threads = std::thread::available_parallelism().map_or(2, |n| n.get());
+            let places = app.places.clone();
             let ctx = Ctx {
                 index,
                 disk: Arc::new(RealDisk),
+                places,
             };
             let worker = Worker::start(Arc::new(ctx), threads, tx);
             restoric::tui::run(app, worker, rx)

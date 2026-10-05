@@ -1,6 +1,8 @@
 //! Terminal setup and teardown, and the event loop (PLAN.md §4.5).
 
-use std::io::stdout;
+use std::io::{Write, stdout};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -8,8 +10,8 @@ use crossbeam_channel::{Receiver, select};
 use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use ratatui::crossterm::execute;
 
-use crate::app::App;
 use crate::app::keys::Hits;
+use crate::app::{App, Effect};
 use crate::ui;
 use crate::ui::theme::Theme;
 use crate::worker::{Response, Worker};
@@ -17,6 +19,68 @@ use crate::worker::{Response, Worker};
 fn restore() {
     let _ = execute!(stdout(), DisableMouseCapture);
     ratatui::restore();
+}
+
+/// Copies to the clipboard: the system one, or the terminal's through the
+/// OSC 52 escape sequence over SSH or without a display.
+fn copy(text: &str) {
+    let ssh = std::env::var_os("SSH_TTY").is_some() || std::env::var_os("SSH_CONNECTION").is_some();
+    if !ssh
+        && let Ok(mut c) = arboard::Clipboard::new()
+        && c.set_text(text).is_ok()
+    {
+        return;
+    }
+    let b64 = base64(text.as_bytes());
+    let mut out = stdout();
+    let _ = write!(out, "\x1b]52;c;{b64}\x07");
+    let _ = out.flush();
+}
+
+fn base64(data: &[u8]) -> String {
+    const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in data.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(A[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+/// Shows bytes in `$PAGER` (default `less`), with the TUI suspended.
+fn page(terminal: &mut ratatui::DefaultTerminal, bytes: &[u8]) -> Result<()> {
+    restore();
+    let pager = std::env::var("PAGER").unwrap_or_else(|_| "less".into());
+    let mut words = pager.split_whitespace();
+    let result = match words.next() {
+        Some(cmd) => std::process::Command::new(cmd)
+            .args(words)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                if let Some(mut stdin) = child.stdin.take() {
+                    // The pager may quit before reading everything.
+                    let _ = stdin.write_all(bytes);
+                }
+                child.wait().map(|_| ())
+            }),
+        None => Ok(()),
+    };
+    *terminal = ratatui::init();
+    execute!(stdout(), EnableMouseCapture)?;
+    terminal.clear()?;
+    result.map_err(|e| anyhow::anyhow!("running {pager}: {e}"))
 }
 
 pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Result<()> {
@@ -29,9 +93,23 @@ pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Resul
     }));
     execute!(stdout(), EnableMouseCapture)?;
 
+    // The reader pauses while a pager owns the terminal, so it doesn't take
+    // the pager's keys.
+    let paused = Arc::new(AtomicBool::new(false));
     let (ev_tx, events) = crossbeam_channel::unbounded();
+    let reader_paused = paused.clone();
     std::thread::spawn(move || {
-        while let Ok(ev) = event::read() {
+        loop {
+            if reader_paused.load(Ordering::Acquire) {
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            match event::poll(Duration::from_millis(50)) {
+                Ok(true) => {}
+                Ok(false) => continue,
+                Err(_) => break,
+            }
+            let Ok(ev) = event::read() else { break };
             if ev_tx.send(ev).is_err() {
                 break;
             }
@@ -48,6 +126,20 @@ pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Resul
             }
             for req in app.outbox.drain(..) {
                 worker.send(req);
+            }
+            for effect in std::mem::take(&mut app.effects) {
+                match effect {
+                    Effect::Clipboard(text) => copy(&text),
+                    Effect::Pager { bytes, .. } => {
+                        paused.store(true, Ordering::Release);
+                        // Let a poll in progress finish before the pager starts.
+                        std::thread::sleep(Duration::from_millis(60));
+                        if let Err(e) = page(&mut terminal, &bytes) {
+                            app.message = Some(format!("{e:#}"));
+                        }
+                        paused.store(false, Ordering::Release);
+                    }
+                }
             }
             terminal.draw(|f| {
                 let area = f.area();

@@ -20,6 +20,7 @@ use crate::index::timeline::ChangePoint;
 use crate::index::versions::Run;
 use crate::index::{Index, NodeRef};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
+use crate::restore::{self, Done, How, Places, Target};
 
 /// Most of a file the preview reads (PLAN.md §4.8).
 pub const PREVIEW_LIMIT: u64 = 64 * 1024;
@@ -28,7 +29,11 @@ pub const PREVIEW_LIMIT: u64 = 64 * 1024;
 pub struct Ctx {
     pub index: Index,
     pub disk: Arc<dyn Disk>,
+    pub places: Places,
 }
+
+/// Most of a file "Show in $PAGER" reads.
+pub const PAGER_LIMIT: u64 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
 pub enum Request {
@@ -74,6 +79,14 @@ pub enum Request {
         path: PathBuf,
         snaps: Vec<usize>,
     },
+    /// Restore these items (writes to disk, never to the repository).
+    Restore { targets: Vec<Target>, how: How },
+    /// Undo the last overwrite.
+    Undo,
+    /// Whether these paths exist on disk.
+    Exists { paths: Vec<PathBuf> },
+    /// A whole file (up to a limit), for the pager.
+    ReadAll { node: Node, name: String },
     /// A full-screen diff: read both sides up to `key.limit` and diff them.
     Diff {
         key: DiffKey,
@@ -96,7 +109,10 @@ impl Request {
     fn skippable(&self) -> bool {
         match self {
             Request::ChangePoints { item, .. } | Request::Live { item, .. } => *item,
-            Request::PointCounts { .. } => false,
+            Request::PointCounts { .. }
+            | Request::Restore { .. }
+            | Request::Undo
+            | Request::ReadAll { .. } => false,
             _ => true,
         }
     }
@@ -150,6 +166,16 @@ pub enum Response {
     Diff {
         key: DiffKey,
         diff: Arc<FileDiff>,
+    },
+    Restored {
+        how: How,
+        done: Vec<Done>,
+    },
+    Undone(Vec<PathBuf>),
+    Exists(Vec<(PathBuf, bool)>),
+    Pager {
+        name: String,
+        bytes: Vec<u8>,
     },
     Error(String),
 }
@@ -234,6 +260,28 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     nodes.push((i, index.node_at(&set[i], &path)?));
                 }
                 send(Response::Nodes { path, nodes });
+            }
+            Request::Restore { targets, how } => {
+                let done = restore::run(index.repo().as_ref(), &targets, how, &ctx.places)?;
+                send(Response::Restored { how, done });
+            }
+            Request::Undo => match restore::undo(&ctx.places) {
+                Ok(paths) => send(Response::Undone(paths)),
+                Err(e) => send(Response::Error(format!("{e:#}"))),
+            },
+            Request::Exists { paths } => {
+                let found = paths
+                    .into_iter()
+                    .map(|p| {
+                        let e = ctx.disk.stat(&p).is_some();
+                        (p, e)
+                    })
+                    .collect();
+                send(Response::Exists(found));
+            }
+            Request::ReadAll { node, name } => {
+                let bytes = index.repo().read_at(&node, 0, PAGER_LIMIT)?;
+                send(Response::Pager { name, bytes });
             }
             Request::Diff { key, old, new } => {
                 let diff = file_diff(ctx, &old, &new, key.limit)?;

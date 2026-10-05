@@ -2,52 +2,21 @@
 //! (tests/fixtures/make_repo.sh). Skipped, with a note, when restic isn't
 //! installed; CI installs it.
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::{Arc, OnceLock};
+mod common;
+
+use std::sync::Arc;
+
+use common::fixture::{Fixture, fixture};
 
 use restoric::cache::Cache;
 use restoric::index::timeline::{ChangeKind, Filter, timeline_set};
 use restoric::index::{Index, Mode};
 use restoric::repo::Repo;
-use restoric::repo::rustic::{OpenOptions, RusticRepo};
 
 use ChangeKind::{Added as A, Changed as C, Deleted as D};
 
-struct Fixture {
-    _dir: tempfile::TempDir,
-    root: PathBuf,
-}
-
-fn fixture() -> Option<&'static Fixture> {
-    static F: OnceLock<Option<Fixture>> = OnceLock::new();
-    F.get_or_init(|| {
-        if Command::new("restic").arg("version").output().is_err() {
-            eprintln!("restic not installed: skipping the fixture tests");
-            return None;
-        }
-        let dir = tempfile::tempdir().unwrap();
-        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/make_repo.sh");
-        let status = Command::new("bash")
-            .arg(script)
-            .arg(dir.path())
-            .status()
-            .unwrap();
-        assert!(status.success(), "make_repo.sh failed");
-        let root = dir.path().to_path_buf();
-        Some(Fixture { _dir: dir, root })
-    })
-    .as_ref()
-}
-
 fn open(f: &Fixture, mode: Mode) -> (Index, Vec<restoric::repo::SnapshotInfo>) {
-    let repo = RusticRepo::open(&OpenOptions {
-        repo: Some(f.root.join("repo").to_string_lossy().into_owned()),
-        password: Some("restoric".into()),
-        cache_dir: Some(f.root.join("rustic-cache")),
-        ..OpenOptions::default()
-    })
-    .unwrap();
+    let repo = f.open();
     let snaps = repo.snapshots().unwrap();
     (
         Index::new(Arc::new(repo), Cache::in_memory(), mode, 1 << 24),

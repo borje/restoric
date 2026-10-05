@@ -164,6 +164,9 @@ pub fn draw(app: &App, g: &mut Grid) {
             g.fill(y, l0, l1, t.selected);
         }
         g.hit(l0, l1 + 1, y, Action::ClickRow(k));
+        if app.is_marked(k, *row) {
+            g.put(l0, y, "┃", t.accent.patch(t.bold));
+        }
         let Some(e) = app.entry(*row) else {
             if *row == Row::Up {
                 g.put(l0 + 3, y, "..", t.dir);

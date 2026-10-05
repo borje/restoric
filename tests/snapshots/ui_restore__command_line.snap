@@ -1,0 +1,16 @@
+---
+source: tests/ui_restore.rs
+expression: "h.screen(100, 12)"
+---
+ restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
+  • ·   ·  · · •  · •   ·  ··    · ·  · ·  ·    ·· ·•·· · · ·  ··  · ·· ·  ·  ┊ · api/
+                                                                      ▲                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ api/
+   ┄ 2 unchanged ┄    │ ▸ api/                            │
+▶Sep 27 08:52 ~1      │ ▸ models/                         │ ◇ handlers.go
+   ┄ 2 unchanged ┄    │ ◇ config.go           96 B        │ ◇ middleware.go
+ Sep 20 20:35 ~1      │ ◇ main.go            108 B        │ ◇ routes.go
+ :fo█                                        sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo

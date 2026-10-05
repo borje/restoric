@@ -6,7 +6,7 @@ pub mod rustic;
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -165,6 +165,31 @@ pub trait Repo: Send + Sync {
     fn id(&self) -> Id;
     fn snapshots(&self) -> Result<Vec<SnapshotInfo>>;
     fn tree(&self, id: &TreeId) -> Result<Arc<Tree>>;
+    /// Up to `len` bytes of a file node, from `offset`.
+    fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>>;
+    /// Restores what's at `path` in `snap` (a file, link or folder) to
+    /// `dest`, which must not exist yet; its parent must. Keeps mode,
+    /// modification time and symlinks; owner and group only as root.
+    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()>;
+
     /// The first `limit` bytes of a file node.
-    fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes>;
+    fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes> {
+        Ok(FileBytes {
+            data: self.read_at(node, 0, limit.min(node.size))?,
+            size: node.size,
+        })
+    }
+}
+
+/// Whether restoric runs as root, so restores may set owner and group.
+pub fn is_root() -> bool {
+    #[cfg(unix)]
+    {
+        // SAFETY: geteuid has no preconditions and can't fail.
+        unsafe { libc::geteuid() == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
 }

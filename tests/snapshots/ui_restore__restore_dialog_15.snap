@@ -1,0 +1,38 @@
+---
+source: tests/ui_restore.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  main.go  Aug 17 16:04  →  on disk                                                  +4 −0
+ what changed since this version
+ ┄┄ around line 6 ┄┄
+    6    6    // flags
+    7    7    // middleware
+    8    8    // feature flag
+         9  + // signals
+        10  + // serve
+        11  + // shutdown
+        12 ╭─ Restore ──────────────────────────────────────────────────────────────────╮
+           │                                                                            │
+           │  main.go  @ Aug 17 16:04  4ad09572                                         │
+           │  from /home/bege/dev/project/src/main.go                                   │
+           │                                                                            │
+           │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
+           │  2 (•) Restore next to it             → main.go.2026-08-17_1604            │
+           │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-17_1604/main.…  │
+           │  4 ( ) Show in $PAGER                 read only, writes nothing            │
+           │                                                                            │
+           │                                                                            │
+           │                                                                            │
+           │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
+           ╰────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+ RST  choose where the restored copy goes                                                    ? help

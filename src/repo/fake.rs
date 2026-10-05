@@ -38,7 +38,7 @@ use jiff::civil::DateTime;
 use jiff::tz::TimeZone;
 use sha2::{Digest, Sha256};
 
-use super::{BlobId, FileBytes, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
+use super::{BlobId, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
 
 #[derive(Clone)]
 enum Entry {
@@ -481,16 +481,68 @@ impl Repo for FakeRepo {
             .ok_or_else(|| anyhow!("tree {id} not found"))
     }
 
-    fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes> {
+    fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>> {
         let mut data = Vec::new();
         for b in &node.content {
             data.extend(self.blobs.get(b).context("blob not found")?);
         }
-        data.truncate(limit as usize);
-        Ok(FileBytes {
-            data,
-            size: node.size,
-        })
+        let start = (offset as usize).min(data.len());
+        let end = start.saturating_add(len as usize).min(data.len());
+        Ok(data[start..end].to_vec())
+    }
+
+    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()> {
+        if dest.symlink_metadata().is_ok() {
+            bail!("{} already exists", dest.display());
+        }
+        let mut node = None;
+        let mut tree = self.tree(&snap.tree)?;
+        for c in parts(path.to_str().context("path must be UTF-8")?) {
+            let n = tree
+                .get(&c)
+                .with_context(|| format!("{} not found", path.display()))?
+                .clone();
+            if let Some(sub) = n.subtree {
+                tree = self.tree(&sub)?;
+            }
+            node = Some(n);
+        }
+        self.write_node(&node.context("nothing to restore")?, dest)
+    }
+}
+
+impl FakeRepo {
+    /// Writes a node (and what's under it) to `dest`, like a restore.
+    fn write_node(&self, node: &Node, dest: &Path) -> Result<()> {
+        match &node.kind {
+            NodeKind::Dir => {
+                std::fs::create_dir(dest)?;
+                if let Some(sub) = node.subtree {
+                    for n in &self.tree(&sub)?.nodes {
+                        self.write_node(n, &dest.join(&n.name))?;
+                    }
+                }
+            }
+            NodeKind::Symlink { target } => {
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(target, dest)?;
+            }
+            NodeKind::File => {
+                let data = self.read_at(node, 0, node.size)?;
+                std::fs::write(dest, data)?;
+                #[cfg(unix)]
+                if let Some(mode) = node.mode {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(dest, std::fs::Permissions::from_mode(mode & 0o7777))?;
+                }
+                if let Some(t) = node.mtime {
+                    let f = std::fs::File::options().write(true).open(dest)?;
+                    f.set_modified(std::time::SystemTime::from(t))?;
+                }
+            }
+            NodeKind::Other(_) => {}
+        }
+        Ok(())
     }
 }
 

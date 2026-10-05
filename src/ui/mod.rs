@@ -182,6 +182,8 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
     }
     statusbar::draw(app, &mut g);
     popup::which_key(app, &mut g);
+    popup::restore_dialog(app, &mut g);
+    popup::confirm(app, &mut g);
     popup::message(app, &mut g);
     popup::help(app, &mut g);
     g.hits

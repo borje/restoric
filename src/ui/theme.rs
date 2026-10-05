@@ -27,6 +27,9 @@ pub struct Theme {
     pub badge: Style,
     /// The DIFF, SEL and VIS badges.
     pub badge_blue: Style,
+    /// The RST badge and warnings.
+    pub badge_red: Style,
+    pub warn: Style,
     pub popup: Style,
     pub popup_border: Style,
 }
@@ -53,6 +56,8 @@ impl Theme {
                 status_bar: plain,
                 badge: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 badge_blue: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
+                badge_red: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
+                warn: plain.add_modifier(Modifier::BOLD),
                 popup: plain,
                 popup_border: plain,
             };
@@ -82,6 +87,11 @@ impl Theme {
                 .bg(Color::Blue)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
+            badge_red: Style::default()
+                .bg(Color::Red)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+            warn: fg(Color::Red).add_modifier(Modifier::BOLD),
             popup: Style::default(),
             popup_border: fg(Color::DarkGray),
         }
