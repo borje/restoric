@@ -1261,7 +1261,7 @@ Tick milestones here as they're done, with the commit.
 - [x] M1: index and `restoric log` — 6bfcf81
 - [x] M2: read-only folder view — cbd4b73
 - [x] M3: preview, item track, versions, deleted items — 3be44ca
-- [x] M4: diff — COMMIT
+- [x] M4: diff — 34dc9c5
 - [ ] M5: restore
 - [ ] M6: navigation extras
 - [ ] M7: polish and release
