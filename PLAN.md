@@ -895,6 +895,7 @@ Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `�
 | `:2026-09-01`, `:09-01`, `:sep 1`, `:september 1` | Jump to the last snapshot on or before that day |
 | `:today` `:yesterday` `:3d` `:2w` | Relative dates |
 | `:latest` `:now` / `:oldest` `:first` | Ends of the timeline |
+| `:reload` | Look for new or removed snapshots now |
 | `:find NAME` / `:f NAME` (or `s`) | Search every snapshot (path contains NAME, case-insensitive) |
 | `:deleted` | Same as `.` |
 | `:undo` | Undo the last overwrite (`P` or option 1) |
@@ -1185,3 +1186,58 @@ Settled during review:
 - Making backups, scheduling, prune/forget. restic/rustic and Backrest already do that.
 - Writing to the repository in any way. restoric is read-only towards the repo.
 - A graphical (non-terminal) app or file manager plugins. That's a possible future, with the index reusable as a library.
+
+---
+
+## 10. Engineering details
+
+**Platforms:** Linux and macOS. Windows later (rustic supports it, but terminal and path handling need their own pass).
+
+**Toolchain:** Rust stable, edition 2024. Minimum Rust version follows rustic_core's. `cargo fmt` and `cargo clippy -- -D warnings` must pass. CI (GitHub Actions): fmt, clippy, tests against the small fixture repo (CI installs the `restic` binary to build it).
+
+**Errors:** a wrong password, a missing repo, a dropped connection or missing packs show as a message popup and in the log; the UI keeps running. Start-up errors print a plain message and exit non-zero. A panic hook restores the terminal before printing.
+
+**Secrets:** passwords never reach the log, the screen, or the cache.
+
+**Restore safety:** restore writes only inside its target. Symlinks are restored as symlinks and never followed while writing. Mode and modification time are kept; owner and group only when running as root.
+
+**File names:** names that aren't valid UTF-8 are kept as raw bytes for every operation and shown with replacement characters.
+
+**Time:** snapshot times are shown in the local time zone. `:sep 1` and other date commands use the local day.
+
+**The repo changing while restoric runs:** new snapshots (a backup finished) are picked up every 5 minutes and on `:reload`, and the timeline extends without losing your place. Snapshots removed by `forget`/`prune` are dropped from the cache, and the affected change points are recomputed.
+
+**Logging:** `tracing` to `~/.local/state/restoric/restoric.log`. Level from `RESTORIC_LOG` (default `info`).
+
+**Config** (`~/.config/restoric/config.toml`, every key optional):
+```toml
+host = ["bege-laptop"]        # several names if the machine was renamed (§2.4)
+tag = ""                      # only snapshots with this tag (§2.4)
+icons = true
+preview_max_kb = 64
+diff_max_mb = 2
+memory_cache_mb = 256
+disk_cache_mb = 2048
+restore_dir = "~/Restored"
+
+[keys]                        # overrides, e.g.
+# versions = "i"
+```
+
+**Mockup vs implementation:** the mockup's sample data is randomly generated, so the screens in §3 are the **layout and behaviour spec**, not byte-exact expected output. `FakeRepo` gets its own small, readable fixture. The insta snapshots generated from it become the exact expected output, reviewed against §3 when first accepted.
+
+---
+
+## 11. Progress
+
+Tick milestones here as they're done, with the commit.
+
+- [ ] M0: rustic_core test run
+- [ ] M1: index and `restoric log`
+- [ ] M2: read-only folder view
+- [ ] M3: preview, item track, versions, deleted items
+- [ ] M4: diff
+- [ ] M5: restore
+- [ ] M6: navigation extras
+- [ ] M7: polish and release
+- [ ] M8: yazi plugin
