@@ -1255,10 +1255,12 @@ restore_dir = "~/Restored"
 
 Tick milestones here as they're done, with the commit.
 
+**Not yet done for any milestone:** the manual check on your real repo over its real backend (§6). It needs that repo's credentials; everything so far was checked on the synthetic repos (§4.8) and the fixtures.
+
 - [ ] M0: rustic_core test run
-- [ ] M1: index and `restoric log`
-- [ ] M2: read-only folder view
-- [ ] M3: preview, item track, versions, deleted items
+- [x] M1: index and `restoric log` — 6bfcf81
+- [x] M2: read-only folder view — cbd4b73
+- [x] M3: preview, item track, versions, deleted items — 3be44ca
 - [ ] M4: diff
 - [ ] M5: restore
 - [ ] M6: navigation extras
