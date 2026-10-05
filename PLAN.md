@@ -283,7 +283,7 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
 Restoring works like yazi's copy and paste, out of the past.
 - `Space` toggles selection and moves down. `v` starts visual mode (a range); pressing `v` again keeps the range selected. `esc` leaves visual mode, then clears the selection.
 - `y` yanks the selection (or the item under the cursor) from **this snapshot**.
-- `p` restores the yanked items **next to the originals** (`name.2026-09-09_1923`), or to their original place if they're missing on disk.
+- `p` restores the yanked items **next to the originals** (`name.2026-09-09_1923`, then `-2`, `-3` if that exists), or to their original place if they're missing on disk.
 - `P` **overwrites** the files on disk, after a confirmation. The current files are moved to the undo folder first, so `:undo` can put them back.
 
 <sub>`docs/screens/05-selection.txt`</sub>
@@ -902,7 +902,7 @@ An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :f
 - "Already at the top of the backup."
 
 ### 3.17 Look and colours
-- **Colours:** by default, the **16 ANSI colours**, so the terminal's theme applies. Respect `NO_COLOR`. Optionally (open question 8), read colours from the user's yazi theme so the two match.
+- **Colours:** by default, the **16 ANSI colours**, so the terminal's theme applies. Respect `NO_COLOR`. Colours can be changed in restoric's own config file. restoric doesn't read yazi's theme: it's a separate app.
   - `+` added: green · `~` changed: blue · `−` deleted: red · not backed up: magenta · accent (current dot, `▶`, `NOR` badge, keys): yellow · `SEL`/`VIS`: blue badge · `FIND`/input: magenta badge · `RST`/overwrite: red badge
   - Selection: a dim background bar across the column (reverse video when only 8 colours are available) · mark bar `┃`: accent
   - Folders: bold blue · deleted: red + strikethrough (where supported) · gone earlier: dim italic
@@ -1126,10 +1126,12 @@ Throwaway binary `spike/`:
 4. **License:** MIT/Apache-2.0 (like rustic)?
 5. **Is the name `restoric` free** on crates.io and GitHub? Check before publishing.
 6. **Snapshots from several hosts** of the same folder (e.g. a laptop and a desktop syncing a project): merge them into one timeline, or keep one host at a time (current plan)?
-7. **Should `p` name the copy like yazi does** (`main_1.go` on conflict) or with the snapshot time (`main.go.2026-09-09_1923`, current plan)? The time tells you which version you got; yazi's form keeps the extension last, so editors still recognise the file type. A middle ground: `main.2026-09-09_1923.go`.
-8. **Read colours from the yazi theme?** It would make the two look the same out of the box. yazi's theme format first needs checking for how stable it is. The fallback is the 16 ANSI colours either way.
 
-Settled during review: labels at the right edge of the timeline rows replace the legend. `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
+Settled during review:
+- Labels at the right edge of the timeline rows replace the legend.
+- `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
+- Restored copies are named with the snapshot time after the full name: `main.go.2026-09-09_1923`, `src.2026-09-09_1923/`. If that name already exists (the same version restored twice), add `-2`, `-3`, …
+- restoric is a separate app and doesn't read yazi's config or theme. The yazi plugin (M8) is only a launcher.
 
 ---
 
