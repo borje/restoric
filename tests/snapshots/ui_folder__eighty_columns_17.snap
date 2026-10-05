@@ -1,0 +1,38 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(80, 34)"
+---
+ restoric  ~/dev/project/src                               ◀ between versions ▶
+  Jul 2026    Aug                 Sep                      now
+  ● · ·  ●●● · ●  ● ●·   ●· ● · ·  ●··●·●· ●· ·● · ·●· ·  ┊ · src/
+
+                                                       ▲               − 1× +
+
+   ..                                 │
+ ▸ api/                               │
+ ▸ models/                            │
+ ◇ config.go              96 B        │
+ ◇ main.go               108 B        │
+ ◇ server.go              42 B        │
+ ◇ util.go               104 B        │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+                                      │
+   2 deleted · . to show              │
+ NOR  Oct 02 12:21  fc0971c5  unchanged since Sep 27  Sep 09 19:23  4/6  ? help

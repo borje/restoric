@@ -4,6 +4,7 @@
 
 pub mod fingerprint;
 pub mod folder;
+pub mod listing;
 pub mod timeline;
 
 use std::ffi::OsString;

@@ -1,16 +1,18 @@
 use std::io::{IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 
+use restoric::app::App;
 use restoric::cache::Cache;
-use restoric::index::timeline::Filter;
+use restoric::index::timeline::{Filter, explain_empty, timeline_set};
 use restoric::index::{Index, Mode};
 use restoric::repo::Repo;
 use restoric::repo::rustic::{BACKEND, OpenOptions, RusticRepo};
+use restoric::worker::Worker;
 
 /// Browse and restore a restic repository by time, anchored on a folder.
 #[derive(Parser)]
@@ -144,7 +146,28 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         None => {
-            anyhow::bail!("the TUI isn't built yet (milestone M2); try `restoric log PATH`")
+            let path = match &cli.path {
+                Some(p) => std::path::absolute(p).context("resolving the path")?,
+                None => std::env::current_dir().context("finding the current folder")?,
+            };
+            // A file opens its folder.
+            let folder = if path.is_file() {
+                path.parent().map(Path::to_path_buf).unwrap_or(path)
+            } else {
+                path
+            };
+            let (index, filter) = open(&cli.repo, &cli.view)?;
+            let snaps = index.repo().snapshots()?;
+            if timeline_set(&snaps, &filter, &folder).is_empty() {
+                anyhow::bail!("{}", explain_empty(&snaps, &filter, &folder));
+            }
+            let mine: Vec<_> = snaps.into_iter().filter(|s| filter.matches(s)).collect();
+            let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+            let app = App::new(mine, folder, jiff::tz::TimeZone::system(), home);
+            let (tx, rx) = crossbeam_channel::unbounded();
+            let threads = std::thread::available_parallelism().map_or(2, |n| n.get());
+            let worker = Worker::start(Arc::new(index), threads, tx);
+            restoric::tui::run(app, worker, rx)
         }
     }
 }

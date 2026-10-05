@@ -1,0 +1,16 @@
+---
+source: tests/ui_folder.rs
+expression: "ui::text(&buf)"
+---
+ restoric  /home/bege/dev/project/src                                                     indexing…
+  Jul 2026        Aug                         Sep                              now
+  · ·   ·  · · ·  · ·   ·  ··    · ·  · ·  ·    ·· ···· · · ·  ··  · ·· ·  ·  ┊ · src/
+
+                                                                           ▲               − 1× +
+
+ indexing…            │   ..                              │
+                      │   loading…                        │
+                      │                                   │
+                      │                                   │
+                      │                                   │
+ NOR  Oct 02 12:21  fc0971c5                                                                 ? help

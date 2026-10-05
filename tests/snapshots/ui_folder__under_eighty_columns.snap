@@ -1,0 +1,28 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(70, 24)"
+---
+ restoric  ~/dev/project/src                     ◀ version 11 of 15 ▶
+  Jul 2026                  Sep                  now
+  ●· · ● ●●· ● ● ●· ● ·● ··  ●·●·●·●· ·●··●· ·  ┊ · src/
+
+                               ▲                             − 1× +
+
+   ..
+ ▸ api/                                                         ~1
+ ▸ models/
+ ◇ config.go                                              89 B  ~
+ ◇ legacy.go                                              62 B  −
+ ◇ main.go                                                96 B  ~
+ ◇ server.go                                              30 B  +
+ ◇ util.go                                                94 B
+
+
+
+
+
+
+
+
+   1 deleted · . to show
+ NOR  Sep 06 18:03  7ff3fd58  src/ +1 ~3    Sep 06 18:03  5/7  ? help

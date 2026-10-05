@@ -974,6 +974,7 @@ restoric/
 │   │   └── versions.rs      runs per file
 │   ├── cache.rs       redb tables (§4.4)
 │   ├── worker.rs      background pool, Request/Response enums, generation ids
+│   ├── tui.rs         terminal setup/teardown, panic hook, event loop
 │   ├── restore.rs     restore/dump/tar, undo log
 │   ├── diff.rs        load both sides (size limit, binary detection), imara-diff, hunks
 │   ├── app/
@@ -988,12 +989,14 @@ restoric/
 │       ├── preview.rs   file content with change marks, inline diff, folder contents
 │       ├── versions.rs  diff.rs  find.rs  statusbar.rs
 │       ├── popup.rs     restore dialog, confirmation, help, which-key, messages (rounded)
+│       ├── fmt.rs       dates, sizes, paths, fitting and wrapping text
 │       ├── icons.rs     Nerd Font glyphs per file type + plain fallback
 │       └── theme.rs
 ├── yazi-plugin/
 │   └── restoric.yazi/main.lua   opens restoric on the hovered folder (M8)
 └── tests/
     ├── fixtures/make_repo.sh   builds a real restic repo with a known history
+    ├── fixtures/project.dsl    FakeRepo history shaped like the mockup's (UI tests, demo)
     ├── index_*.rs              change points against the fixture
     └── ui_*.rs                 insta snapshots of every screen (the screens in this plan)
 ```
@@ -1029,7 +1032,7 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 
 ### 4.5 Threads
 - **UI thread:** the event loop over `crossbeam::select!` between crossterm events, worker responses and a tick for spinners. It draws only from `App` state and never calls `Repo`.
-- **Worker pool** (N = number of CPUs, minimum 2): handles `Request` messages (`ChangePoints{path}`, `Listing{snap,path}`, `ItemTrack{snap_range,path}`, `Versions{path}`, `Preview{snap,path}`, `LoadFile{…}`, `Restore{…}`, `Find{q}`). Each request carries a **generation id**, and results from older generations are dropped, so fast scrolling stays snappy.
+- **Worker pool** (N = number of CPUs, minimum 2): handles `Request` messages (`ChangePoints{path}`, `Listing{snap,path}`, `ItemTrack{snap_range,path}`, `Versions{path}`, `Preview{snap,path}`, `LoadFile{…}`, `Restore{…}`, `Find{q}`). Each request carries a **generation id**. When the view moves on, the UI bumps the generation, and requests about what was on screen (listings, deleted items, previews) that haven't started yet are skipped, so fast scrolling stays snappy. Requests whose results are kept anyway (change points, counts) always run. `worker::handle` does the work and is called directly by the UI tests.
 - **Prefetch:** after a listing loads, prefetch the neighbouring change points (n±1), the item track and the preview for the selection. Previews are cached by content id, so the same file version is only read once.
 - **Progress:** the title bar shows `indexing 120/430` while change points are computed. Partial results draw as they arrive, newest first.
 
@@ -1099,7 +1102,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 - `Repo` trait, `RusticRepo`, `FakeRepo` + DSL.
 - Fingerprints, timeline set, change points, folder counts, cache.
 - `restoric log PATH` prints change points with counts.
-- `tests/fixtures/make_repo.sh`: uses the real `restic` binary with `backup --time` to build a repo with known history: added, changed, deleted, re-created, metadata-only (`touch`, `chmod`) and renamed files.
+- `tests/fixtures/make_repo.sh`: uses the real `restic` binary with `backup --time` to build a repo with known history: added, changed, deleted, re-created, metadata-only (`touch`), permission-changed (`chmod`, which counts as a change) and renamed files.
 - **Done when:** change points match the fixture's expected list, and metadata-only snapshots are skipped by default but shown with `--strict`.
 
 ### M2: read-only folder view
@@ -1111,6 +1114,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 
 ### M3: preview, item track, versions, deleted items
 - Preview column: file content in the snapshot with `+`/`−` margin marks, folder contents, deleted items. `⇥` content / vs disk, `J` `K`. Loaded in the background and cached by content id.
+- The Versions column's `now` row and the timeline's live marker (what changed on disk since the newest snapshot). Moved here from M2, because they need the comparison with disk.
 - Row 2 with its label, `{` `}`.
 - Versions view with on-disk row, compared-to-disk stats (computed lazily for visible rows) and preview.
 - Deleted items (`.` `zh`), jump on deleted items.

@@ -1,0 +1,38 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ · src/
+
+                                                                      ▲                    − 1× +
+             ╭─ Help ─────────────────────────────────────────────────────────────────╮
+   ┄ 2 unchan│                                                                        │
+▶Sep 27 08:52│  Folder view                                                           │
+   ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+ Sep 20 20:35│  h l  - ⏎               parent / open (a file opens its versions)      │
+   ┄ 2 unchan│  H L  ← →               older / newer change in this folder            │
+ Sep 13 20:51│  [ ]   { }              every snapshot / changes of the selected item  │
+   ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+ Sep 09 19:23│  ␣  v                   select / visual select                         │
+   ┄ 1 unchan│  y  p  P                yank, restore next to it, overwrite            │
+ Sep 06 18:03│  r  d                   restore options / full-screen diff             │
+   ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
+ Sep 02 20:16│  / n N   f              search / next, previous / filter               │
+   ┄ 2 unchan│  .  zh   zi zo          show deleted items / zoom timeline             │
+ Aug 22 11:59│  gh   3H 5j             backup root / counts with motions              │
+   ┄ 1 unchan│                                                                        │
+ Aug 17 16:04│  Commands                                                              │
+   ┄ 1 unchan│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
+ Aug 10 15:44│  :find NAME   s         search every snapshot for a name               │
+ Aug 07 08:15│  :latest :oldest :undo                                                 │
+ Aug 03 16:19│                                                                        │
+   ┄ 1 unchan│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │
+ Jul 28 15:59│  Press any key to close                                                │
+ Jul 26 11:57╰────────────────────────────────────────────────────────────────────────╯
+ Jul 24 12:16 ~1      │                                   │
+   ┄ 2 unchanged ┄    │                                   │
+ Jul 14 09:00 +7      │                                   │
+                      │   2 deleted · . to show           │
+ NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
