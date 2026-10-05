@@ -1044,6 +1044,30 @@ restoric versions FILE [--json]       print the distinct versions of FILE       
 restoric demo                         TUI against FakeRepo with the mockup's sample data
 ```
 
+### 4.8 Scale: any repository size
+restoric must work on repositories of **any size**: any number of snapshots, files, folders and versions, and any total size. The UI must stay responsive regardless. Design rules that follow from this:
+
+1. **Work grows with what's on screen, never with the repo.** Opening a folder costs about *depth × snapshots* tree reads (cached after the first time), not the number of files in the repo. Nothing walks a whole snapshot unless the user asks for it (`:find`, restoring a whole folder).
+2. **Nothing assumes a list fits on screen or in memory.** The listing, the Versions column, the versions view, find results and the diff are virtualised: only visible rows are built. Long lists load in pages.
+3. **Results stream in.** Change points, find results and folder counts appear as they're computed, newest first, with progress in the header (`indexing 1 200/48 000`). Every long operation can be cancelled with `esc` and resumes from the cache next time.
+4. **Lazy everything.** Folder counts, "compared to disk" stats, item tracks, previews and deleted items are computed only for what's visible, and cached.
+5. **Bounded memory.** In-memory caches (trees, previews, diffs) are LRU with a size cap, configurable. The on-disk cache can grow, but has a size cap too, and evicts the least recently used entries. Previews are capped at 64 KB and diffs at 2 MB (both configurable). Files are never loaded whole just to show them.
+6. **Incremental refresh.** At start-up, only snapshots that are new since the last run are read. Change points are extended, not recomputed.
+7. **`:find` uses the cache first.** Paths seen in cached trees answer instantly. The full search across all snapshots then runs in the background and streams in further results.
+8. **The timeline handles thousands of snapshots.** At 1× zoom many snapshots share a column, and the info shows how many. Zoom goes as far as needed to separate them (beyond 8× when the repo needs it), and `[` `]` always step one snapshot at a time.
+
+**The one limit restoric can't design away:** rustic_core, like restic, may keep the repository's **index** (the list of every blob) in memory. That memory grows with the number of blobs in the repo, not with what restoric shows. M0 measures it on a large repo. If it's a problem, the options are rustic_core settings that reduce index memory (if they exist), contributing such a feature upstream, or loading only the tree part of the index (restoric reads trees far more often than file data).
+
+**Test repos:** a generator (`tests/fixtures/make_big_repo.sh`, using rustic or restic) builds synthetic repos at three sizes, kept out of git:
+
+| Size | Snapshots | Files per snapshot | Used in |
+|---|---|---|---|
+| small | 50 | 1 000 | CI, every commit |
+| large | 2 000 | 200 000 | M0, M7, before releases |
+| huge | 20 000 | 2 000 000, deep trees, folders with 100 000 entries | M7, manual |
+
+**Targets (large repo, warm cache, local disk):** first screen under 1 s; `H`/`L`, `j`/`k` and preview feel instant (under 50 ms); a folder's change points under 2 s. Cold cache and remote backends may be slower, but the UI never freezes: it shows progress and partial results.
+
 ---
 
 ## 5. Milestones
@@ -1057,7 +1081,9 @@ Throwaway binary `spike/`:
 - Count snapshots where the tree id differs vs where the fingerprint differs.
 - Read one file from an old snapshot. Restore one file into a temporary folder.
 
-**Go/no-go:** a warm walk over all snapshots under ~2 s for a typical folder, a cold walk acceptable with a progress indicator, the backend works, and the restored file matches. If rustic_core fails on something essential, record what and decide between fixing it upstream and a `restic`-CLI implementation of `Repo` (the trait makes that possible).
+Run it on the **large** synthetic repo (§4.8) as well as yours, and record memory use (especially the index).
+
+**Go/no-go:** a warm walk over all snapshots under ~2 s for a typical folder on the large repo, a cold walk acceptable with a progress indicator, memory use acceptable, the backend works, and the restored file matches. If rustic_core fails on something essential, record what and decide between fixing it upstream and a `restic`-CLI implementation of `Repo` (the trait makes that possible).
 
 ### M1: index and `restoric log`
 - `Repo` trait, `RusticRepo`, `FakeRepo` + DSL.
@@ -1101,7 +1127,7 @@ Throwaway binary `spike/`:
 - Config file (keymap overrides, colours, icons on/off, diff/preview size limit, default host). `NO_COLOR`.
 - Nerd Font icons per file type with fallback.
 - `restoric demo`.
-- Performance pass on a large repo (thousands of snapshots, deep trees).
+- Performance pass on the large and huge repos (§4.8): meet the targets, check memory caps and cancellation.
 - README with screenshots. `cargo install`, GitHub release binaries (Linux x86_64/aarch64, macOS), AUR/deb later.
 - Optional: syntax highlighting in the preview and diff (`syntect`), restore to the system trash.
 
@@ -1127,7 +1153,8 @@ Throwaway binary `spike/`:
 |---|---|
 | rustic_core API changes or missing pieces | Pin the version, wrap it in `Repo`, test in M0. A restic-CLI `Repo` is possible as a fallback. |
 | Metadata changes make every snapshot look changed | Content fingerprints (§2.2), measured in M0 |
-| Slow first run on big or remote repos | Persistent cache, background indexing with progress, newest-first partial results |
+| Slow first run on big or remote repos | Persistent cache, background indexing with progress, newest-first partial results, cancellable (§4.8) |
+| Index memory grows with repo size (rustic_core) | Measure in M0; see §4.8 for options |
 | `restic prune` running while restoric reads (rustic doesn't take locks) | Treat missing packs as recoverable: reload the index, retry once, show an error in the status line without crashing |
 | Restore overwrites something important | Default is "next to it", confirmation, undo folder |
 | Snapshots with different backup roots or hosts | Timeline set filter (§2.3), `:host`, `:tag`, clear message when the path isn't backed up |
@@ -1138,8 +1165,7 @@ Throwaway binary `spike/`:
 ---
 
 ## 8. Open questions
-1. **How big** is the repo: number of snapshots, and files per snapshot? This sets the performance targets for M0. `restic snapshots --host $(hostname) | tail -2` gives the snapshot count, and `restic stats latest` the files in the newest one.
-2. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
+1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
 - Labels at the right edge of the timeline rows replace the legend.
@@ -1151,6 +1177,7 @@ Settled during review:
 - License: AGPLv3. Fine with the dependencies, which are MIT or Apache-2.0 (rustic_core, ratatui and the rest).
 - Name: `restoric` is free on crates.io and the AUR, and the GitHub account name `restoric` is free. One existing GitHub repo has the same name: [leaanthony/restoric](https://github.com/leaanthony/restoric), "A PoC Restic GUI using the Wails Framework" (12 stars, no license, last push January 2023). It's an abandoned proof of concept, but it's in the same space, so expect some confusion in search results.
 - Only snapshots from this machine are shown (§2.4).
+- Repository size: any. Design rules, test repos and targets are in §4.8.
 
 ---
 
