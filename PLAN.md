@@ -1168,6 +1168,8 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 - Publish it for yazi's package manager (`ya pack`), with install instructions in the README.
 - **Done when:** in yazi, pressing the key over a folder opens restoric there, and `q` comes back to the same place in yazi.
 
+How it works (M8): a `@sync` entry reads the hovered file (or the folder, if nothing is hovered) and emits yazi's `shell --block` with `restoric <path>`. A file path makes restoric open its folder with the file selected, so `--select` isn't needed. Arguments after `--` in the keymap pass through; yazi turns `--no-icons` into `no_icons`, so the plugin turns it back. Tested with yazi 26.9.1. Publishing for `ya pkg` needs the plugin at the root of a published repository, so it waits until restoric has a public home; until then the README says to copy the folder.
+
 ---
 
 ## 6. Testing
@@ -1279,4 +1281,4 @@ Tick milestones here as they're done, with the commit.
 - [x] M5: restore — adf677b
 - [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
-- [ ] M8: yazi plugin
+- [x] M8: yazi plugin — COMMIT (not yet published for `ya pkg`)
