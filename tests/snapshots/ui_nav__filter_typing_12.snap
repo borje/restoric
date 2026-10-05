@@ -1,0 +1,16 @@
+---
+source: tests/ui_nav.rs
+expression: "h.screen(100, 12)"
+---
+ restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
+  Jul 2026        Aug                         Sep                              now
+  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
+  • ·   ·  · • ·  · ·   ·  ··    · ·  • ·  ·    ·· ·•·· · · ·  ·•  · ·· ·  ·  ┊ · config.go
+                                                                      ▲                    − 1× +
+
+ now  ~1 unsaved      │   ..                              │ config.go · v5/5 · 96 B      ⇥ content
+   ┄ 2 unchanged ┄    │ ◇ config.go           96 B        │ unchanged since Sep 20 20:35
+▶Sep 27 08:52 ~1      │                                   │
+   ┄ 2 unchanged ┄    │                                   │   5  }
+ Sep 20 20:35 ~1      │   2 deleted · . to show           │   6  // defaults
+ filter: co█                                                    type to filter · ⏎ keep · esc clear

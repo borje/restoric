@@ -119,7 +119,7 @@ impl Index {
         Ok(match (a, b) {
             (NodeRef::Dir(x), NodeRef::Dir(y)) => self.trees_differ(*x, *y)?,
             (NodeRef::Leaf { fp: f1, raw: r1 }, NodeRef::Leaf { fp: f2, raw: r2 }) => {
-                match self.mode {
+                match self.mode() {
                     Mode::Content => f1 != f2,
                     Mode::Strict => r1 != r2,
                 }
@@ -133,10 +133,10 @@ impl Index {
         if a == b {
             return Ok(false);
         }
-        if self.mode == Mode::Strict {
+        if self.mode() == Mode::Strict {
             return Ok(true);
         }
-        let k = key(self.mode, Some(a.min(b)), Some(a.max(b)));
+        let k = key(self.mode(), Some(a.min(b)), Some(a.max(b)));
         if let Some(v) = self.cache.get(Table::Differs, &k)? {
             return Ok(v.first() == Some(&1));
         }
@@ -200,7 +200,7 @@ impl Index {
         if a == b {
             return Ok(Counts::default());
         }
-        let k = key(self.mode, a, b);
+        let k = key(self.mode(), a, b);
         if let Some(c) = self
             .cache
             .get(Table::Counts, &k)?
@@ -228,7 +228,7 @@ impl Index {
                 (Some(x), Some(y)) => match (x.is_dir(), y.is_dir()) {
                     (true, true) => {
                         c += self.tree_counts(x.subtree, y.subtree)?;
-                        if self.mode == Mode::Strict && x.subtree == y.subtree && x.raw != y.raw {
+                        if self.mode() == Mode::Strict && x.subtree == y.subtree && x.raw != y.raw {
                             c.changed += 1;
                         }
                     }

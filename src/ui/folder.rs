@@ -179,12 +179,15 @@ pub fn draw(app: &App, g: &mut Grid) {
         if e.is_dir() {
             name.push('/');
         }
-        let style = match e.delta {
+        let mut style = match e.delta {
             Delta::Deleted => t.deleted.add_modifier(t.strike),
             Delta::Gone(_) => ghost,
             _ if e.is_dir() => t.dir,
             _ => t.text,
         };
+        if app.matches(*row) {
+            style = style.patch(t.accent).add_modifier(Modifier::UNDERLINED);
+        }
         g.put(l0 + 3, y, &fmt::fit(&name, nw), style);
         if !e.is_dir() {
             let s = fmt::size(e.node.size);

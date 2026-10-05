@@ -1,0 +1,16 @@
+---
+source: tests/ui_nav.rs
+expression: "h.screen(100, 12)"
+---
+ restoric  Find  "legacy"                                                   1 match in 32 snapshots
+
+  PATH                                                  FIRST SEEN    LAST SEEN     NOW
+▶ src/legacy.go                                         Jul 14 09:00  Sep 05 22:40  gone Sep 06
+
+
+
+
+
+
+
+ FIND  ⏎ jumps to the last snapshot that has it                                         1/1  ? help

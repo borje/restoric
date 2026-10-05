@@ -472,6 +472,8 @@ Restoring works like yazi's copy and paste, out of the past.
 
 `:find NAME` searches every snapshot by path. It answers "where did this file go?"
 
+How it works (M6): the search starts at the backup root and matches paths relative to it, ignoring case. When a folder matches, its contents aren't listed again. Matches are memoised by (folder path, tree id), so an unchanged folder is read once, and the cost follows the number of distinct trees. It runs in the background; the header shows `searching 120/430` and partial results arrive as it goes.
+
 <sub>`docs/screens/09-find.txt`</sub>
 
 ```text
@@ -916,6 +918,8 @@ Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `�
 
 An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :find NAME, :undo`.
 
+Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one name or several, separated by commas. `:tag` with no tag clears the tag filter. A filter that would leave the folder without snapshots is refused, with the §4.6 explanation. `:set strict` switches the worker's change detection while running and recomputes what's on screen; the status bar then says `strict`. Zoom doubles from 1× up to whatever separates the closest two snapshots (at least 8×, at most 4096×).
+
 ### 3.16 Messages (copy the mockup's wording)
 - "This is the oldest version of this folder." / "Newest snapshot. Newer changes exist only on disk." / "Newest snapshot. Nothing changed on disk since."
 - "No older snapshot of this folder." · "No older change to main.go." · "Select a file or folder first."
@@ -1267,6 +1271,6 @@ Tick milestones here as they're done, with the commit.
 - [x] M3: preview, item track, versions, deleted items — 3be44ca
 - [x] M4: diff — 34dc9c5
 - [x] M5: restore — adf677b
-- [ ] M6: navigation extras
+- [x] M6: navigation extras — COMMIT
 - [ ] M7: polish and release
 - [ ] M8: yazi plugin

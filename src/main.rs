@@ -188,9 +188,10 @@ fn run(cli: Cli) -> Result<()> {
             if timeline_set(&snaps, &filter, &folder).is_empty() {
                 anyhow::bail!("{}", explain_empty(&snaps, &filter, &folder));
             }
-            let mine: Vec<_> = snaps.into_iter().filter(|s| filter.matches(s)).collect();
             let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
-            let app = App::new(mine, folder, jiff::tz::TimeZone::system(), home);
+            let mut app = App::new(snaps, filter, folder, jiff::tz::TimeZone::system(), home);
+            app.mode_switch = Some(index.mode_switch());
+            app.strict = cli.view.strict;
             let (tx, rx) = crossbeam_channel::unbounded();
             let threads = std::thread::available_parallelism().map_or(2, |n| n.get());
             let places = app.places.clone();

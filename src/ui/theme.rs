@@ -29,6 +29,8 @@ pub struct Theme {
     pub badge_blue: Style,
     /// The RST badge and warnings.
     pub badge_red: Style,
+    /// The FIND badge.
+    pub badge_magenta: Style,
     pub warn: Style,
     pub popup: Style,
     pub popup_border: Style,
@@ -57,6 +59,7 @@ impl Theme {
                 badge: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 badge_blue: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 badge_red: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
+                badge_magenta: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 warn: plain.add_modifier(Modifier::BOLD),
                 popup: plain,
                 popup_border: plain,
@@ -85,6 +88,10 @@ impl Theme {
                 .add_modifier(Modifier::BOLD),
             badge_blue: Style::default()
                 .bg(Color::Blue)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+            badge_magenta: Style::default()
+                .bg(Color::Magenta)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
             badge_red: Style::default()

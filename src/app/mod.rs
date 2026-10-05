@@ -17,16 +17,19 @@ use jiff::tz::TimeZone;
 
 use crate::diff::{DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, SideKey};
 use crate::index::NodeRef;
+use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
 use crate::index::folder::Counts;
 use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
+use crate::index::timeline::{Filter, explain_empty};
 use crate::index::versions::{Run, run_at};
+use crate::index::{Mode, ModeSwitch};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
 use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
 use crate::worker::{Request, Response, Side};
-use cmdline::Input;
+use cmdline::{Input, InputKind};
 use selection::{Confirm, Dialog};
 
 /// Things the event loop does outside the app: they need the terminal.
@@ -150,12 +153,27 @@ pub struct DiffView {
     pub from_versions: bool,
 }
 
+/// `:find` results (PLAN.md §3.6).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FindView {
+    pub query: String,
+    /// Where it searched from, and the snapshots it searched.
+    pub root: PathBuf,
+    pub set: Arc<Vec<SnapshotInfo>>,
+    /// Each with whether it's on disk now.
+    pub results: Vec<(Found, bool)>,
+    /// `(done, total)` while still searching.
+    pub progress: Option<(usize, usize)>,
+    pub sel: usize,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum View {
     #[default]
     Folder,
     Versions(VersionsView),
     Diff(DiffView),
+    Find(FindView),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,6 +223,16 @@ pub enum Action {
     CommandLine,
     /// `esc`: leave visual mode, then clear the selection.
     Escape,
+    /// `/`, `f`, `s`
+    Search,
+    FilterInput,
+    Find,
+    NextMatch,
+    PrevMatch,
+    ZoomIn,
+    ZoomOut,
+    /// A click on a find result: select it, or go there if selected.
+    ClickFound(usize),
     /// A click on a restore dialog option: select it, or restore if selected.
     DialogOption(usize),
     DialogRestore,
@@ -234,6 +262,10 @@ impl Action {
                 | Action::Scroll(_)
                 | Action::NextHunk
                 | Action::PrevHunk
+                | Action::NextMatch
+                | Action::PrevMatch
+                | Action::ZoomIn
+                | Action::ZoomOut
         )
     }
 }
@@ -271,8 +303,21 @@ pub struct App {
     pub tz: TimeZone,
     /// The home folder, shown as `~`.
     pub home: Option<PathBuf>,
-    /// This machine's snapshots (§2.4).
+    /// Every snapshot in the repository.
+    everything: Vec<SnapshotInfo>,
+    /// Which of them are this machine's (§2.4); `:host`, `:tag`.
+    pub filter: Filter,
+    /// The snapshots that pass the filter.
     all: Vec<SnapshotInfo>,
+    /// Switches the worker's change detection (`:set strict`).
+    pub mode_switch: Option<ModeSwitch>,
+    pub strict: bool,
+    /// "Today", for `:yesterday`; the clock when `None` (tests set it).
+    pub now: Option<jiff::Timestamp>,
+    /// `/`: matches are highlighted, `n` `N` step through them.
+    pub search: String,
+    /// `f`: only names containing it are listed.
+    pub name_filter: String,
     /// The backup root: `h` stops here.
     pub root: PathBuf,
     pub folder: PathBuf,
@@ -339,13 +384,20 @@ pub struct App {
 }
 
 impl App {
-    /// `all` is this machine's snapshots; `folder` must be in some of them.
+    /// `everything` is every snapshot, of which `filter` picks this
+    /// machine's; `folder` must be in some of those.
     pub fn new(
-        all: Vec<SnapshotInfo>,
+        everything: Vec<SnapshotInfo>,
+        filter: Filter,
         folder: PathBuf,
         tz: TimeZone,
         home: Option<PathBuf>,
     ) -> Self {
+        let all: Vec<SnapshotInfo> = everything
+            .iter()
+            .filter(|s| filter.matches(s))
+            .cloned()
+            .collect();
         let root = all
             .iter()
             .flat_map(|s| &s.paths)
@@ -356,7 +408,14 @@ impl App {
         let mut app = App {
             tz: tz.clone(),
             home,
+            everything,
+            filter,
             all,
+            mode_switch: None,
+            strict: false,
+            now: None,
+            search: String::new(),
+            name_filter: String::new(),
             root,
             folder: folder.clone(),
             snap: SnapshotId::default(),
@@ -465,6 +524,14 @@ impl App {
         let Some(Some(entries)) = self.listing() else {
             return rows;
         };
+        let shown = |e: &Entry| {
+            self.name_filter.is_empty()
+                || e.node
+                    .name
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .contains(&self.name_filter.to_lowercase())
+        };
         let ghosts: &[Entry] = match (self.ghosts, self.ghost_entries()) {
             (true, Some(g)) => g,
             _ => &[],
@@ -477,10 +544,14 @@ impl App {
                 _ => false,
             };
             if take_entry {
-                rows.push(Row::Entry(i));
+                if shown(&entries[i]) {
+                    rows.push(Row::Entry(i));
+                }
                 i += 1;
             } else {
-                rows.push(Row::Ghost(j));
+                if shown(&ghosts[j]) {
+                    rows.push(Row::Ghost(j));
+                }
                 j += 1;
             }
         }
@@ -676,6 +747,7 @@ impl App {
             View::Folder => self.ensure_selected(),
             View::Versions(v) => self.ensure_versions(&v),
             View::Diff(d) => self.ensure_diff(&d),
+            View::Find(_) => {}
         }
 
         let key = self.preview_key();
@@ -859,6 +931,7 @@ impl App {
 
     fn preview_key(&self) -> String {
         match &self.view {
+            View::Find(_) => "find".into(),
             View::Folder => format!(
                 "f|{}|{:?}|{}|{:?}",
                 self.folder.display(),
@@ -1028,6 +1101,30 @@ impl App {
                 }
             }
             Response::Pager { name, bytes } => self.effects.push(Effect::Pager { name, bytes }),
+            Response::Snapshots(snaps) => {
+                let before = self.all.len();
+                self.everything = snaps;
+                let f = self.filter.clone();
+                self.apply_filter(f);
+                let n = self.all.len();
+                self.message = Some(match n.cmp(&before) {
+                    Ordering::Greater => format!("{} new snapshots.", n - before),
+                    Ordering::Less => format!("{} snapshots were removed.", before - n),
+                    Ordering::Equal => "No new snapshots.".into(),
+                });
+            }
+            Response::Found {
+                query,
+                results,
+                progress,
+            } => {
+                if let View::Find(f) = &mut self.view
+                    && f.query == query
+                {
+                    f.results = results;
+                    f.progress = progress;
+                }
+            }
             Response::Error(e) => self.message = Some(e),
         }
     }
@@ -1094,6 +1191,7 @@ impl App {
         self.sel = usize::from(self.folder != self.root);
         self.marks.clear();
         self.visual = None;
+        self.name_filter.clear();
         self.restore_selection();
         self.moved_on();
     }
@@ -1127,9 +1225,14 @@ impl App {
             Action::RestoreDialog => return self.open_dialog(),
             Action::Copy(c) => return self.copy(c),
             Action::CommandLine => {
-                self.input = Some(Input::default());
+                self.start_input(InputKind::Command, "");
                 return true;
             }
+            Action::Find => {
+                self.start_input(InputKind::Command, "find ");
+                return true;
+            }
+            Action::ZoomIn | Action::ZoomOut => return self.zoom_by(a == Action::ZoomIn),
             Action::DialogOption(k) => {
                 if let Some(d) = &mut self.dialog {
                     if d.sel == k {
@@ -1167,6 +1270,7 @@ impl App {
         match self.view.clone() {
             View::Versions(v) => return self.act_versions(v, a),
             View::Diff(d) => return self.act_diff(d, a),
+            View::Find(f) => return self.act_find(f, a),
             View::Folder => {}
         }
         let rows = self.rows().len();
@@ -1381,10 +1485,23 @@ impl App {
             Action::ToggleMark => self.toggle_mark(),
             Action::Visual => self.toggle_visual(),
             Action::Escape => {
-                if self.visual.take().is_none() {
+                if self.visual.take().is_some() {
+                } else if !self.marks.is_empty() {
                     self.marks.clear();
+                } else {
+                    self.search.clear();
+                    self.name_filter.clear();
+                    self.restore_selection();
                 }
             }
+            Action::Search => self.start_input(InputKind::Search, ""),
+            Action::FilterInput => {
+                let f = self.name_filter.clone();
+                self.start_input(InputKind::Filter, &f);
+            }
+            Action::NextMatch => return self.search_step(true),
+            Action::PrevMatch => return self.search_step(false),
+            Action::ClickFound(_) => {}
             Action::Yank
             | Action::Paste
             | Action::PasteOver
@@ -1395,7 +1512,10 @@ impl App {
             | Action::DialogRestore
             | Action::DialogCancel
             | Action::ConfirmYes
-            | Action::ConfirmNo => unreachable!("handled above"),
+            | Action::ConfirmNo
+            | Action::Find
+            | Action::ZoomIn
+            | Action::ZoomOut => unreachable!("handled above"),
             Action::TogglePreview => self.toggle_preview(),
             Action::Scroll(n) => self.scroll_by(n),
             Action::Help => self.help = true,
@@ -1590,6 +1710,221 @@ impl App {
             }
         }
         true
+    }
+
+    /// Whether a row matches the search.
+    pub fn matches(&self, row: Row) -> bool {
+        !self.search.is_empty()
+            && self.entry(row).is_some_and(|e| {
+                e.node
+                    .name
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .contains(&self.search.to_lowercase())
+            })
+    }
+
+    fn select_row(&mut self, k: usize) {
+        self.select(k);
+    }
+
+    /// The first entry (below `..`).
+    fn select_first(&mut self) {
+        self.select(usize::from(self.folder != self.root));
+    }
+
+    /// `:host`, `:tag`: a new filter, unless it leaves this folder with no snapshots.
+    fn set_filter(&mut self, f: Filter) {
+        let mine: Vec<SnapshotInfo> = self
+            .everything
+            .iter()
+            .filter(|s| f.matches(s))
+            .cloned()
+            .collect();
+        let covers = |p: &Path| {
+            mine.iter()
+                .any(|s| s.paths.iter().any(|b| p.starts_with(b)))
+        };
+        if !covers(&self.folder) {
+            self.message = Some(explain_empty(&self.everything, &f, &self.folder));
+            return;
+        }
+        self.apply_filter(f);
+        let hosts = if self.filter.hosts.is_empty() {
+            "any host".to_string()
+        } else {
+            self.filter.hosts.join(", ")
+        };
+        let tag = self
+            .filter
+            .tag
+            .as_ref()
+            .map(|t| format!(", tag {t}"))
+            .unwrap_or_default();
+        self.message = Some(format!("Showing snapshots from {hosts}{tag}."));
+    }
+
+    /// Recomputes everything that depends on which snapshots are shown.
+    fn apply_filter(&mut self, f: Filter) {
+        let time = self.set().get(self.idx()).map(|s| s.time);
+        self.filter = f;
+        self.all = self
+            .everything
+            .iter()
+            .filter(|s| self.filter.matches(s))
+            .cloned()
+            .collect();
+        self.forget_history();
+        let set = self.set_for(&self.folder);
+        if !set.iter().any(|s| s.id == self.snap)
+            && let Some(s) = time
+                .and_then(|t| set.iter().rev().find(|s| s.time <= t))
+                .or(set.last())
+        {
+            self.snap = s.id;
+        }
+        self.moved_on();
+    }
+
+    /// Forgets what was computed over the snapshots, to compute it again.
+    fn forget_history(&mut self) {
+        self.tracks.clear();
+        self.listings.clear();
+        self.deleted.clear();
+        self.nodes.clear();
+        self.pending.clear();
+    }
+
+    /// `:set strict` / `:set nostrict`.
+    fn set_mode(&mut self, mode: Mode) {
+        self.strict = mode == Mode::Strict;
+        if let Some(m) = &self.mode_switch {
+            m.set(mode);
+        }
+        self.forget_history();
+        self.moved_on();
+        self.message = Some(
+            if self.strict {
+                "Counting every change restic stored (strict)."
+            } else {
+                "Counting changes to content, permissions and owner."
+            }
+            .into(),
+        );
+    }
+
+    /// The zoom levels: 1×, 2×, 4×, … until no two snapshots share a column.
+    fn max_zoom(&self) -> u32 {
+        let set = self.set();
+        let secs: Vec<i64> = set.iter().map(|s| s.time.as_second()).collect();
+        let span = secs.last().zip(secs.first()).map_or(0, |(b, a)| b - a);
+        let gap = secs
+            .windows(2)
+            .map(|w| w[1] - w[0])
+            .filter(|&g| g > 0)
+            .min();
+        let width = 74i64;
+        let need = match gap {
+            Some(g) if span > 0 => (span / (g * width)).max(1),
+            _ => 1,
+        };
+        (need as u32).next_power_of_two().clamp(8, 4096)
+    }
+
+    fn zoom_by(&mut self, zoom_in: bool) -> bool {
+        let next = if zoom_in {
+            self.zoom * 2
+        } else {
+            self.zoom / 2
+        };
+        if next < 1 || next > self.max_zoom() {
+            self.message = Some(
+                if zoom_in {
+                    "Fully zoomed in."
+                } else {
+                    "Fully zoomed out."
+                }
+                .into(),
+            );
+            return false;
+        }
+        self.zoom = next;
+        true
+    }
+
+    /// `:find NAME`: search every snapshot from the backup root.
+    pub(super) fn open_find(&mut self, query: &str) {
+        let root = self.root.clone();
+        let set = self.set_for(&root);
+        self.outbox.push(Request::Find {
+            set: set.clone(),
+            root: root.clone(),
+            query: query.to_string(),
+        });
+        self.view = View::Find(FindView {
+            query: query.to_string(),
+            root,
+            set,
+            results: Vec::new(),
+            progress: Some((0, 0)),
+            sel: 0,
+        });
+    }
+
+    fn act_find(&mut self, f: FindView, a: Action) -> bool {
+        let n = f.results.len();
+        let mut sel = f.sel;
+        match a {
+            Action::Down(k) => sel = (sel + k).min(n.saturating_sub(1)),
+            Action::Up(k) => sel = sel.saturating_sub(k),
+            Action::Top => sel = 0,
+            Action::Bottom => sel = n.saturating_sub(1),
+            Action::HalfDown => sel = (sel + 10).min(n.saturating_sub(1)),
+            Action::HalfUp => sel = sel.saturating_sub(10),
+            Action::ClickFound(k) if k != sel => sel = k.min(n.saturating_sub(1)),
+            Action::Open | Action::ClickFound(_) => {
+                if let Some((found, _)) = f.results.get(sel).cloned() {
+                    self.go_found(&f, &found);
+                }
+                return true;
+            }
+            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
+                self.view = View::Folder;
+                self.moved_on();
+                return true;
+            }
+            Action::Help => self.help = true,
+            Action::Prefix(c) => self.prefix = Some(c),
+            _ => {}
+        }
+        self.view = View::Find(FindView { sel, ..f });
+        true
+    }
+
+    /// Opens a find result's folder at the last snapshot that had it, with it selected.
+    fn go_found(&mut self, f: &FindView, found: &Found) {
+        let path = f.root.join(&found.path);
+        let parent = path.parent().unwrap_or(&f.root).to_path_buf();
+        let snap = f.set[found.last].clone();
+        self.view = View::Folder;
+        self.snap = snap.id;
+        self.moved = true;
+        let name = path.file_name().map(|n| n.to_os_string());
+        self.go_folder(parent, name.clone());
+        let mut shown = name
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if found.is_dir {
+            shown.push('/');
+        }
+        self.message = Some(if found.last + 1 == f.set.len() {
+            format!("Showing {shown} in the latest snapshot.")
+        } else {
+            format!(
+                "Jumped to {}, the last snapshot that has {shown}",
+                fmt::time(snap.time, &self.tz)
+            )
+        });
     }
 
     /// Does an action `n` times, stopping at the first boundary message.

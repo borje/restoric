@@ -48,9 +48,21 @@ fn view_action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action
         },
         View::Versions(_) => match (prefix, k.code) {
             (None, KeyCode::Char('p')) => Some(DiffPrevious),
+            (Some('z'), KeyCode::Char('i')) => Some(ZoomIn),
+            (Some('z'), KeyCode::Char('o')) => Some(ZoomOut),
             _ => None,
         },
-        View::Folder => None,
+        View::Folder => match (prefix, k.code) {
+            (Some('z'), KeyCode::Char('i')) => Some(ZoomIn),
+            (Some('z'), KeyCode::Char('o')) => Some(ZoomOut),
+            (None, KeyCode::Char('/')) => Some(Search),
+            (None, KeyCode::Char('f')) => Some(FilterInput),
+            (None, KeyCode::Char('s')) => Some(Find),
+            (None, KeyCode::Char('n')) => Some(NextMatch),
+            (None, KeyCode::Char('N')) => Some(PrevMatch),
+            _ => None,
+        },
+        View::Find(_) => None,
     }
 }
 
@@ -118,18 +130,19 @@ impl App {
     fn input_key(&mut self, k: KeyEvent) {
         let Some(input) = &mut self.input else { return };
         match k.code {
-            KeyCode::Esc => self.input = None,
-            KeyCode::Enter => {
-                let text = std::mem::take(&mut input.text);
-                self.input = None;
-                self.run_command(&text);
-            }
+            KeyCode::Esc => self.input_cancel(),
+            KeyCode::Enter => self.input_enter(),
             KeyCode::Backspace => {
                 if input.text.pop().is_none() {
-                    self.input = None;
+                    self.input_cancel();
+                } else {
+                    self.input_changed();
                 }
             }
-            KeyCode::Char(c) => input.text.push(c),
+            KeyCode::Char(c) => {
+                input.text.push(c);
+                self.input_changed();
+            }
             _ => {}
         }
     }

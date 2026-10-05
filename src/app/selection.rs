@@ -150,6 +150,7 @@ impl App {
             }
             View::Versions(v) => self.version_target(&v.path, v.sel).map(|t| vec![t]),
             View::Diff(d) => self.version_target(&d.path, d.run).map(|t| vec![t]),
+            View::Find(_) => Err(String::new()),
         }
     }
 

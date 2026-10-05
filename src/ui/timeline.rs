@@ -283,9 +283,9 @@ pub fn draw(
     let cr = r + 1 + tracks.len() as u16;
     g.put(axis.col_of(sel), cr, "▲", t.accent);
     let zc = cols.saturating_sub(9);
-    let c = g.put(zc, cr, "−", t.accent.patch(t.bold)) + 1;
+    let c = g.put_act(zc, cr, "−", t.accent.patch(t.bold), Action::ZoomOut) + 1;
     let c = g.put(c, cr, &format!("{zoom}×"), t.dim) + 1;
-    g.put(c, cr, "+", t.accent.patch(t.bold));
+    g.put_act(c, cr, "+", t.accent.patch(t.bold), Action::ZoomIn);
 }
 
 /// The folder view's timeline: the folder's changes and the selected item's.

@@ -11,7 +11,7 @@ use crate::repo::SnapshotInfo;
 /// Which snapshots belong to this machine (§2.4).
 #[derive(Clone, Debug, Default)]
 pub struct Filter {
-    /// Accepted hostnames; several when the machine was renamed.
+    /// Accepted hostnames; several when the machine was renamed. Empty: any.
     pub hosts: Vec<String>,
     /// Only snapshots with this tag.
     pub tag: Option<String>,
@@ -19,7 +19,8 @@ pub struct Filter {
 
 impl Filter {
     pub fn matches(&self, s: &SnapshotInfo) -> bool {
-        self.hosts.contains(&s.host) && self.tag.as_ref().is_none_or(|t| s.tags.contains(t))
+        (self.hosts.is_empty() || self.hosts.contains(&s.host))
+            && self.tag.as_ref().is_none_or(|t| s.tags.contains(t))
     }
 }
 

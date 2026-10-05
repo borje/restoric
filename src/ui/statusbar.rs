@@ -4,6 +4,7 @@ use ratatui::style::Style;
 
 use super::timeline::Axis;
 use super::{Grid, fmt};
+use crate::app::cmdline::InputKind;
 use crate::app::{Action, App, View};
 
 pub fn draw(app: &App, g: &mut Grid) {
@@ -11,10 +12,17 @@ pub fn draw(app: &App, g: &mut Grid) {
     let (cols, r) = (g.cols(), g.rows() - 1);
     g.fill(r, 0, cols - 1, t.status_bar);
     if let Some(input) = &app.input {
-        let c = g.put(1, r, ":", t.accent.patch(t.bold));
+        let (label, hint) = match input.kind {
+            InputKind::Command => (
+                ":",
+                "sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo",
+            ),
+            InputKind::Search => ("/", "type to search this folder · ⏎ keep · esc cancel"),
+            InputKind::Filter => ("filter: ", "type to filter · ⏎ keep · esc clear"),
+        };
+        let c = g.put(1, r, label, t.accent.patch(t.bold));
         let c = g.put(c, r, &input.text, t.text);
         let c = g.put(c, r, "█", t.accent);
-        let hint = "sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo";
         let hx = cols.saturating_sub(1 + fmt::width(hint) as u16);
         if c + 2 < hx {
             g.put(hx, r, hint, t.dim);
@@ -25,6 +33,17 @@ pub fn draw(app: &App, g: &mut Grid) {
         let c = g.put(0, r, " RST ", t.badge_red) + 1;
         let mid = vec![("choose where the restored copy goes".to_string(), t.dim)];
         finish(app, g, c, mid, Vec::new());
+        return;
+    }
+    if let View::Find(f) = &app.view {
+        let c = g.put(0, r, " FIND ", t.badge_magenta) + 1;
+        let mid = vec![(
+            "⏎ jumps to the last snapshot that has it".to_string(),
+            t.dim,
+        )];
+        let n = f.results.len();
+        let pos = format!("{}/{n}", if n > 0 { f.sel + 1 } else { 0 });
+        finish(app, g, c, mid, vec![(pos, t.text, None)]);
         return;
     }
     if let View::Diff(d) = &app.view {
@@ -104,6 +123,12 @@ pub fn draw(app: &App, g: &mut Grid) {
         if share > 1 {
             mid.push((format!("  {share} in column · zi"), t.dim));
         }
+    }
+    if !app.name_filter.is_empty() {
+        mid.push((format!("  filter \"{}\"", app.name_filter), t.accent));
+    }
+    if app.strict {
+        mid.push(("  strict".to_string(), t.dim));
     }
     if let Some(y) = &app.yanked {
         mid.push((format!("  {} yanked", y.len()), t.accent));

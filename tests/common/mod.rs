@@ -43,13 +43,17 @@ impl Harness {
         let snaps = repo.snapshots().unwrap();
         let disk = Arc::new(repo.disk());
         let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 24);
+        let mode_switch = index.mode_switch();
         let app = App::new(
             snaps,
+            restoric::index::timeline::Filter::default(),
             PathBuf::from(folder),
             TimeZone::UTC,
             Some(PathBuf::from("/home/bege")),
         );
         let mut app = app;
+        app.mode_switch = Some(mode_switch);
+        app.now = Some("2026-10-05T12:00:00Z".parse().unwrap());
         app.places.restore_dir = PathBuf::from("/home/bege/Restored");
         let mut h = Harness {
             app,

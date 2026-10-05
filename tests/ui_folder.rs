@@ -77,7 +77,13 @@ fn boundary_message() {
 fn indexing() {
     let repo = Arc::new(FakeRepo::parse(PROJECT).unwrap());
     let snaps = repo.snapshots().unwrap();
-    let mut app = App::new(snaps, PathBuf::from(SRC), TimeZone::UTC, None);
+    let mut app = App::new(
+        snaps,
+        restoric::index::timeline::Filter::default(),
+        PathBuf::from(SRC),
+        TimeZone::UTC,
+        None,
+    );
     let area = Rect::new(0, 0, 100, 12);
     let mut buf = Buffer::empty(area);
     ui::draw(&mut app, &mut buf, area, &Theme::new(false));

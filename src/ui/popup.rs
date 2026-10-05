@@ -10,7 +10,11 @@ fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Ac
         (View::Diff(_), 'g') => &[("gg", "top", Action::Top)],
         (View::Diff(_), ']') => &[("]c", "next change", Action::NextHunk)],
         (View::Diff(_), '[') => &[("[c", "previous change", Action::PrevHunk)],
-        (_, 'z') => &[("zh", "show / hide deleted", Action::ToggleDeleted)],
+        (_, 'z') => &[
+            ("zh", "show / hide deleted", Action::ToggleDeleted),
+            ("zi", "zoom timeline in", Action::ZoomIn),
+            ("zo", "zoom timeline out", Action::ZoomOut),
+        ],
         (_, 'c') => &[
             ("cc", "copy snapshot:path", Action::Copy('c')),
             ("cd", "copy folder path", Action::Copy('d')),

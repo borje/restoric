@@ -3,6 +3,7 @@
 //! drawing works on a grid of cells rather than with ratatui widgets.
 
 pub mod diffview;
+pub mod findview;
 pub mod fmt;
 pub mod folder;
 pub mod icons;
@@ -179,6 +180,7 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
             versions::draw(app, &mut g, &v);
         }
         View::Diff(d) => diffview::draw(app, &mut g, &d),
+        View::Find(f) => findview::draw(app, &mut g, &f),
     }
     statusbar::draw(app, &mut g);
     popup::which_key(app, &mut g);

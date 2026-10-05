@@ -1,0 +1,14 @@
+---
+source: tests/ui_nav.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  Find  "nosuchthing"                                            0 matches in 32 snapshots
+
+  PATH                                                  FIRST SEEN    LAST SEEN     NOW
+
+
+  Nothing with that name in any snapshot.
+
+
+
+ FIND  ⏎ jumps to the last snapshot that has it                                         0/0  ? help

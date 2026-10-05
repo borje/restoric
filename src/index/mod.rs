@@ -2,6 +2,7 @@
 //! snapshot, whether two versions differ, change points and counts.
 //! Written against [`Repo`] only.
 
+pub mod find;
 pub mod fingerprint;
 pub mod folder;
 pub mod listing;
@@ -12,6 +13,7 @@ pub mod versions;
 use std::ffi::OsString;
 use std::path::{Component, Path};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use anyhow::Result;
 use quick_cache::Weighter;
@@ -36,6 +38,16 @@ impl Mode {
             Mode::Content => 0,
             Mode::Strict => 1,
         }
+    }
+}
+
+/// Switches an [`Index`]'s mode from elsewhere (the UI thread).
+#[derive(Clone, Debug)]
+pub struct ModeSwitch(Arc<AtomicU8>);
+
+impl ModeSwitch {
+    pub fn set(&self, mode: Mode) {
+        self.0.store(mode.byte(), Ordering::Relaxed);
     }
 }
 
@@ -98,7 +110,8 @@ pub struct Index {
     repo: Arc<dyn Repo>,
     trees: quick_cache::sync::Cache<TreeId, Arc<Tree>, TreeWeight>,
     cache: Cache,
-    pub mode: Mode,
+    /// The current [`Mode`], switchable while running (`:set strict`).
+    mode: Arc<AtomicU8>,
 }
 
 pub fn components(path: &Path) -> Vec<OsString> {
@@ -117,8 +130,20 @@ impl Index {
             repo,
             trees: quick_cache::sync::Cache::with_weighter(10_000, memory_bytes, TreeWeight),
             cache,
-            mode,
+            mode: Arc::new(AtomicU8::new(mode.byte())),
         }
+    }
+
+    pub fn mode(&self) -> Mode {
+        match self.mode.load(Ordering::Relaxed) {
+            1 => Mode::Strict,
+            _ => Mode::Content,
+        }
+    }
+
+    /// A handle that switches the mode for every user of this index.
+    pub fn mode_switch(&self) -> ModeSwitch {
+        ModeSwitch(self.mode.clone())
     }
 
     pub fn repo(&self) -> &Arc<dyn Repo> {

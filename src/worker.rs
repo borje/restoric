@@ -13,6 +13,7 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::diff::{self, DiffKey, FileDiff};
 use crate::disk::Disk;
+use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
 use crate::index::folder::Counts;
 use crate::index::listing::Entry;
@@ -87,6 +88,14 @@ pub enum Request {
     Exists { paths: Vec<PathBuf> },
     /// A whole file (up to a limit), for the pager.
     ReadAll { node: Node, name: String },
+    /// Read the snapshot list again (`:reload`).
+    Reload,
+    /// Everything under `root` with `query` in its path, in every snapshot.
+    Find {
+        set: Arc<Vec<SnapshotInfo>>,
+        root: PathBuf,
+        query: String,
+    },
     /// A full-screen diff: read both sides up to `key.limit` and diff them.
     Diff {
         key: DiffKey,
@@ -112,7 +121,9 @@ impl Request {
             Request::PointCounts { .. }
             | Request::Restore { .. }
             | Request::Undo
-            | Request::ReadAll { .. } => false,
+            | Request::ReadAll { .. }
+            | Request::Reload
+            | Request::Find { .. } => false,
             _ => true,
         }
     }
@@ -176,6 +187,14 @@ pub enum Response {
     Pager {
         name: String,
         bytes: Vec<u8>,
+    },
+    Snapshots(Vec<SnapshotInfo>),
+    Found {
+        query: String,
+        /// With whether each is on disk now.
+        results: Vec<(Found, bool)>,
+        /// `(done, total)` while still searching.
+        progress: Option<(usize, usize)>,
     },
     Error(String),
 }
@@ -282,6 +301,29 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
             Request::ReadAll { node, name } => {
                 let bytes = index.repo().read_at(&node, 0, PAGER_LIMIT)?;
                 send(Response::Pager { name, bytes });
+            }
+            Request::Reload => send(Response::Snapshots(index.repo().snapshots()?)),
+            Request::Find { set, root, query } => {
+                let on_disk = |f: Vec<Found>| -> Vec<(Found, bool)> {
+                    f.into_iter()
+                        .map(|f| {
+                            let e = ctx.disk.stat(&root.join(&f.path)).is_some();
+                            (f, e)
+                        })
+                        .collect()
+                };
+                let found = index.find(&set, &root, &query, &mut |done, total, partial| {
+                    send(Response::Found {
+                        query: query.clone(),
+                        results: on_disk(partial),
+                        progress: Some((done, total)),
+                    });
+                })?;
+                send(Response::Found {
+                    query,
+                    results: on_disk(found),
+                    progress: None,
+                });
             }
             Request::Diff { key, old, new } => {
                 let diff = file_diff(ctx, &old, &new, key.limit)?;
