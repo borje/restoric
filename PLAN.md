@@ -1281,4 +1281,4 @@ Tick milestones here as they're done, with the commit.
 - [x] M5: restore — adf677b
 - [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
-- [x] M8: yazi plugin — COMMIT (not yet published for `ya pkg`)
+- [x] M8: yazi plugin — abb5806 (not yet published for `ya pkg`)
