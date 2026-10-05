@@ -1,11 +1,11 @@
 ---
 source: tests/ui_restore.rs
+assertion_line: 17
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 12 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-                                                    •·· · · ·  ··  · ·• ·  ·  ┊ · server.go
+  ○        ○ ○ ○    ○   ○  ○     ○    ○         ○   ●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ server.go · v1/2 · 30 B      ⇥ content
@@ -34,5 +34,6 @@ expression: "h.screen(100, 34)"
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │                                   │
    ┄ 2 unchanged ┄    │                                   │
- Jul 14 09:00 +7      │   2 deleted · . to show           │
+ Jul 14 09:00 +7      │                                   │
+                      │   2 deleted · . to show           │
  SEL  Sep 09 19:23  811fc3af  src/ ~1                                     Sep 06 18:03  5/6  ? help

@@ -1,11 +1,11 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 52
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project                                                       ◀ version 17 of 17 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ●  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ●    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● project/
-  • ·   ·  · · ·  · ·   ·  ··    · ·  · ·  •    ·· ···· · · ·  ··  · ·· ·  ·  ┊ · docs/
+  ● ·   ○  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ●    ○· ·○·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ docs/  ○ project/
                                                                       ▲                    − 1× +
 
  now  ~1 unsaved      │ ▸ docs/                           │ docs/
@@ -35,4 +35,5 @@ expression: "h.screen(100, 34)"
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │                                   │
  Jul 20 12:00 ~1      │                                   │
+   ┄ 1 unchanged ┄    │                                   │
  NOR  Sep 27 08:52  c177b849  project/ ~1                                               1/5  ? help

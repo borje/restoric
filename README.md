@@ -7,8 +7,7 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 11 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-  • ·   ·  • · ·  · •   ·  ··    • ·  · ·  ·    •· ·•·• · · ·  ··  · ·· ·  ·  ┊ • main.go
+  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
                                                     ▲                                      − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v6/7 · 96 B        ⇥ content
@@ -24,10 +23,11 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 ▶Sep 06 18:03 +1~3−1  │                                   │   8  // feature flag
    ┄ 2 unchanged ┄    │                                   │   9  // signals
  Sep 02 20:16 ~1      │                                   │  10+ // serve
+   ┄ 2 unchanged ┄    │                                   │
  NOR  Sep 06 18:03  7ff3fd58  src/ +1 ~3 −1                               Sep 06 18:03  5/7  ? help
 ```
 
-- The top row of dots marks the snapshots where the folder changed. The second row tracks the selected file.
+- The row of dots marks the snapshots where the selected file changed (`●`) and where only its folder did (`○`).
 - A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored).
 - Only this machine's snapshots are shown, picked by hostname as `restic snapshots --host` does.
 - Restoring works like copy and paste: `y` yanks, `p` puts the old version next to the original, `P` overwrites it after asking. `:undo` puts back what was overwritten.

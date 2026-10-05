@@ -54,18 +54,17 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             exists,
             on: "●",
             style: t.text,
-            mark_only_changes: false,
             live: app.live.get(&v.path).map(|c| !c.is_empty()),
             label: name.clone(),
             label_style: t.bold,
-            empty: None,
+            outer: None,
         };
         timeline::draw(
             g,
             &axis,
             app.zoom,
             sel.from,
-            &[row],
+            &row,
             &app.tz,
             &Action::GoSnapshot,
         );

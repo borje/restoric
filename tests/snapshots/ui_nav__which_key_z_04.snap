@@ -1,11 +1,11 @@
 ---
 source: tests/ui_nav.rs
+assertion_line: 24
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 12 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-  • ·   ·  • · ·  · •   ·  ··    • ·  · ·  ·    •· ·•·• · · ·  ··  · ·· ·  ·  ┊ • main.go
+  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v7/7 · 108 B       ⇥ content
@@ -29,10 +29,11 @@ expression: "h.screen(100, 34)"
  Aug 10 15:44 ~1      │                                   │
  Aug 07 08:15 +1      │                                   │
  Aug 03 16:19 +1~1    │                                   │
-   ┄ 1 unchanged ┄    │                                   │      ╭─ z ────────────────────────────╮
- Jul 28 15:59 ~1      │                                   │      │ zh   show / hide deleted       │
- Jul 26 11:57 ~1      │                                   │      │ zi   zoom timeline in          │
- Jul 24 12:16 ~1      │                                   │      │ zo   zoom timeline out         │
-   ┄ 2 unchanged ┄    │                                   │      ╰────────────────────────────────╯
- Jul 14 09:00 +7      │   2 deleted · . to show           │
+   ┄ 1 unchanged ┄    │                                   │
+ Jul 28 15:59 ~1      │                                   │      ╭─ z ────────────────────────────╮
+ Jul 26 11:57 ~1      │                                   │      │ zh   show / hide deleted       │
+ Jul 24 12:16 ~1      │                                   │      │ zi   zoom timeline in          │
+   ┄ 2 unchanged ┄    │                                   │      │ zo   zoom timeline out         │
+ Jul 14 09:00 +7      │                                   │      ╰────────────────────────────────╯
+                      │   2 deleted · . to show           │
  NOR  Sep 09 19:23  811fc3af  src/ ~1                                  z  Sep 09 19:23  4/6  ? help

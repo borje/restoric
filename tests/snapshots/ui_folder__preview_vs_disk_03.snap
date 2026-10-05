@@ -1,11 +1,11 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 142
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 12 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-  • ·   ·  • · ·  · •   ·  ··    • ·  · ·  ·    •· ·•·• · · ·  ··  · ·· ·  ·  ┊ • main.go
+  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v7/7 · 108 B       ⇥ vs disk
@@ -34,5 +34,6 @@ expression: "h.screen(100, 34)"
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │                                   │
    ┄ 2 unchanged ┄    │                                   │
- Jul 14 09:00 +7      │   2 deleted · . to show           │
+ Jul 14 09:00 +7      │                                   │
+                      │   2 deleted · . to show           │
  NOR  Sep 09 19:23  811fc3af  src/ ~1                                     Sep 09 19:23  4/6  ? help

@@ -154,7 +154,7 @@ pub fn panes(cols: u16) -> Panes {
 }
 
 /// First row of the panes.
-pub const TOP: u16 = 6;
+pub const TOP: u16 = 5;
 
 /// Draws the whole screen and returns where things can be clicked.
 pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits {

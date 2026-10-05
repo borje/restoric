@@ -284,8 +284,8 @@ function rbox(y,x,h,w,title,titleCls='b'){for(let r=y;r<y+h;r++)for(let c=x;c<x+
   if(title)put(y,x+2,` ${title} `,titleCls);}
 function wrap(t,w){const out=[];let line='';for(const word of t.split(' ')){if(line&&(line+' '+word).length>w){out.push(line);line=word}else line=line?line+' '+word:word}if(line)out.push(line);return out}
 
-// tracks share one time axis; labels sit at the right edge. Returns how many snapshots share the selected column.
-function timeline(r,tracks,sel,onPick){
+// one row of dots: the track's changes (●) over its folder's (○, tr.outer); labels sit at the right edge. Returns how many snapshots share the selected column.
+function timeline(r,tr,sel,onPick){
   const t0=+snaps[0].t,t1=+snaps[LAST].t,X0=2,TW=COLS-26;
   const span=(t1-t0)/S.zoom;let a=+snaps[sel].t-span/2;a=Math.max(t0,Math.min(a,t1-span));const b=a+span;
   const col=t=>X0+Math.round((t-a)/(b-a)*(TW-1)),vis=t=>t>=a-1&&t<=b+1;
@@ -294,15 +294,16 @@ function timeline(r,tracks,sel,onPick){
     const txt=m1?M[d.getMonth()]:String(d.getDate());const c=col(+d);if(c>end&&c+txt.length<X0+TW){put(r,c,txt,m1?'dim':'dim2');end=c+txt.length+1}}
   put(r,X0+TW+3,'now','dim');
   const by=new Map();for(let i=0;i<N;i++){const t=+snaps[i].t;if(!vis(t))continue;const c=col(t);if(!by.has(c))by.set(c,[]);by.get(c).push(i)}
-  tracks.forEach((tr,k)=>{const rr=r+1+k;
-    if(a>t0)put(rr,0,'‹','acc');if(b<t1)put(rr,X0+TW,'›','acc');put(rr,X0+TW+2,'┊','dim2');
-    if(!tr.isChange){put(rr,X0,tr.empty||'','dim2');return}
-    for(const [c,l] of by){const ch=l.some(tr.isChange),ex=!tr.exists||l.some(tr.exists);
-      const cls=l.includes(sel)&&(k===0||ch)?'mksel':ch?tr.cls:'dim2';
-      put(rr,c,ch?tr.on:ex?'·':' ',cls,()=>onPick(l.find(tr.isChange)??l[0]));}
-    put(rr,X0+TW+4,tr.live?tr.on:'·',tr.live?'live':'dim2');
-    put(rr,X0+TW+6,fit(tr.label,COLS-(X0+TW+6)-1),tr.labelCls||'dim');});
-  const cr=r+1+tracks.length;put(cr,col(+snaps[sel].t),'▲','acc');
+  const rr=r+1,o=tr.outer,oc=j=>!!o&&o.isChange(j);
+  if(a>t0)put(rr,0,'‹','acc');if(b<t1)put(rr,X0+TW,'›','acc');put(rr,X0+TW+2,'┊','dim2');
+  for(const [c,l] of by){const ch=l.some(tr.isChange),och=l.some(oc),ex=!tr.exists||l.some(tr.exists);
+    const [sym,cls]=ch?[tr.on,tr.cls]:och?[o.on,o.cls]:ex?['·','dim2']:[' ','dim2'];
+    put(rr,c,sym,l.includes(sel)?'mksel':cls,()=>onPick(l.find(tr.isChange)??l.find(oc)??l[0]));}
+  const [lsym,lcls]=tr.live?[tr.on,'live']:o&&o.live?[o.on,'live']:['·','dim2'];
+  put(rr,X0+TW+4,lsym,lcls);
+  let lc=put(rr,X0+TW+6,fit(tr.label,COLS-(X0+TW+6)-1),tr.labelCls||'dim');
+  if(o&&lc+4+o.label.length<COLS){lc=put(rr,lc+2,o.on,o.cls);put(rr,lc+1,o.label,o.labelCls)}
+  const cr=r+2;put(cr,col(+snaps[sel].t),'▲','acc');
   const zc=COLS-9;let c=put(cr,zc,'−','acc b',()=>zoom(-1));c=put(cr,c+1,S.zoom+'×','dim');put(cr,c+1,'+','acc b',()=>zoom(1));
   return (by.get(col(+snaps[sel].t))||[]).length;}
 function zoom(d){const k=clamp(ZOOMS.indexOf(S.zoom)+d,0,ZOOMS.length-1);if(ZOOMS[k]===S.zoom)flash(d>0?'Fully zoomed in.':'Fully zoomed out.');S.zoom=ZOOMS[k];}
@@ -355,9 +356,9 @@ function renderMain(){
   const label=pos>=0?`version ${pos+1} of ${cp.length}`:`between versions`;
   header(crumbs(),[['◀ ','acc b',()=>key('H')],[label,''],[' ▶','acc b',()=>key('L')]]);
   const dname=(dir?base(dir):'project')+'/',tr=track(selRow);
-  const share=timeline(1,[{isChange:j=>nonzero(counts[dir][j]),live:nonzero(liveC[dir]),on:'●',cls:'mk',label:dname,labelCls:'b'},
-    tr?{...tr,on:'•',cls:'mod',label:tr.name,labelCls:'mod'}:{empty:'select a file or folder to see its changes here'}],i,j=>{S.snap=j});
-  const T=6,B=ROWS-2,BH=B-T+1;
+  const folder={isChange:j=>nonzero(counts[dir][j]),live:nonzero(liveC[dir]),on:'●',cls:'mk',label:dname,labelCls:'b'};
+  const share=timeline(1,tr?{...tr,on:'●',cls:'mod',label:tr.name,labelCls:'mod',outer:{...folder,on:'○'}}:folder,i,j=>{S.snap=j});
+  const T=5,B=ROWS-2,BH=B-T+1;
   // versions column
   if(LY.V){const [v0,v1]=LY.V;vline(v1+1,T,B);
     const V=[{live:true}];const lc=liveC[dir];
@@ -404,7 +405,7 @@ function renderHist(){
   const pk=`h|${f.path}|${S.hist.sel}|${S.pmode}`;if(pk!==S.pkey){S.pkey=pk;S.pscroll=null}
   const nver=runs.filter(r=>r.s>=0).length;
   header([['Versions  ','b'],[ROOTD+'/'+f.path,'acc']],[[`${nver} version${nver===1?'':'s'} in ${N} snapshots`,'dim']]);
-  timeline(1,[{isChange:j=>f.state[j]!==(j?f.state[j-1]:-1),exists:j=>f.state[j]>=0,live:f.live!==f.state[LAST],on:'●',cls:'mk',label:f.name,labelCls:'b'}],sel.from,
+  timeline(1,{isChange:j=>f.state[j]!==(j?f.state[j-1]:-1),exists:j=>f.state[j]>=0,live:f.live!==f.state[LAST],on:'●',cls:'mk',label:f.name,labelCls:'b'},sel.from,
     j=>{const k=runs.findIndex(r=>j>=r.from&&j<=r.to);if(k>=0)S.hist.sel=k});
   const T=5,B=ROWS-2,wide=COLS>=100,L1=wide?47:43,P0=L1+2;vline(L1+1,T,B);
   put(T,1,'VERSION','dim2');put(T,17,'SIZE','dim2');put(T,23,'SNAPSHOTS','dim2');put(T,34,'VS DISK','dim2');
@@ -484,7 +485,7 @@ const WK={main:{g:[['gg','top of list'],['gh','backup root'],['G','bottom (no pr
   hist:{g:[['gg','newest version']]},diff:{g:[['gg','top']],']':[[']c','next change']],'[':[['[c','previous change']]},find:{g:[['gg','top']]}};
 function renderWhichKey(){const items=(WK[S.view]||{})[S.pend];if(!items)return;const w=34,h=items.length+2,x=COLS-w-1,y=ROWS-2-h;
   rbox(y,x,h,w,S.pend,'acc b');items.forEach(([k,l],n)=>{put(y+1+n,x+2,k.padEnd(4),'acc b',()=>keySeq(k.split('').join(' ')));put(y+1+n,x+7,l,'')});}
-function renderToast(){if(!S.msg)return;const w=Math.min(50,COLS-4),lines=wrap(S.msg.text,w-4),h=lines.length+2,x=COLS-w-1,y=6;
+function renderToast(){if(!S.msg)return;const w=Math.min(50,COLS-4),lines=wrap(S.msg.text,w-4),h=lines.length+2,x=COLS-w-1,y=5;
   rbox(y,x,h,w,'');lines.forEach((l,k)=>put(y+1+k,x+2,l,S.msg.cls||''));}
 function renderHelp(){
   const L=[['Folder view',''],['j k  gg G  C-d C-u','move, top, bottom, half page'],['h l  - ⏎','parent / open (a file opens its versions)'],
@@ -680,7 +681,7 @@ function renderCmds(){const L=[];
   if(!S.dlg&&S.view==='main'){const i=S.snap,id=snaps[i].id,depth=S.dir?S.dir.split('/').length+4:4;
     L.push([`restic snapshots --json --host bege-laptop --path ${ROOT}`,`Run once at startup, then cached. ${N} snapshots.`]);
     L.push([`restic cat snapshot ${id}\nrestic cat blob <tree-id>   # ${depth}× down to ${absDir(S.dir)}`,`Read the folder's subtree id from each snapshot: ${treeId(S.dir,i)} here${i?`, ${treeId(S.dir,i-1)} in the previous snapshot`:''}. Same id means nothing below changed, so the timeline skips it. ${cps[S.dir].length} of ${N} snapshots differ.`]);
-    L.push([`restic ls --json ${id} ${absDir(S.dir)}`,'Listing for the middle column. The second timeline row reuses the cached trees.']);
+    L.push([`restic ls --json ${id} ${absDir(S.dir)}`,'Listing for the middle column. The selected entry\'s dots on the timeline reuse the cached trees.']);
     const {rows}=mainRows(),r=rows[S.sel];if(r&&r.kind==='file')L.push([`restic dump ${id} ${ROOT}/${r.f.path} | head -c 64k`,'Preview. Loaded in the background and cached by content id, so moving the cursor stays instant.']);}
   else if(!S.dlg&&S.view==='hist'){const f=S.hist.f;
     L.push([`# for each snapshot: node "${f.name}" in tree of ${absDir(f.dir)}`,`Reuses the cached trees. Snapshots are grouped by the file's content blob list: ${fileRuns(f).filter(r=>r.s>=0).length} distinct versions with no file reads.`]);}

@@ -1,7 +1,6 @@
  restoric  ~/dev/project/src                                                   ◀ version 11 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · ·  · · · ·· ··  ···  · ·· · · · ···  · · · · · · · · · ·  · ·  ┊ · util.go
+  ● · ·  ○·○ ○ ○  · ○ · ○· ○·  ··○  · ○· · · · ·○·  ○ ○ · ○ · · ○ · · ○  · ·  ┊ ○ util.go  ○ src/
                                                 ▲                                          − 1× +
 
  now  ~1 unsaved      │   ..                              │ util.go · v1/1 · 823 B       ⇥ content
@@ -31,4 +30,5 @@
  Jul 28 15:59 ~1      │                                   │  22
  Jul 26 11:57 ~1      │                                   │  23  func mustEnv(ctx context.Context) …
  Jul 24 12:16 ~1      │                                   │  24    total := order.Subtotal() + orde…
+                      │                                   │
  :find legacy█                               sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo

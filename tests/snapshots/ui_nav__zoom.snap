@@ -1,11 +1,11 @@
 ---
 source: tests/ui_nav.rs
+assertion_line: 131
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
   Sep 22                                   28                    Oct           now
-‹         ·                ·           ●              ·                     › ┊ ● src/
-‹         ·                ·           ·              ·                     › ┊ · api/
+‹         ·                ·           ○              ·                     › ┊ ○ api/  ○ src/
                                        ▲                                                   − 8× +
 
  now  ~1 unsaved      │   ..                              │ api/
@@ -13,4 +13,5 @@ expression: "h.screen(100, 12)"
 ▶Sep 27 08:52 ~1      │ ▸ models/                         │ ◇ handlers.go
    ┄ 2 unchanged ┄    │ ◇ config.go           96 B        │ ◇ middleware.go
  Sep 20 20:35 ~1      │ ◇ main.go            108 B        │ ◇ routes.go
+   ┄ 2 unchanged ┄    │ ◇ server.go           42 B  ~     │
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help

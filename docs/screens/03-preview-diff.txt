@@ -1,7 +1,6 @@
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
@@ -31,4 +30,5 @@
  Jul 28 15:59 ~1      │                                   │
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │   1 deleted · . to show           │
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help

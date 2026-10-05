@@ -78,21 +78,30 @@ impl<'a> Axis<'a> {
     }
 }
 
-/// One row of dots.
+/// The timeline's row of dots.
 pub struct TrackRow {
     /// Per snapshot of the axis: changed here, exists here.
     pub change: Vec<bool>,
     pub exists: Vec<bool>,
     pub on: &'static str,
     pub style: Style,
-    /// The selected snapshot's cell is marked only where it changed.
-    pub mark_only_changes: bool,
     /// Whether it changed on disk since the newest snapshot.
     pub live: Option<bool>,
     pub label: String,
     pub label_style: Style,
-    /// Shown instead of dots when there's nothing to track.
-    pub empty: Option<&'static str>,
+    /// The folder around the tracked item, drawn where only it changed.
+    pub outer: Option<Outer>,
+}
+
+/// The folder's changes, under the selected item's in the same row (§3.2).
+/// The item can only change where its folder does.
+pub struct Outer {
+    pub change: Vec<bool>,
+    pub on: &'static str,
+    pub style: Style,
+    pub live: Option<bool>,
+    pub label: String,
+    pub label_style: Style,
 }
 
 /// A track's dots on the axis of `set`, mapped by snapshot id.
@@ -184,14 +193,14 @@ pub fn header(app: &App, g: &mut Grid) {
     }
 }
 
-/// Rows 1 to 2 + tracks: date labels, one row per track, and the caret
-/// with the zoom control. Clicking a dot does `pick(snapshot)`.
+/// Rows 1 to 3: date labels, the row of dots, and the caret with the zoom
+/// control. Clicking a dot does `pick(snapshot)`.
 pub fn draw(
     g: &mut Grid,
     axis: &Axis,
     zoom: u32,
     sel: usize,
-    tracks: &[TrackRow],
+    tr: &TrackRow,
     tz: &jiff::tz::TimeZone,
     pick: &dyn Fn(usize) -> Action,
 ) {
@@ -234,53 +243,54 @@ pub fn draw(
     g.put(x0 + tw + 3, r, "now", t.dim);
 
     let columns = axis.columns();
-    for (k, tr) in tracks.iter().enumerate() {
-        let rr = r + 1 + k as u16;
-        if axis.a > axis.t0 {
-            g.put(0, rr, "‹", t.accent);
-        }
-        if axis.b < axis.t1 {
-            g.put(x0 + tw, rr, "›", t.accent);
-        }
-        g.put(x0 + tw + 2, rr, "┊", t.dim2);
-        if let Some(empty) = tr.empty {
-            g.put_to(x0, rr, empty, t.dim2, x0 + tw);
-            continue;
-        }
-        for (&c, list) in &columns {
-            let ch = list.iter().any(|&i| tr.change[i]);
-            let exists = list.iter().any(|&i| tr.exists[i]);
-            let style = if list.contains(&sel) && (!tr.mark_only_changes || ch) {
-                t.marker
-            } else if ch {
-                tr.style
-            } else {
-                t.dim2
-            };
-            let sym = if ch {
-                tr.on
-            } else if exists {
-                "·"
-            } else {
-                " "
-            };
-            let target = list
-                .iter()
-                .copied()
-                .find(|&i| tr.change[i])
-                .unwrap_or(list[0]);
-            g.put_act(c, rr, sym, style, pick(target));
-        }
-        match tr.live {
-            Some(true) => g.put(x0 + tw + 4, rr, tr.on, t.live),
-            _ => g.put(x0 + tw + 4, rr, "·", t.dim2),
+    let rr = r + 1;
+    if axis.a > axis.t0 {
+        g.put(0, rr, "‹", t.accent);
+    }
+    if axis.b < axis.t1 {
+        g.put(x0 + tw, rr, "›", t.accent);
+    }
+    g.put(x0 + tw + 2, rr, "┊", t.dim2);
+    let outer = |i: usize| tr.outer.as_ref().is_some_and(|o| o.change[i]);
+    for (&c, list) in &columns {
+        let (sym, style) = if list.iter().any(|&i| tr.change[i]) {
+            (tr.on, tr.style)
+        } else if let Some(o) = tr.outer.as_ref().filter(|_| list.iter().any(|&i| outer(i))) {
+            (o.on, o.style)
+        } else if list.iter().any(|&i| tr.exists[i]) {
+            ("·", t.dim2)
+        } else {
+            (" ", t.dim2)
         };
-        let lx = x0 + tw + 6;
-        let w = cols.saturating_sub(lx + 1) as usize;
-        g.put(lx, rr, &fmt::fit(&tr.label, w), tr.label_style);
+        let style = if list.contains(&sel) { t.marker } else { style };
+        let target = list
+            .iter()
+            .copied()
+            .find(|&i| tr.change[i])
+            .or_else(|| list.iter().copied().find(|&i| outer(i)))
+            .unwrap_or(list[0]);
+        g.put_act(c, rr, sym, style, pick(target));
+    }
+    let live = match &tr.outer {
+        _ if tr.live == Some(true) => (tr.on, t.live),
+        Some(o) if o.live == Some(true) => (o.on, t.live),
+        _ => ("·", t.dim2),
+    };
+    g.put(x0 + tw + 4, rr, live.0, live.1);
+    let lx = x0 + tw + 6;
+    let w = cols.saturating_sub(lx + 1) as usize;
+    let mut c = g.put(lx, rr, &fmt::fit(&tr.label, w), tr.label_style);
+    if let Some(o) = &tr.outer {
+        let label = format!("  {} {}", o.on, o.label);
+        let w = cols.saturating_sub(c + 1) as usize;
+        if fmt::width(&label) <= w {
+            c = g.put(c, rr, "  ", t.dim2);
+            c = g.put(c, rr, o.on, o.style);
+            g.put(c, rr, &format!(" {}", o.label), o.label_style);
+        }
     }
 
-    let cr = r + 1 + tracks.len() as u16;
+    let cr = rr + 1;
     g.put(axis.col_of(sel), cr, "▲", t.accent);
     let zc = cols.saturating_sub(9);
     let c = g.put_act(zc, cr, "−", t.accent.patch(t.bold), Action::ZoomOut) + 1;
@@ -288,7 +298,8 @@ pub fn draw(
     g.put_act(c, cr, "+", t.accent.patch(t.bold), Action::ZoomIn);
 }
 
-/// The folder view's timeline: the folder's changes and the selected item's.
+/// The folder view's timeline: the selected item's changes over the
+/// folder's, or the folder's alone when nothing is selected.
 pub fn draw_folder(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let set = app.set();
@@ -302,55 +313,42 @@ pub fn draw_folder(app: &App, g: &mut Grid) {
         .map(|n| format!("{}/", n.to_string_lossy()))
         .unwrap_or_else(|| "/".to_string());
     let (change, exists) = track_row(&set, app.state());
-    let folder = TrackRow {
-        change,
-        exists,
-        on: "●",
-        style: t.text,
-        mark_only_changes: false,
-        live: app.live.get(&app.folder).map(|c| !c.is_empty()),
-        label: name,
-        label_style: t.bold,
-        empty: None,
-    };
-    let item = match (app.selected(), app.selected_path()) {
+    let live = app.live.get(&app.folder).map(|c| !c.is_empty());
+    let row = match (app.selected(), app.selected_path()) {
         (Some(e), Some(path)) => {
-            let (change, exists) = track_row(&set, app.tracks.get(&path));
+            let (item_change, item_exists) = track_row(&set, app.tracks.get(&path));
             let mut label = e.node.name.to_string_lossy().into_owned();
             if e.is_dir() {
                 label.push('/');
             }
             TrackRow {
-                change,
-                exists,
-                on: "•",
+                change: item_change,
+                exists: item_exists,
+                on: "●",
                 style: t.changed,
-                mark_only_changes: true,
                 live: app.live.get(&path).map(|c| !c.is_empty()),
                 label,
                 label_style: t.changed,
-                empty: None,
+                outer: Some(Outer {
+                    change,
+                    on: "○",
+                    style: t.text,
+                    live,
+                    label: name,
+                    label_style: t.bold,
+                }),
             }
         }
         _ => TrackRow {
-            change: Vec::new(),
-            exists: Vec::new(),
-            on: "•",
-            style: t.changed,
-            mark_only_changes: true,
-            live: None,
-            label: String::new(),
-            label_style: t.dim,
-            empty: Some("select a file or folder to see its changes here"),
+            change,
+            exists,
+            on: "●",
+            style: t.text,
+            live,
+            label: name,
+            label_style: t.bold,
+            outer: None,
         },
     };
-    draw(
-        g,
-        &axis,
-        app.zoom,
-        sel,
-        &[folder, item],
-        &app.tz,
-        &Action::GoSnapshot,
-    );
+    draw(g, &axis, app.zoom, sel, &row, &app.tz, &Action::GoSnapshot);
 }

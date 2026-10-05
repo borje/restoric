@@ -1,11 +1,11 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 59
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-  • ·   ·  · · •  · •   ·  ··    · ·  · ·  ·    ·· ·•·· · · ·  ··  · ·· ·  ·  ┊ · api/
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
                                                                       ▲                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ api/
@@ -29,10 +29,11 @@ expression: "h.screen(100, 34)"
  Aug 10 15:44 ~1      │                                   │
  Aug 07 08:15 +1      │                                   │
  Aug 03 16:19 +1~1    │                                   │
-   ┄ 1 unchanged ┄    │                                   │      ╭─ g ────────────────────────────╮
- Jul 28 15:59 ~1      │                                   │      │ gg   top of list               │
- Jul 26 11:57 ~1      │                                   │      │ gh   backup root               │
- Jul 24 12:16 ~1      │                                   │      │ G    bottom (no prefix)        │
-   ┄ 2 unchanged ┄    │                                   │      ╰────────────────────────────────╯
- Jul 14 09:00 +7      │   2 deleted · . to show           │
+   ┄ 1 unchanged ┄    │                                   │
+ Jul 28 15:59 ~1      │                                   │      ╭─ g ────────────────────────────╮
+ Jul 26 11:57 ~1      │                                   │      │ gg   top of list               │
+ Jul 24 12:16 ~1      │                                   │      │ gh   backup root               │
+   ┄ 2 unchanged ┄    │                                   │      │ G    bottom (no prefix)        │
+ Jul 14 09:00 +7      │                                   │      ╰────────────────────────────────╯
+                      │   2 deleted · . to show           │
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                g  1/6  ? help

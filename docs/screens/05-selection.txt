@@ -1,7 +1,6 @@
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+  ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
@@ -31,4 +30,5 @@
  Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
  Jul 26 11:57 ~1      │                                   │  23    defer cancel()
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+                      │                                   │
  SEL  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 06 15:17  5/6  ? help

@@ -69,8 +69,8 @@ fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 | Name | Definition | Used for |
 |---|---|---|
 | Timeline set | Snapshots of **this machine** (§2.4) that hold the browsed folder, sorted by time. A snapshot holds it when one of its backup paths is the folder, above it, or below it (`restic backup dir/a.log dir/b.csv` holds `dir`, since the snapshot tree has the folders above each backup path) | Every view |
-| Change points of folder P | Snapshots where `fingerprint(P)` differs from the previous snapshot in the timeline set (or P first appears or disappears) | Row 1 of the timeline, the Versions pane, `H`/`L` |
-| Item track | The same as change points, for the selected entry | Row 2 of the timeline, `{`/`}` |
+| Change points of folder P | Snapshots where `fingerprint(P)` differs from the previous snapshot in the timeline set (or P first appears or disappears) | The timeline's `○` (`●` when nothing is selected), the Versions pane, `H`/`L` |
+| Item track | The same as change points, for the selected entry | The timeline's `●`, `{`/`}` |
 | Entry change marker | The entry's node at snapshot n compared with n−1: `+` added, `~` changed, `−` deleted | Δ column |
 | Folder counts | Number of files added, changed and deleted under P between n−1 and n | `+1 ~3 −1` labels |
 | Versions | Consecutive runs of snapshots with an identical file fingerprint | Versions view |
@@ -95,7 +95,7 @@ It works for normal setups. Things that can break it, and what restoric does:
 So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
 ### 2.5 Changes on disk since the newest snapshot
-The `now` row, the live marker at the right end of each timeline row, "vs disk" and the versions view compare with the files on disk (M3):
+The `now` row, the live marker at the right end of the timeline row, "vs disk" and the versions view compare with the files on disk (M3):
 
 - A file **counts as changed on disk** when its kind, size, modification time or permissions differ from the newest snapshot. That's the same test restic uses to decide whether to read a file again. Content isn't hashed, so a file that's only touched counts as changed here, unlike between snapshots (§2.2).
 - A folder's `now` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done.
@@ -118,8 +118,7 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 12 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                     ▲                                      − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v5/6 · 1.3K        ⇥ content
@@ -149,6 +148,7 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
  Jul 28 15:59 ~1      │                                   │  48+   for i := 0; i < retries; i++ { t…
  Jul 26 11:57 ~1      │                                   │  49  }
  Jul 24 12:16 ~1      │                                   │  50
+                      │                                   │
  NOR  Sep 06 18:03  9c3a7b4f  src/ +1 ~3 −1  2 in column · zi             Sep 06 16:34  5/7  ? help
 ```
 
@@ -156,11 +156,10 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 |---|---|
 | 0 | Header: `restoric`, clickable breadcrumb, and `◀ version 12 of 16 ▶` on the right (`between versions` when viewing an unchanged snapshot) |
 | 1 | Timeline labels: months, or dates and day numbers when zoomed, plus `now` |
-| 2 | **Row 1, `●`: changes in the current folder.** `·` = snapshot without changes. Highlighted cell = the snapshot being viewed. **Label at the right edge** (`src/`). |
-| 3 | **Row 2, `•`: changes in the selected entry.** `·` = exists but unchanged, blank = didn't exist. Label at the right edge (`main.go`). |
-| 4 | `▲` under the viewed snapshot · zoom control `− 1× +` |
-| 5 | Blank |
-| 6–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (35) · **preview** (the rest) |
+| 2 | **The row of dots, one per snapshot column.** `●` = the selected entry changed. `○` = the current folder changed but the selected entry didn't. `·` = neither changed. Blank = the entry didn't exist (and the folder didn't change). With nothing selected (`..`), `●` marks the folder's changes. Highlighted cell = the snapshot being viewed. The cell under `now` uses the same symbols for changes on disk since the newest snapshot. **Labels at the right edge:** the entry, then `○` and the folder (`main.go  ○ src/`). |
+| 3 | `▲` under the viewed snapshot · zoom control `− 1× +` |
+| 4 | Blank |
+| 5–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (35) · **preview** (the rest) |
 | 33 | **Status bar** (or the `:` / `/` / `f` input line) |
 
 **Versions column:** the top row is `now`, showing what changed on disk since the last backup ("~1 unsaved", in purple). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
@@ -178,16 +177,15 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 
 **Messages** appear as a small rounded popup at the top right of the panes, like yazi's notifications, and disappear at the next key press.
 
-### 3.2 The second timeline row
-After `}`, the view jumps to the next change of `main.go`. A file changing means its folder changed too, so row 2 only has dots where row 1 does.
+### 3.2 The selected entry on the timeline
+After `}`, the view jumps to the next change of `main.go`. A file changing means its folder changed too, so one row holds both: `●` where the entry changed, `○` where only the folder did. This used to be two rows, the folder's and the entry's. The folder's row only repeated the Versions column, so they were merged (§8).
 
 <sub>`docs/screens/02-file-track.txt`</sub>
 
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
@@ -217,6 +215,7 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
  Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
  Jul 26 11:57 ~1      │                                   │  48  }
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
 ```
 
@@ -228,8 +227,7 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
@@ -259,6 +257,7 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
  Jul 28 15:59 ~1      │                                   │
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │   1 deleted · . to show           │
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
 ```
 
@@ -270,8 +269,7 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
@@ -301,6 +299,7 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
  Jul 28 15:59 ~1      │                                   │  47  │ zo   zoom timeline out         │…
  Jul 26 11:57 ~1      │                                   │  48  ╰────────────────────────────────╯
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                  z  Sep 09 18:25  4/6  ? help
 ```
 
@@ -316,8 +315,7 @@ Restoring works like yazi's copy and paste, out of the past.
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+  ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
@@ -347,6 +345,7 @@ Restoring works like yazi's copy and paste, out of the past.
  Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
  Jul 26 11:57 ~1      │                                   │  23    defer cancel()
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+                      │                                   │
  SEL  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 06 15:17  5/6  ? help
 ```
 
@@ -355,8 +354,7 @@ Restoring works like yazi's copy and paste, out of the past.
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+  ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
@@ -386,6 +384,7 @@ Restoring works like yazi's copy and paste, out of the past.
  Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
  Jul 26 11:57 ~1      │                                   │  23    defer cancel()
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1  2 yanked                           Sep 06 15:17  5/6  ? help
 ```
 
@@ -394,8 +393,7 @@ Restoring works like yazi's copy and paste, out of the past.
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-                                                    • · · · · · · · · ·  · ·  ┊ · server.go
+  ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
  now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
@@ -425,6 +423,7 @@ Restoring works like yazi's copy and paste, out of the past.
  Jul 28 15:59 ~1      │                                   │  22    srv := &http.Server{Addr: cfg.Ad…
  Jul 26 11:57 ~1      │                                   │  23    defer cancel()
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  24    for i := 0; i < retries; i++ { t…
+                      │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1  2 yanked                           Sep 06 15:17  5/6  ? help
 ```
 
@@ -436,8 +435,7 @@ Restoring works like yazi's copy and paste, out of the past.
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 11 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · ·  · · · ·· ··  ···  · ·· · · · ···  · · · · · · · · · ·  · ·  ┊ · util.go
+  ● · ·  ○·○ ○ ○  · ○ · ○· ○·  ··○  · ○· · · · ·○·  ○ ○ · ○ · · ○ · · ○  · ·  ┊ ○ util.go  ○ src/
                                                 ▲                                          − 1× +
 
  now  ~1 unsaved      │   ..                              │ util.go · v1/1 · 823 B       ⇥ content
@@ -467,6 +465,7 @@ Restoring works like yazi's copy and paste, out of the past.
  Jul 28 15:59 ~1      │                                   │  22
  Jul 26 11:57 ~1      │                                   │  23  func mustEnv(ctx context.Context) …
  Jul 24 12:16 ~1      │                                   │  24    total := order.Subtotal() + orde…
+                      │                                   │
  :find legacy█                               sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo
 ```
 
@@ -520,8 +519,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 ```text
  restoric  ~/dev/project/src                                                   ◀ between versions ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· • ·  · · · ·· ··  ···  · •· · · · ···  •                         ┊ · legacy.go
+  ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                  ▲                                         − 1× +
 
  now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
@@ -551,19 +549,19 @@ How it works (M6): the search starts at the backup root and matches paths relati
  Jul 28 15:59 ~1      │                                   │  25+   signal.Notify(stop, os.Interrupt…
  Jul 26 11:57 ~1      │                                   │  26  }
  Jul 24 12:16 ~1      │                                   │  27
+                      │                                   │
  NOR  Sep 04 08:08  c005272e  unchanged since Sep 02  2 in column · zi    Aug 22 09:20  4/6  ? help
 ```
 
 ### 3.7 Deleted items
-`.` (or `zh`) shows items deleted earlier, marked `gone` in Δ and in italics. Row 2 shows the item's history: dots up to the deletion, then blank. The preview shows the last version. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
+`.` (or `zh`) shows items deleted earlier, marked `gone` in Δ and in italics. The timeline shows the item's history: dots up to the deletion, then only the folder's `○`. The preview shows the last version. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
 
 <sub>`docs/screens/11-deleted-shown.txt`</sub>
 
 ```text
  restoric  ~/dev/project/src                                                   ◀ version 14 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· • ·  · · · ·· ··  ···  · •· · · · ···  •                         ┊ · legacy.go
+  ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
 
  now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
@@ -593,6 +591,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
  Jul 28 15:59 ~1      │                                   │  25+   signal.Notify(stop, os.Interrupt…
  Jul 26 11:57 ~1      │                                   │  26  }
  Jul 24 12:16 ~1      │                                   │  27
+                      │                                   │
  NOR  Sep 13 20:51  25e5c7c8  src/ ~2  2 yanked                                         4/7  ? help
 ```
 
@@ -604,8 +603,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 ```text
  restoric  ~/dev/project/src                                                   ◀ between versions ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-                    • · ·· ··  ···  · ·· · · · ···  • · · • · · · · · ·  · ·  ┊ · config.go
+  ○      ○ ○ ○ ○    ● · ○· ○·  ··○  · ○· · · · ·○·  ● ○ · ● · · ○ · · ○  · ·  ┊ ○ config.go  ○ src/
                                                                            ▲               − 1× +
 
  now  ~1 unsaved      │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
@@ -635,6 +633,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
  Jul 28 15:59 ~1      │                                   │  30    if len(args) == 0 { return errNo…
  Jul 26 11:57 ~1      │                                   │  31  }
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  32
+                      │                                   │
  filter: go█                                                    type to filter · ⏎ keep · esc clear
 ```
 
@@ -781,8 +780,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
 ```text
  restoric  ~/dev/project/src                                                   ◀ between versions ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                                            ▲               − 1× +
              ╭─ Help ─────────────────────────────────────────────────────────────────╮
  now  ~1 unsa│                                                                        │  ⇥ content
@@ -812,6 +810,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
  Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
  Jul 26 11:57 ~1      │                                   │  48  }
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+                      │                                   │
  NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  2 yanked            Sep 09 18:25  4/6  ? help
 ```
 
@@ -823,8 +822,7 @@ At **under 100 columns** the Versions column folds away, leaving listing and pre
 ```text
  restoric  ~/dev/project/src                               ◀ between versions ▶
   Jul 2026    Aug                 Sep                      now
-  ●· · ●·●●●  ·● ·●·●· ··● ·●·· ·· ●· ● ●· ●·· ●· · ● ··  ┊ ● src/
-  •· · ····•  ·• ····· ··· ·•·· ·· ·· • •· ··· ·· · · ··  ┊ • main.go
+  ●· · ○·○○●  ·● ·○·○· ··○ ·●·· ·· ○· ● ●· ○·· ○· · ○ ··  ┊ ● main.go  ○ src/
                                                        ▲               − 1× +
 
    ..                                 │ main.go · v6/6 · 1.3K        ⇥ content
@@ -854,6 +852,7 @@ At **under 100 columns** the Versions column folds away, leaving listing and pre
                                       │  47    for i := 0; i < retries; i++ { t…
                                       │  48  }
    1 deleted · . to show              │  49
+                                      │
  NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  Sep 09 18:25  4/6  ? help
 ```
 
@@ -1124,7 +1123,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 
 ### M2: read-only folder view
 - Terminal setup and teardown (panic hook restores the terminal), event loop, worker, generation ids.
-- Header with breadcrumb, timeline row 1 with its label, Versions column with folding, listing with icons and Δ, status bar, message popups, help.
+- Header with breadcrumb, the timeline row with the folder's changes and its label, Versions column with folding, listing with icons and Δ, status bar, message popups, help.
 - Keys: `j k gg G C-d C-u h l - ⌫ ⏎ gh H L [ ] Home End q ? ~` and counts. Which-key popup for `g`. Mouse clicks on rows, dots, breadcrumb.
 - Narrow layouts (under 100 and under 80 columns).
 - **Done when:** insta snapshots of screens 01 and 17 (from FakeRepo, preview column empty) match, and it's usable on your real repo.
@@ -1132,7 +1131,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 ### M3: preview, item track, versions, deleted items
 - Preview column: file content in the snapshot with `+`/`−` margin marks, folder contents, deleted items. `⇥` content / vs disk, `J` `K`. Loaded in the background and cached by content id.
 - The Versions column's `now` row and the timeline's live marker (what changed on disk since the newest snapshot). Moved here from M2, because they need the comparison with disk.
-- Row 2 with its label, `{` `}`.
+- The selected entry's changes in the timeline row (`●` over the folder's `○`) with its label, `{` `}`.
 - Versions view with on-disk row, compared-to-disk stats (computed lazily for visible rows) and preview.
 - Deleted items (`.` `zh`), jump on deleted items.
 - `restoric versions FILE`.
@@ -1201,7 +1200,8 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
-- Labels at the right edge of the timeline rows replace the legend.
+- Labels at the right edge of the timeline row replace the legend.
+- The timeline has one row of dots, not two: `●` where the selected entry changed, `○` where only the current folder did (§3.1, §3.2). The folder's own row repeated the Versions column; merged, the panes get a row back.
 - `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
 - Restored copies are named with the snapshot time after the full name: `main.go.2026-09-09_1923`, `src.2026-09-09_1923/`. If that name already exists (the same version restored twice), add `-2`, `-3`, …
 - restoric is a separate app and doesn't read yazi's config or theme. The yazi plugin (M8) is only a launcher.

@@ -1,7 +1,6 @@
  restoric  ~/dev/project/src                                                   ◀ between versions ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· · •  · • · ·· ··  ···  · •· · · · ···  • • · · · · · · · ·  · ·  ┊ • main.go
+  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                                            ▲               − 1× +
              ╭─ Help ─────────────────────────────────────────────────────────────────╮
  now  ~1 unsa│                                                                        │  ⇥ content
@@ -31,4 +30,5 @@
  Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
  Jul 26 11:57 ~1      │                                   │  48  }
  Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
+                      │                                   │
  NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  2 yanked            Sep 09 18:25  4/6  ? help

@@ -1,7 +1,6 @@
  restoric  ~/dev/project/src                                                   ◀ version 14 of 16 ▶
   Jul 2026        Aug                         Sep                              now
-  ● · ·  ●·● ● ●  · ● · ●· ●·  ··●  · ●· · · · ·●·  ● ● · ● · · ● · · ●  · ·  ┊ ● src/
-  • · ·  ··· • ·  · · · ·· ··  ···  · •· · · · ···  •                         ┊ · legacy.go
+  ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
 
  now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
@@ -31,4 +30,5 @@
  Jul 28 15:59 ~1      │                                   │  25+   signal.Notify(stop, os.Interrupt…
  Jul 26 11:57 ~1      │                                   │  26  }
  Jul 24 12:16 ~1      │                                   │  27
+                      │                                   │
  NOR  Sep 13 20:51  25e5c7c8  src/ ~2  2 yanked                                         4/7  ? help

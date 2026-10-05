@@ -1,11 +1,11 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 149
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 13 of 15 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ·    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● src/
-  • ·   ·  · · ·  · ·   ·  ··    · ·  · ·  ·    ·· ·                          ┊ · legacy.go
+  ● ·   ·  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ·    ○· ·○ ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
 
  now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
@@ -35,4 +35,5 @@ expression: "h.screen(100, 34)"
  Jul 24 12:16 ~1      │                                   │
    ┄ 2 unchanged ┄    │                                   │
  Jul 14 09:00 +7      │                                   │
+                      │                                   │
  NOR  Sep 13 20:51  f59afa23  src/ ~2                                     Jul 14 09:00  5/8  ? help
