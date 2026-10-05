@@ -213,6 +213,15 @@ impl App {
         let prefix = self.prefix.take();
         let n = self.count.parse().unwrap_or(1);
         self.count.clear();
+        if prefix.is_none()
+            && let Some(a) = self
+                .keymap
+                .get(&(k.code, k.modifiers & KeyModifiers::CONTROL))
+                .cloned()
+        {
+            self.act_n(a, n);
+            return;
+        }
         if let Some(a) = action(&self.view.clone(), prefix, &k) {
             self.act_n(a, n);
         }

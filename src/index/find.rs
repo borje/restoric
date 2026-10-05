@@ -28,13 +28,14 @@ type Matches = Arc<Vec<(PathBuf, bool)>>;
 impl Index {
     /// Everything under `root` whose path (relative to `root`) contains
     /// `query`, ignoring case. A match's contents aren't listed again.
-    /// `progress(done, total, partial results)` is called as it goes.
+    /// `progress(done, total, partial results)` is called as it goes; when
+    /// it returns false, the search stops there.
     pub fn find(
         &self,
         set: &[SnapshotInfo],
         root: &Path,
         query: &str,
-        progress: &mut dyn FnMut(usize, usize, Vec<Found>),
+        progress: &mut dyn FnMut(usize, usize, Vec<Found>) -> bool,
     ) -> Result<Vec<Found>> {
         let q = query.to_lowercase();
         let mut memo: HashMap<(PathBuf, TreeId), Matches> = HashMap::new();
@@ -53,8 +54,11 @@ impl Index {
                         });
                 }
             }
-            if (i + 1).is_multiple_of(64) && i + 1 < set.len() {
-                progress(i + 1, set.len(), found.values().cloned().collect());
+            if (i + 1).is_multiple_of(64)
+                && i + 1 < set.len()
+                && !progress(i + 1, set.len(), found.values().cloned().collect())
+            {
+                break;
             }
         }
         Ok(found.into_values().collect())
@@ -115,7 +119,7 @@ snapshot 2026-01-03 00:00
         let set = repo.snapshots().unwrap();
         let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 20);
         let found = index
-            .find(&set, Path::new("/p"), "legacy", &mut |_, _, _| {})
+            .find(&set, Path::new("/p"), "legacy", &mut |_, _, _| true)
             .unwrap();
         let got: Vec<(String, bool, usize, usize)> = found
             .iter()

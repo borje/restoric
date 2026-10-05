@@ -65,6 +65,7 @@ impl Harness {
                     undo_dir: std::env::temp_dir().join("restoric-test-undo"),
                     tz: TimeZone::UTC,
                 },
+                preview_limit: restoric::worker::PREVIEW_LIMIT,
             },
         };
         h.pump();

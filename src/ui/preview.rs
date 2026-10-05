@@ -195,7 +195,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
         };
         for (k, c) in entries.iter().take((y1 - y0 - 1) as usize).enumerate() {
             let y = y0 + 2 + k as u16;
-            let (icon, icon_style) = icons::icon(&c.node, &t);
+            let (icon, icon_style) = icons::icon(&c.node, &t, app.icons);
             g.put(x0, y, icon, icon_style);
             let mut n = c.node.name.to_string_lossy().into_owned();
             if c.is_dir() {

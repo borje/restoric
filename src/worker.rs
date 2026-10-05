@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crossbeam_channel::{Receiver, Sender};
 
@@ -31,6 +31,8 @@ pub struct Ctx {
     pub index: Index,
     pub disk: Arc<dyn Disk>,
     pub places: Places,
+    /// Most of a file the preview reads (`preview_max_kb`).
+    pub preview_limit: u64,
 }
 
 /// Most of a file "Show in $PAGER" reads.
@@ -88,13 +90,15 @@ pub enum Request {
     Exists { paths: Vec<PathBuf> },
     /// A whole file (up to a limit), for the pager.
     ReadAll { node: Node, name: String },
-    /// Read the snapshot list again (`:reload`).
-    Reload,
+    /// Read the snapshot list again (`:reload`, and every 5 minutes quietly).
+    Reload { quiet: bool },
     /// Everything under `root` with `query` in its path, in every snapshot.
     Find {
         set: Arc<Vec<SnapshotInfo>>,
         root: PathBuf,
         query: String,
+        /// Set when the user leaves the results: stop searching.
+        cancel: Cancel,
     },
     /// A full-screen diff: read both sides up to `key.limit` and diff them.
     Diff {
@@ -103,6 +107,28 @@ pub enum Request {
         new: Box<Side>,
     },
 }
+
+/// Stops a long request (`:find`) when the user leaves it.
+#[derive(Clone, Debug, Default)]
+pub struct Cancel(Arc<AtomicBool>);
+
+impl Cancel {
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+
+    pub fn cancelled(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+impl PartialEq for Cancel {
+    fn eq(&self, o: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &o.0)
+    }
+}
+
+impl Eq for Cancel {}
 
 /// Where a side of a diff comes from.
 #[derive(Clone, Debug)]
@@ -122,7 +148,7 @@ impl Request {
             | Request::Restore { .. }
             | Request::Undo
             | Request::ReadAll { .. }
-            | Request::Reload
+            | Request::Reload { .. }
             | Request::Find { .. } => false,
             _ => true,
         }
@@ -188,7 +214,10 @@ pub enum Response {
         name: String,
         bytes: Vec<u8>,
     },
-    Snapshots(Vec<SnapshotInfo>),
+    Snapshots {
+        snaps: Vec<SnapshotInfo>,
+        quiet: bool,
+    },
     Found {
         query: String,
         /// With whether each is on disk now.
@@ -259,7 +288,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 send(Response::Live { path, counts });
             }
             Request::ReadFile { node } => {
-                let bytes = index.repo().read_file(&node, PREVIEW_LIMIT)?;
+                let bytes = index.repo().read_file(&node, ctx.preview_limit)?;
                 send(Response::File {
                     key: fingerprint::content(&node),
                     bytes: Arc::new(bytes),
@@ -269,7 +298,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 let size = ctx.disk.stat(&path).map_or(0, |d| d.size);
                 let bytes = ctx
                     .disk
-                    .read(&path, PREVIEW_LIMIT)
+                    .read(&path, ctx.preview_limit)
                     .map(|data| Arc::new(FileBytes { data, size }));
                 send(Response::DiskFile { path, bytes });
             }
@@ -302,8 +331,16 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 let bytes = index.repo().read_at(&node, 0, PAGER_LIMIT)?;
                 send(Response::Pager { name, bytes });
             }
-            Request::Reload => send(Response::Snapshots(index.repo().snapshots()?)),
-            Request::Find { set, root, query } => {
+            Request::Reload { quiet } => send(Response::Snapshots {
+                snaps: index.repo().snapshots()?,
+                quiet,
+            }),
+            Request::Find {
+                set,
+                root,
+                query,
+                cancel,
+            } => {
                 let on_disk = |f: Vec<Found>| -> Vec<(Found, bool)> {
                     f.into_iter()
                         .map(|f| {
@@ -313,12 +350,19 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                         .collect()
                 };
                 let found = index.find(&set, &root, &query, &mut |done, total, partial| {
+                    if cancel.cancelled() {
+                        return false;
+                    }
                     send(Response::Found {
                         query: query.clone(),
                         results: on_disk(partial),
                         progress: Some((done, total)),
                     });
+                    true
                 })?;
+                if cancel.cancelled() {
+                    return Ok(());
+                }
                 send(Response::Found {
                     query,
                     results: on_disk(found),

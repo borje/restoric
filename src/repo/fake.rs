@@ -592,6 +592,43 @@ fn disk_entry(e: &Entry) -> crate::disk::DiskEntry {
     }
 }
 
+impl FakeDisk {
+    /// Writes the files to the real file system, at their absolute paths.
+    pub fn write_files(&self) -> Result<()> {
+        fn write(path: &Path, e: &Entry) -> Result<()> {
+            match e {
+                Entry::Dir(m) => {
+                    std::fs::create_dir_all(path)?;
+                    for (n, c) in m {
+                        write(&path.join(n), c)?;
+                    }
+                }
+                Entry::File {
+                    data, mode, mtime, ..
+                } => {
+                    std::fs::write(path, data)?;
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        std::fs::set_permissions(path, std::fs::Permissions::from_mode(*mode))?;
+                    }
+                    let f = std::fs::File::options().write(true).open(path)?;
+                    f.set_modified(std::time::SystemTime::from(*mtime))?;
+                }
+                Entry::Link(t) => {
+                    #[cfg(unix)]
+                    std::os::unix::fs::symlink(t, path)?;
+                }
+            }
+            Ok(())
+        }
+        for (n, e) in &self.top {
+            write(&Path::new("/").join(n), e)?;
+        }
+        Ok(())
+    }
+}
+
 impl crate::disk::Disk for FakeDisk {
     fn stat(&self, path: &Path) -> Option<crate::disk::DiskEntry> {
         self.find(path).map(disk_entry)

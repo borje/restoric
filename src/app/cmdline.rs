@@ -130,7 +130,7 @@ impl App {
             }
             ("find" | "f", q) if !q.is_empty() => self.open_find(q),
             ("reload", "") => {
-                self.outbox.push(Request::Reload);
+                self.outbox.push(Request::Reload { quiet: false });
                 self.message = Some("Looking for new snapshots…".into());
             }
             ("host", h) if !h.is_empty() => {

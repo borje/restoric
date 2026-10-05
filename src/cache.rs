@@ -64,7 +64,13 @@ impl Cache {
 
     /// Opens the cache file, starting a new one if it was written by another
     /// schema or backend version. `backend` names the rustic_core version.
-    pub fn open(path: &Path, backend: &str) -> Result<Self> {
+    /// A file bigger than `cap` bytes starts over: everything in it can be
+    /// computed again.
+    pub fn open(path: &Path, backend: &str, cap: u64) -> Result<Self> {
+        if std::fs::metadata(path).is_ok_and(|m| m.len() > cap) {
+            tracing::info!("cache over {cap} bytes, starting a new one");
+            let _ = std::fs::remove_file(path);
+        }
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
         }
@@ -158,17 +164,23 @@ mod tests {
     fn keeps_values_across_reopen_and_wipes_on_version_change() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("c.redb");
-        let c = Cache::open(&path, "v1")?;
+        let c = Cache::open(&path, "v1", u64::MAX)?;
         c.put(Table::Differs, vec![1, 2], vec![1]);
         assert_eq!(c.get(Table::Differs, &[1, 2])?, Some(vec![1]));
         c.flush()?;
         drop(c);
 
-        let c = Cache::open(&path, "v1")?;
+        let c = Cache::open(&path, "v1", u64::MAX)?;
         assert_eq!(c.get(Table::Differs, &[1, 2])?, Some(vec![1]));
         drop(c);
 
-        let c = Cache::open(&path, "v2")?;
+        let c = Cache::open(&path, "v1", 1)?;
+        assert_eq!(c.get(Table::Differs, &[1, 2])?, None, "over the cap");
+        c.put(Table::Differs, vec![1, 2], vec![1]);
+        c.flush()?;
+        drop(c);
+
+        let c = Cache::open(&path, "v2", u64::MAX)?;
         assert_eq!(c.get(Table::Differs, &[1, 2])?, None);
         Ok(())
     }

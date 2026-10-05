@@ -28,8 +28,9 @@ use crate::index::{Mode, ModeSwitch};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
 use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
-use crate::worker::{Request, Response, Side};
+use crate::worker::{Cancel, Request, Response, Side};
 use cmdline::{Input, InputKind};
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use selection::{Confirm, Dialog};
 
 /// Things the event loop does outside the app: they need the terminal.
@@ -165,6 +166,8 @@ pub struct FindView {
     /// `(done, total)` while still searching.
     pub progress: Option<(usize, usize)>,
     pub sel: usize,
+    /// Stops the search when the view is left.
+    pub cancel: Cancel,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -318,6 +321,14 @@ pub struct App {
     pub search: String,
     /// `f`: only names containing it are listed.
     pub name_filter: String,
+    /// Keys from the config's `[keys]`, before the built-in ones.
+    pub keymap: HashMap<(KeyCode, KeyModifiers), Action>,
+    /// Nerd Font icons (or the plain set).
+    pub icons: bool,
+    /// Files larger than this are diffed only on request.
+    pub diff_limit: u64,
+    /// `--at DATE`: where to start instead of the newest change.
+    pub start_at: Option<String>,
     /// The backup root: `h` stops here.
     pub root: PathBuf,
     pub folder: PathBuf,
@@ -416,6 +427,10 @@ impl App {
             now: None,
             search: String::new(),
             name_filter: String::new(),
+            keymap: HashMap::new(),
+            icons: false,
+            diff_limit: DIFF_LIMIT,
+            start_at: None,
             root,
             folder: folder.clone(),
             snap: SnapshotId::default(),
@@ -856,7 +871,11 @@ impl App {
                 (old, (k, s, label(r0)))
             }
         };
-        let limit = if d.force { FORCED_LIMIT } else { DIFF_LIMIT };
+        let limit = if d.force {
+            FORCED_LIMIT
+        } else {
+            self.diff_limit
+        };
         let key = DiffKey {
             old: ok,
             new: nk,
@@ -976,13 +995,18 @@ impl App {
                 t.points = points;
                 t.runs = runs;
                 t.progress = None;
-                // Start at the newest snapshot that changed the folder (§3.1).
+                // Start at the newest snapshot that changed the folder (§3.1),
+                // or at `--at`.
                 if path == self.folder && !self.moved {
-                    let t = &self.tracks[&path];
-                    if let Some(&v) = t.versions().last() {
-                        let id = t.set[v].id;
-                        self.go_snapshot_id(id);
-                        self.moved = false;
+                    if let Some(at) = self.start_at.take() {
+                        self.run_command(&at);
+                    } else {
+                        let t = &self.tracks[&path];
+                        if let Some(&v) = t.versions().last() {
+                            let id = t.set[v].id;
+                            self.go_snapshot_id(id);
+                            self.moved = false;
+                        }
                     }
                 }
                 self.ensure();
@@ -1101,7 +1125,11 @@ impl App {
                 }
             }
             Response::Pager { name, bytes } => self.effects.push(Effect::Pager { name, bytes }),
-            Response::Snapshots(snaps) => {
+            Response::Snapshots { snaps, quiet } => {
+                let ids = |v: &[SnapshotInfo]| v.iter().map(|s| s.id).collect::<HashSet<_>>();
+                if quiet && ids(&snaps) == ids(&self.everything) {
+                    return;
+                }
                 let before = self.all.len();
                 self.everything = snaps;
                 let f = self.filter.clone();
@@ -1127,6 +1155,12 @@ impl App {
             }
             Response::Error(e) => self.message = Some(e),
         }
+    }
+
+    /// Selects an entry by name once the listing is there (`--select`).
+    pub fn select_name(&mut self, name: OsString) {
+        self.sel_name = Some(name);
+        self.restore_selection();
     }
 
     /// Keeps the same name selected when the listing changes.
@@ -1856,10 +1890,12 @@ impl App {
     pub(super) fn open_find(&mut self, query: &str) {
         let root = self.root.clone();
         let set = self.set_for(&root);
+        let cancel = Cancel::default();
         self.outbox.push(Request::Find {
             set: set.clone(),
             root: root.clone(),
             query: query.to_string(),
+            cancel: cancel.clone(),
         });
         self.view = View::Find(FindView {
             query: query.to_string(),
@@ -1868,6 +1904,7 @@ impl App {
             results: Vec::new(),
             progress: Some((0, 0)),
             sel: 0,
+            cancel,
         });
     }
 
@@ -1884,11 +1921,13 @@ impl App {
             Action::ClickFound(k) if k != sel => sel = k.min(n.saturating_sub(1)),
             Action::Open | Action::ClickFound(_) => {
                 if let Some((found, _)) = f.results.get(sel).cloned() {
+                    f.cancel.cancel();
                     self.go_found(&f, &found);
                 }
                 return true;
             }
             Action::Back | Action::Parent | Action::Quit | Action::Escape => {
+                f.cancel.cancel();
                 self.view = View::Folder;
                 self.moved_on();
                 return true;

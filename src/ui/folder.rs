@@ -173,7 +173,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             }
             continue;
         };
-        let (icon, icon_style) = icons::icon(&e.node, &t);
+        let (icon, icon_style) = icons::icon(&e.node, &t, app.icons);
         g.put(l0 + 1, y, icon, icon_style);
         let mut name = e.node.name.to_string_lossy().into_owned();
         if e.is_dir() {

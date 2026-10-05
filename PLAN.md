@@ -938,7 +938,7 @@ Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one na
   - `+` added: green · `~` changed: blue · `−` deleted: red · not backed up: magenta · accent (current dot, `▶`, `NOR` badge, keys): yellow · `SEL`/`VIS`: blue badge · `FIND`/input: magenta badge · `RST`/overwrite: red badge
   - Selection: a dim background bar across the column (reverse video when only 8 colours are available) · mark bar `┃`: accent
   - Folders: bold blue · deleted: red + strikethrough (where supported) · gone earlier: dim italic
-- **Icons:** Nerd Font glyphs per file type (folder, language, markdown, shell, config…), coloured by type. `--no-icons` / config, and automatic fallback to the plain set used in the mockup.
+- **Icons:** Nerd Font glyphs per file type (folder, language, markdown, shell, config…), coloured by type. `--no-icons` / `icons = false` switch to the plain set used in the mockup. A terminal can't report whether its font has the glyphs, so there's no automatic fallback: Nerd Font is the default, as in yazi.
 - **Lines:** only thin vertical `│` between columns. Popups (restore, confirmation, help, which-key, messages) have rounded corners `╭╮╰╯`.
 
 ---
@@ -1071,7 +1071,7 @@ restoric [PATH]                       open the TUI at PATH (default: current fol
   --at DATE             start at a date (:sep 1 syntax)
 restoric log PATH [--json]            print the change points of PATH (no TUI)   (M1)
 restoric versions FILE [--json]       print the distinct versions of FILE        (M3)
-restoric demo                         TUI against FakeRepo with the mockup's sample data
+restoric demo                         TUI against FakeRepo with tests/fixtures/project.dsl, its files written to a temporary folder (removed on exit)
 ```
 
 ### 4.8 Scale: any repository size
@@ -1079,9 +1079,9 @@ restoric must work on repositories of **any size**: any number of snapshots, fil
 
 1. **Work grows with what's on screen, never with the repo.** Opening a folder costs about *depth × snapshots* tree reads (cached after the first time), not the number of files in the repo. Nothing walks a whole snapshot unless the user asks for it (`:find`, restoring a whole folder).
 2. **Nothing assumes a list fits on screen or in memory.** The listing, the Versions column, the versions view, find results and the diff are virtualised: only visible rows are built. Long lists load in pages.
-3. **Results stream in.** Change points, find results and folder counts appear as they're computed, newest first, with progress in the header (`indexing 1 200/48 000`). Every long operation can be cancelled with `esc` and resumes from the cache next time.
+3. **Results stream in.** Change points, find results and folder counts appear as they're computed, newest first, with progress in the header (`indexing 1 200/48 000`). Every long operation can be cancelled with `esc` and resumes from the cache next time. (M7: leaving the Find view stops `:find`. A folder's indexing runs to the end in the background, and everything it computed is cached.)
 4. **Lazy everything.** Folder counts, "compared to disk" stats, item tracks, previews and deleted items are computed only for what's visible, and cached.
-5. **Bounded memory.** In-memory caches (trees, previews, diffs) are LRU with a size cap, configurable. The on-disk cache can grow, but has a size cap too, and evicts the least recently used entries. Previews are capped at 64 KB and diffs at 2 MB (both configurable). Files are never loaded whole just to show them.
+5. **Bounded memory.** In-memory caches (trees, previews, diffs) are LRU with a size cap, configurable. The on-disk cache can grow, but has a size cap too. (M7: a cache file over the cap is started afresh at start-up, rather than evicting the least recently used entries; everything in it can be computed again.) Previews are capped at 64 KB and diffs at 2 MB (both configurable). Files are never loaded whole just to show them.
 6. **Incremental refresh.** At start-up, only snapshots that are new since the last run are read. Change points are extended, not recomputed.
 7. **`:find` uses the cache first.** Paths seen in cached trees answer instantly. The full search across all snapshots then runs in the background and streams in further results.
 8. **The timeline handles thousands of snapshots.** At 1× zoom many snapshots share a column, and the info shows how many. Zoom goes as far as needed to separate them (beyond 8× when the repo needs it), and `[` `]` always step one snapshot at a time.
@@ -1251,9 +1251,15 @@ memory_cache_mb = 256
 disk_cache_mb = 2048
 restore_dir = "~/Restored"
 
-[keys]                        # overrides, e.g.
+[keys]                        # action = "key", e.g.
 # versions = "i"
+# half_down = "C-f"
+
+[colors]                      # accent added changed deleted live dim dir code selected
+# accent = "magenta"          # ANSI names, "#rrggbb" or 0–255
 ```
+
+How it works (M7): `--host` and `--tag` win over the config, and the config over the hostname. A mistake in the file (an unknown key, action, key name or colour) stops start-up with a message naming it. Key overrides apply in every view, before the built-in keys. Actions: `down up top bottom half_down half_up parent open versions root older_change newer_change older_snapshot newer_snapshot oldest_change newest_change older_item_change newer_item_change preview_mode scroll_down scroll_up deleted diff select visual yank paste overwrite restore search filter find next_match prev_match command zoom_in zoom_out help quit`. Keys: a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, arrows, `Home`, `End`, `PageUp`, `PageDown`, `F1`–`F12`.
 
 **Mockup vs implementation:** the mockup's sample data is randomly generated, so the screens in §3 are the **layout and behaviour spec**, not byte-exact expected output. `FakeRepo` gets its own small, readable fixture. The insta snapshots generated from it become the exact expected output, reviewed against §3 when first accepted.
 

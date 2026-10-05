@@ -50,7 +50,7 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
             let msg = format!(
                 "This file is {}, more than the {} limit. Press ⏎ to diff it anyway.",
                 fmt::size(*size),
-                fmt::size(crate::diff::DIFF_LIMIT)
+                fmt::size(app.diff_limit)
             );
             g.put_to(1, top + 1, &msg, t.dim, cols);
         }

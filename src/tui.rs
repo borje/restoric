@@ -83,7 +83,12 @@ fn page(terminal: &mut ratatui::DefaultTerminal, bytes: &[u8]) -> Result<()> {
     result.map_err(|e| anyhow::anyhow!("running {pager}: {e}"))
 }
 
-pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Result<()> {
+pub fn run(
+    mut app: App,
+    worker: Worker,
+    responses: Receiver<Response>,
+    theme: Theme,
+) -> Result<()> {
     // ratatui::init restores the terminal on panic; mouse capture too.
     let mut terminal = ratatui::init();
     let hook = std::panic::take_hook();
@@ -116,8 +121,9 @@ pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Resul
         }
     });
 
-    let theme = Theme::from_env();
     let mut hits = Hits::default();
+    // New snapshots (a backup finished) are looked for every 5 minutes.
+    let mut last_reload = std::time::Instant::now();
     let result = (|| -> Result<()> {
         loop {
             if app.bumped {
@@ -140,6 +146,10 @@ pub fn run(mut app: App, worker: Worker, responses: Receiver<Response>) -> Resul
                         paused.store(false, Ordering::Release);
                     }
                 }
+            }
+            if last_reload.elapsed() > Duration::from_secs(300) {
+                last_reload = std::time::Instant::now();
+                worker.send(crate::worker::Request::Reload { quiet: true });
             }
             terminal.draw(|f| {
                 let area = f.area();
