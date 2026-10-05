@@ -1,0 +1,34 @@
+ restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
+ ~/dev/project/src                                                            ◀ version 10 of 16 ▶
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  Jul 2026           Aug                               Sep                                   now
+  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
+  • · ·   ···· ·  •  ·· • · · · ··  · ··  · • · ·  · · · ··  •· • ·  · · ·  · · ·  ·   · ·  ┊ •
+                                            ▲                                              − 1× +
+  Aug 22 11:59   snapshot 6b0f6953   src/  ~2                                    ● src/  • main.go
+─ Versions ───────────────────────┬ src/ @ Aug 22 11:59 ────────────────────────────────────────────
+    ┄ 2 unchanged ┄               │ NAME                             SIZE  MODIFIED        Δ
+   Sep 20 20:35  ~1               │ ..
+    ┄ 2 unchanged ┄               │ api/                                –  Aug 17 13:17
+   Sep 13 20:51  ~2               │ models/                             –  Aug 17 14:53
+    ┄ 1 unchanged ┄               │ config.go                       634 B  Aug 03 14:07
+   Sep 09 19:23  ~1               │ legacy.go                       673 B  Aug 22 09:20    ~
+    ┄ 1 unchanged ┄               │ main.go                          1.2K  Aug 22 10:42    ~          ◂
+   Sep 06 18:03  +1 ~3 −1         │ util.go                         823 B  Jul 14 06:49
+    ┄ 2 unchanged ┄               │
+   Sep 02 20:16  ~1               │
+    ┄ 5 unchanged ┄               │
+ ▶ Aug 22 11:59  ~2               │                                                                   ◂
+    ┄ 1 unchanged ┄               │
+   Aug 17 16:04  +1 ~1            │
+    ┄ 3 unchanged ┄               │
+   Aug 10 15:44  ~1               │
+    ┄ 1 unchanged ┄               │
+   Aug 07 08:15  +1               │
+    ┄ 1 unchanged ┄               │
+   Aug 03 16:19  +1 ~1            │
+    ┄ 2 unchanged ┄               │
+   Jul 28 15:59  ~1               │
+   Jul 26 11:57  ~1               │
+──────────────────────────────────┴─────────────────────────────────────────────────────────────────
+ :find legacy█                            2026-09-01 · sep 1 · yesterday · 3d · find NAME · deleted

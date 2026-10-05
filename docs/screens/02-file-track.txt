@@ -1,0 +1,34 @@
+ restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
+ ~/dev/project/src                                                            ◀ version 13 of 16 ▶
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  Jul 2026           Aug                               Sep                                   now
+  ● · ·   ·●·● ●  ●  ·· ● · ● · ●·  · ·●  · ● · ·  · · · ●·  ●· ● ·  ● · ·  ● · ·  ●   · ·  ┊ ●
+  • · ·   ···· ·  •  ·· • · · · ··  · ··  · • · ·  · · · ··  •· • ·  · · ·  · · ·  ·   · ·  ┊ •
+                                                                ▲                          − 1× +
+  Sep 09 19:23   snapshot 62c0e9c7   src/  ~1                                    ● src/  • main.go
+─ Versions ───────────────────────┬ src/ @ Sep 09 19:23 ────────────────────────────────────────────
+  now         ~1  not backed up   │ NAME                             SIZE  MODIFIED        Δ
+    ┄ 2 unchanged ┄               │ ..
+   Sep 27 08:52  ~1               │ api/                                –  Sep 06 17:37
+    ┄ 2 unchanged ┄               │ models/                             –  Aug 17 14:53
+   Sep 20 20:35  ~1               │ config.go                       737 B  Sep 06 17:04
+    ┄ 2 unchanged ┄               │ main.go                          1.3K  Sep 09 18:25    ~          ◂
+   Sep 13 20:51  ~2               │ server.go                       845 B  Sep 06 15:17
+    ┄ 1 unchanged ┄               │ util.go                         823 B  Jul 14 06:49
+ ▶ Sep 09 19:23  ~1               │                                                                   ◂
+    ┄ 1 unchanged ┄               │
+   Sep 06 18:03  +1 ~3 −1         │
+    ┄ 2 unchanged ┄               │
+   Sep 02 20:16  ~1               │
+    ┄ 5 unchanged ┄               │
+   Aug 22 11:59  ~2               │
+    ┄ 1 unchanged ┄               │
+   Aug 17 16:04  +1 ~1            │
+    ┄ 3 unchanged ┄               │
+   Aug 10 15:44  ~1               │
+    ┄ 1 unchanged ┄               │
+   Aug 07 08:15  +1               │
+    ┄ 1 unchanged ┄               │
+   Aug 03 16:19  +1 ~1            │ 1 deleted earlier · zh to show
+──────────────────────────────────┴─────────────────────────────────────────────────────────────────
+ H L change  [ ] every snapshot  { } item change  j k move  h l up/open  v versions  d diff

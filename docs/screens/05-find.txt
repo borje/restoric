@@ -1,0 +1,34 @@
+ restoric  repo sftp:nas:/backup/restic   host bege-laptop                43 snapshots · cache warm
+ Find  "legacy"   1 match across all 43 snapshots
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  PATH                                                  FIRST SEEN    LAST SEEN     NOW
+ ▶src/legacy.go                                         Jul 14 09:00  Sep 04 08:08  gone Sep 06       ◂
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ j k move  ⏎ go to last snapshot that has it  q back
