@@ -17,10 +17,14 @@
 //!   link src/current -> main.go
 //!   rm src/legacy.go               # files or whole folders
 //!   mv src/a.go src/b.go
+//!
+//! disk                             # optional: how the files look on disk now
+//!   append src/main.go // unsaved\n
 //! ```
 //!
-//! Each snapshot starts from the previous one's files. Text after `write` and
-//! `append` takes `\n` and `\t` escapes.
+//! Each snapshot starts from the previous one's files, and the disk from the
+//! last snapshot's. Text after `write` and `append` takes `\n` and `\t`
+//! escapes.
 
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
@@ -52,6 +56,14 @@ pub struct FakeRepo {
     snapshots: Vec<SnapshotInfo>,
     trees: HashMap<TreeId, Arc<Tree>>,
     blobs: HashMap<BlobId, Vec<u8>>,
+    disk: FakeDisk,
+}
+
+/// The files on disk after the last snapshot (and the `disk` block),
+/// nested under the root path like a snapshot's tree.
+#[derive(Clone)]
+pub struct FakeDisk {
+    top: BTreeMap<OsString, Entry>,
 }
 
 fn hash(parts: &[&[u8]]) -> Id {
@@ -134,7 +146,12 @@ impl FakeRepo {
             snapshots: Vec::new(),
             trees: HashMap::new(),
             blobs: HashMap::new(),
+            disk: FakeDisk {
+                top: BTreeMap::new(),
+            },
         };
+        // Set once the `disk` block starts: the time its changes are made.
+        let mut disk_time: Option<Timestamp> = None;
         let mut host = "fake-host".to_string();
         let mut root = PathBuf::from("/data");
         let mut files: BTreeMap<OsString, Entry> = BTreeMap::new();
@@ -157,11 +174,23 @@ impl FakeRepo {
                 continue;
             }
             let (cmd, rest) = trimmed.split_once(' ').unwrap_or((trimmed, ""));
-            let mtime = current.as_ref().map(|c| c.0).unwrap_or_default();
+            let mtime = disk_time
+                .or(current.as_ref().map(|c| c.0))
+                .unwrap_or_default();
             match cmd {
                 "host" => host = rest.trim().to_string(),
                 "root" => root = PathBuf::from(rest.trim()),
+                "disk" => {
+                    let last = current.as_ref().map(|c| c.0).unwrap_or_default();
+                    if let Some(c) = current.take() {
+                        repo.add_snapshot(&files, c)?;
+                    }
+                    disk_time = Some(last + jiff::SignedDuration::from_hours(1));
+                }
                 "snapshot" => {
+                    if disk_time.is_some() {
+                        bail!("{}: snapshots must come before the disk block", err());
+                    }
                     if let Some(c) = current.take() {
                         repo.add_snapshot(&files, c)?;
                     }
@@ -284,7 +313,22 @@ impl FakeRepo {
             repo.add_snapshot(&files, c)?;
         }
         repo.snapshots.sort_by_key(|s| s.time);
+        let mut whole = Entry::Dir(files);
+        for p in parts(root.to_str().context("root must be UTF-8")?)
+            .into_iter()
+            .rev()
+        {
+            whole = Entry::Dir(BTreeMap::from([(p, whole)]));
+        }
+        let Entry::Dir(top) = whole else {
+            unreachable!()
+        };
+        repo.disk = FakeDisk { top };
         Ok(repo)
+    }
+
+    pub fn disk(&self) -> FakeDisk {
+        self.disk.clone()
     }
 
     fn add_snapshot(
@@ -428,6 +472,76 @@ impl Repo for FakeRepo {
 /// Look a name up in a tree's entries; handy in tests.
 pub fn name(s: &str) -> &OsStr {
     OsStr::new(s)
+}
+
+impl FakeDisk {
+    fn find(&self, path: &Path) -> Option<&Entry> {
+        let p = parts(path.to_str()?);
+        let (name, parent) = p.split_last()?;
+        let mut d = &self.top;
+        for c in parent {
+            match d.get(c)? {
+                Entry::Dir(m) => d = m,
+                _ => return None,
+            }
+        }
+        d.get(name)
+    }
+}
+
+fn disk_entry(e: &Entry) -> crate::disk::DiskEntry {
+    use crate::disk::{DiskEntry, DiskKind};
+    match e {
+        Entry::File {
+            data, mode, mtime, ..
+        } => DiskEntry {
+            kind: DiskKind::File,
+            size: data.len() as u64,
+            mtime: Some(*mtime),
+            mode: Some(*mode),
+        },
+        Entry::Dir(_) => DiskEntry {
+            kind: DiskKind::Dir,
+            size: 0,
+            mtime: None,
+            mode: None,
+        },
+        Entry::Link(_) => DiskEntry {
+            kind: DiskKind::Symlink,
+            size: 0,
+            mtime: None,
+            mode: None,
+        },
+    }
+}
+
+impl crate::disk::Disk for FakeDisk {
+    fn stat(&self, path: &Path) -> Option<crate::disk::DiskEntry> {
+        self.find(path).map(disk_entry)
+    }
+
+    fn read_dir(&self, path: &Path) -> Option<Vec<(OsString, crate::disk::DiskEntry)>> {
+        let d = if components_empty(path) {
+            &self.top
+        } else {
+            match self.find(path)? {
+                Entry::Dir(m) => m,
+                _ => return None,
+            }
+        };
+        Some(d.iter().map(|(n, e)| (n.clone(), disk_entry(e))).collect())
+    }
+
+    fn read(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {
+        match self.find(path)? {
+            Entry::File { data, .. } => Some(data[..data.len().min(limit as usize)].to_vec()),
+            _ => None,
+        }
+    }
+}
+
+fn components_empty(path: &Path) -> bool {
+    path.to_str().is_some_and(|p| parts(p).is_empty())
 }
 
 #[cfg(test)]

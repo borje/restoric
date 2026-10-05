@@ -16,19 +16,20 @@ use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::ui;
 use restoric::ui::theme::Theme;
-use restoric::worker::handle;
+use restoric::worker::{Ctx, handle};
 
 const PROJECT: &str = include_str!("fixtures/project.dsl");
 
 struct Harness {
     app: App,
-    index: Index,
+    ctx: Ctx,
 }
 
 impl Harness {
     fn new(folder: &str) -> Self {
         let repo = Arc::new(FakeRepo::parse(PROJECT).unwrap());
         let snaps = repo.snapshots().unwrap();
+        let disk = Arc::new(repo.disk());
         let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 24);
         let app = App::new(
             snaps,
@@ -36,7 +37,10 @@ impl Harness {
             TimeZone::UTC,
             Some(PathBuf::from("/home/bege")),
         );
-        let mut h = Harness { app, index };
+        let mut h = Harness {
+            app,
+            ctx: Ctx { index, disk },
+        };
         h.pump();
         h
     }
@@ -47,7 +51,7 @@ impl Harness {
             let reqs = std::mem::take(&mut self.app.outbox);
             let mut out = Vec::new();
             for r in reqs {
-                handle(&self.index, r, &mut |resp| out.push(resp));
+                handle(&self.ctx, r, &mut |resp| out.push(resp));
             }
             for r in out {
                 self.app.apply(r);
@@ -64,10 +68,14 @@ impl Harness {
 
     fn keys(&mut self, keys: &str) -> &mut Self {
         for c in keys.chars() {
-            self.app
-                .key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
-            self.pump();
+            self.key(KeyCode::Char(c));
         }
+        self
+    }
+
+    fn key(&mut self, code: KeyCode) -> &mut Self {
+        self.app.key(KeyEvent::new(code, KeyModifiers::NONE));
+        self.pump();
         self
     }
 
@@ -220,4 +228,79 @@ fn opening_a_folder_keeps_the_time_and_h_selects_where_you_came_from() {
         h.app.message.as_deref(),
         Some("Already at the top of the backup.")
     );
+}
+
+#[test]
+fn file_track_02() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("main.go").keys("}");
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn preview_vs_disk_03() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("main.go").key(KeyCode::Tab);
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn deleted_shown_11() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-13 20:51").keys(".").select("legacy.go");
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn versions_13() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("main.go").keys("l");
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn folder_preview() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("api");
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn deleted_items_toggle() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03");
+    assert_eq!(h.app.hidden(), 1);
+    h.keys(".");
+    assert_eq!(h.app.hidden(), 0);
+    let rows = h.app.rows();
+    assert!(
+        rows.iter()
+            .any(|r| h.app.entry(*r).is_some_and(|e| e.node.name == "feature.go"))
+    );
+    h.keys("zh");
+    assert_eq!(h.app.hidden(), 1);
+}
+
+#[test]
+fn item_changes_and_versions_keys() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("main.go");
+    h.keys("{");
+    let t = h.app.set()[h.app.idx()].time;
+    assert_eq!(ui::fmt::time(t, &TimeZone::UTC), "Sep 02 20:16");
+    h.keys("99{");
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("No older change to main.go.")
+    );
+    h.keys("l");
+    assert!(matches!(h.app.view, restoric::app::View::Versions(_)));
+    h.keys("99j");
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("This is the oldest version.")
+    );
+    h.keys("q");
+    assert!(matches!(h.app.view, restoric::app::View::Folder));
+    assert_eq!(h.app.selected().unwrap().node.name, "main.go");
 }

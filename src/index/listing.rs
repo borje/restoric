@@ -1,7 +1,7 @@
 //! A folder's entries at one snapshot, with change markers against the
 //! snapshot before (PLAN.md §3.1), and items deleted earlier.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -23,6 +23,8 @@ pub enum Delta {
     Deleted,
     /// A folder: what changed under it (empty when nothing did).
     Counts(Counts),
+    /// Deleted before the snapshot before; the last snapshot that had it.
+    Gone(usize),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,21 +39,29 @@ impl Entry {
         self.node.is_dir()
     }
 
+    /// Deleted in this snapshot (`−`).
     pub fn is_deleted(&self) -> bool {
         self.delta == Delta::Deleted
+    }
+
+    /// Deleted in this snapshot or earlier: not in this snapshot at all.
+    pub fn is_gone(&self) -> bool {
+        matches!(self.delta, Delta::Deleted | Delta::Gone(_))
     }
 }
 
 /// Folders first, then by name, ignoring case.
+pub fn cmp(a: &Entry, b: &Entry) -> std::cmp::Ordering {
+    b.is_dir().cmp(&a.is_dir()).then_with(|| {
+        let (x, y) = (a.node.name.to_string_lossy(), b.node.name.to_string_lossy());
+        x.to_lowercase()
+            .cmp(&y.to_lowercase())
+            .then_with(|| a.node.name.cmp(&b.node.name))
+    })
+}
+
 pub fn sort(entries: &mut [Entry]) {
-    entries.sort_by(|a, b| {
-        b.is_dir().cmp(&a.is_dir()).then_with(|| {
-            let (x, y) = (a.node.name.to_string_lossy(), b.node.name.to_string_lossy());
-            x.to_lowercase()
-                .cmp(&y.to_lowercase())
-                .then_with(|| a.node.name.cmp(&b.node.name))
-        })
-    });
+    entries.sort_by(cmp);
 }
 
 impl Index {
@@ -107,35 +117,54 @@ impl Index {
         Ok(Some(out))
     }
 
-    /// Names in `folder` at some snapshot before `set[i - 1]` that are in
-    /// neither `set[i - 1]` nor `set[i]`: the items deleted earlier.
-    /// Reads one tree per distinct earlier version of the folder.
+    /// Items in `folder` at some snapshot before `set[i - 1]` that are in
+    /// neither `set[i - 1]` nor `set[i]`: deleted earlier. Each comes with
+    /// its node and the last snapshot that had it. Reads one tree per
+    /// distinct earlier version of the folder.
     pub fn deleted_earlier(
         &self,
         set: &[SnapshotInfo],
         i: usize,
         folder: &Path,
-    ) -> Result<Vec<OsString>> {
+    ) -> Result<Vec<Entry>> {
         let mut now = BTreeSet::new();
         for j in [i.checked_sub(1), Some(i)].into_iter().flatten() {
             if let NodeRef::Dir(t) = self.node_ref(&set[j], folder)? {
                 now.extend(self.tree(t)?.nodes.iter().map(|n| n.name.clone()));
             }
         }
-        let mut seen = BTreeSet::new();
-        let mut last = None;
-        for s in set.iter().take(i.saturating_sub(1)) {
-            if let NodeRef::Dir(t) = self.node_ref(s, folder)?
-                && last != Some(t)
-            {
-                last = Some(t);
-                for n in &self.tree(t)?.nodes {
-                    if !now.contains(&n.name) {
-                        seen.insert(n.name.clone());
+        // Name → (last snapshot with it, its node there).
+        let mut last: BTreeMap<OsString, (usize, Node)> = BTreeMap::new();
+        let mut prev = None;
+        for (j, s) in set.iter().enumerate().take(i.saturating_sub(1)) {
+            let NodeRef::Dir(t) = self.node_ref(s, folder)? else {
+                prev = None;
+                continue;
+            };
+            if prev == Some(t) {
+                // Same tree as the snapshot before: the same names, seen later.
+                for v in last.values_mut() {
+                    if v.0 + 1 == j {
+                        v.0 = j;
                     }
+                }
+                continue;
+            }
+            prev = Some(t);
+            for n in &self.tree(t)?.nodes {
+                if !now.contains(&n.name) {
+                    last.insert(n.name.clone(), (j, n.clone()));
                 }
             }
         }
-        Ok(seen.into_iter().collect())
+        let mut out: Vec<Entry> = last
+            .into_values()
+            .map(|(j, node)| Entry {
+                node,
+                delta: Delta::Gone(j),
+            })
+            .collect();
+        sort(&mut out);
+        Ok(out)
     }
 }

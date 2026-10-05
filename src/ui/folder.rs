@@ -1,9 +1,10 @@
-//! The Versions column and the listing (PLAN.md §3.1). The preview column
-//! comes in M3.
+//! The folder view's panes (PLAN.md §3.1): the Versions column, the
+//! listing and the preview.
 
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 
-use super::{Grid, TOP, fmt, icons, panes};
+use super::{Grid, TOP, fmt, icons, panes, preview};
 use crate::app::{Action, App, Row};
 use crate::index::folder::Counts;
 use crate::index::listing::Delta;
@@ -29,7 +30,19 @@ pub fn put_counts(g: &mut Grid, x: u16, y: u16, c: &Counts, gap: &str, end: u16)
     x
 }
 
+/// Width of what `put_counts` writes.
+pub fn counts_width(c: &Counts, gap: &str) -> u16 {
+    let parts: Vec<String> = [(c.added, "+"), (c.changed, "~"), (c.deleted, "−")]
+        .iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, s)| format!("{s}{n}"))
+        .collect();
+    fmt::width(&parts.join(gap)) as u16
+}
+
 enum VRow {
+    /// What changed on disk since the newest snapshot.
+    Now,
     /// A version: the snapshot index where the folder changed.
     Version(usize),
     /// Snapshots `from..=to` where nothing changed.
@@ -54,9 +67,8 @@ pub fn draw(app: &App, g: &mut Grid) {
         ));
         match app.state() {
             Some(s) if s.loaded() => {
-                let mut rows = Vec::new();
-                let versions = s.versions();
-                for &v in versions.iter().rev() {
+                let mut rows = vec![VRow::Now];
+                for &v in s.versions().iter().rev() {
                     let next = s
                         .points
                         .iter()
@@ -72,6 +84,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                     rows.push(VRow::Version(v));
                 }
                 let on = |r: &VRow| match r {
+                    VRow::Now => false,
                     VRow::Version(v) => *v == i,
                     VRow::Fold { from, to } => (*from..=*to).contains(&i),
                 };
@@ -83,6 +96,21 @@ pub fn draw(app: &App, g: &mut Grid) {
                     let y = TOP + k as u16;
                     let here = on(row);
                     match row {
+                        VRow::Now => {
+                            let c = g.put(v0 + 1, y, "now  ", t.live);
+                            match app.live.get(&app.folder) {
+                                Some(lc) if !lc.is_empty() => {
+                                    let c = put_counts(g, c, y, lc, "", v1 + 1);
+                                    g.put_to(c, y, " unsaved", t.dim, v1 + 1);
+                                }
+                                Some(_) => {
+                                    g.put(c, y, "= latest", t.dim);
+                                }
+                                None => {
+                                    g.put(c, y, "…", t.dim);
+                                }
+                            }
+                        }
                         VRow::Fold { from, to } => {
                             if here {
                                 g.put(v0, y, "▶", t.accent);
@@ -129,6 +157,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         .sel
         .saturating_sub(height / 2)
         .min(rows.len().saturating_sub(height));
+    let ghost = t.dim.add_modifier(Modifier::ITALIC);
     for (k, row) in rows.iter().enumerate().skip(off).take(height) {
         let y = TOP + (k - off) as u16;
         if k == app.sel {
@@ -143,44 +172,39 @@ pub fn draw(app: &App, g: &mut Grid) {
         };
         let (icon, icon_style) = icons::icon(&e.node, &t);
         g.put(l0 + 1, y, icon, icon_style);
-        let gone = e.is_deleted();
         let mut name = e.node.name.to_string_lossy().into_owned();
         if e.is_dir() {
             name.push('/');
         }
-        let style = if gone {
-            t.deleted.add_modifier(t.strike)
-        } else if e.is_dir() {
-            t.dir
-        } else {
-            t.text
+        let style = match e.delta {
+            Delta::Deleted => t.deleted.add_modifier(t.strike),
+            Delta::Gone(_) => ghost,
+            _ if e.is_dir() => t.dir,
+            _ => t.text,
         };
         g.put(l0 + 3, y, &fmt::fit(&name, nw), style);
-        if e.is_dir() {
-            match &e.delta {
-                Delta::Deleted => {
-                    g.put(dx, y, "−", t.deleted);
-                }
-                Delta::Counts(c) => {
-                    put_counts(g, dx, y, c, "", l1 + 1);
-                }
-                _ => {}
-            }
-        } else {
+        if !e.is_dir() {
             let s = fmt::size(e.node.size);
-            g.put(
-                se - fmt::width(&s) as u16,
-                y,
-                &s,
-                if gone { t.dim } else { t.text },
-            );
-            let (mark, style) = match e.delta {
-                Delta::Added => ("+", t.added),
-                Delta::Changed => ("~", t.changed),
-                Delta::Deleted => ("−", t.deleted),
-                _ => ("", t.text),
-            };
-            g.put(dx, y, mark, style);
+            let size_style = if e.is_gone() { t.dim } else { t.text };
+            g.put(se - fmt::width(&s) as u16, y, &s, size_style);
+        }
+        match &e.delta {
+            Delta::Deleted => {
+                g.put(dx, y, "−", t.deleted);
+            }
+            Delta::Gone(_) => {
+                g.put_to(dx, y, "gone", ghost, l1 + 1);
+            }
+            Delta::Added => {
+                g.put(dx, y, "+", t.added);
+            }
+            Delta::Changed => {
+                g.put(dx, y, "~", t.changed);
+            }
+            Delta::Counts(c) => {
+                put_counts(g, dx, y, c, "", l1 + 1);
+            }
+            Delta::Same => {}
         }
     }
     let y = TOP + (rows.len() - off).min(height) as u16;
@@ -193,22 +217,14 @@ pub fn draw(app: &App, g: &mut Grid) {
         }
         _ => {}
     }
-    let hidden = app
-        .deleted
-        .get(&(app.snap, app.folder.clone()))
-        .copied()
-        .unwrap_or(0);
+    let hidden = app.hidden();
     if hidden > 0 && rows.len() < height {
-        g.put(
-            l0 + 3,
-            bottom,
-            &format!("{hidden} deleted · . to show"),
-            t.dim2,
-        );
+        let label = format!("{hidden} deleted · . to show");
+        g.put_act(l0 + 3, bottom, &label, t.dim2, Action::ToggleDeleted);
     }
 
-    // Preview column: its divider only, for now.
-    if let Some((p0, _)) = p.preview {
+    if let Some((p0, p1)) = p.preview {
         g.vline(p0 - 1, TOP, bottom);
+        preview::folder_view(app, g, p0 + 1, p1, TOP, bottom);
     }
 }

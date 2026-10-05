@@ -39,6 +39,7 @@ fn action(prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         return match (p, k.code) {
             ('g', KeyCode::Char('g')) => Some(Top),
             ('g', KeyCode::Char('h')) => Some(Root),
+            ('z', KeyCode::Char('h')) => Some(ToggleDeleted),
             _ => None,
         };
     }
@@ -52,6 +53,7 @@ fn action(prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::PageUp => HalfUp,
         KeyCode::Char('G') => Bottom,
         KeyCode::Char('g') => Prefix('g'),
+        KeyCode::Char('z') => Prefix('z'),
         KeyCode::Char('h') | KeyCode::Char('-') | KeyCode::Backspace => Parent,
         KeyCode::Char('l') | KeyCode::Char('i') | KeyCode::Enter => Open,
         KeyCode::Left if shift => OlderSnapshot,
@@ -60,8 +62,15 @@ fn action(prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('L') | KeyCode::Right => NewerChange,
         KeyCode::Char('[') => OlderSnapshot,
         KeyCode::Char(']') => NewerSnapshot,
+        KeyCode::Char('{') => OlderItemChange,
+        KeyCode::Char('}') => NewerItemChange,
         KeyCode::Home => OldestChange,
         KeyCode::End => NewestChange,
+        KeyCode::Tab => TogglePreview,
+        KeyCode::Char('J') => Scroll(3),
+        KeyCode::Char('K') => Scroll(-3),
+        KeyCode::Char('.') => ToggleDeleted,
+        KeyCode::Char('d') => Diff,
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
         KeyCode::Char('q') => Quit,
         _ => return None,
@@ -89,8 +98,11 @@ impl App {
             return;
         }
         if k.code == KeyCode::Esc {
-            self.prefix = None;
+            let pending = self.prefix.take().is_some() || !self.count.is_empty();
             self.count.clear();
+            if !pending && matches!(self.view, super::View::Versions(_)) {
+                self.act(Action::Back);
+            }
             return;
         }
         let prefix = self.prefix.take();

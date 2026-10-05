@@ -94,6 +94,14 @@ It works for normal setups. Things that can break it, and what restoric does:
 
 So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
+### 2.5 Changes on disk since the newest snapshot
+The `now` row, the live marker at the right end of each timeline row, "vs disk" and the versions view compare with the files on disk (M3):
+
+- A file **counts as changed on disk** when its kind, size, modification time or permissions differ from the newest snapshot. That's the same test restic uses to decide whether to read a file again. Content isn't hashed, so a file that's only touched counts as changed here, unlike between snapshots (§2.2).
+- A folder's `now` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done.
+- "vs disk" and the VS DISK column diff the first 64 KB of each side.
+- Disk access goes through a `Disk` trait, so tests use a fake disk built from the same DSL as `FakeRepo` (a `disk` block after the snapshots). Symlinks are never followed.
+
 ---
 
 ## 3. UX specification
@@ -964,19 +972,21 @@ restoric/
 │   ├── repo/
 │   │   ├── mod.rs     trait Repo + our own types (SnapshotInfo, TreeId, Node, NodeKind)
 │   │   ├── rustic.rs  RusticRepo: rustic_core implementation
-│   │   └── fake.rs    FakeRepo: in-memory, built from a small DSL (tests, UI work, demo mode)
+│   │   └── fake.rs    FakeRepo: in-memory, built from a small DSL (tests, UI work, demo mode), plus a FakeDisk
 │   ├── index/
 │   │   ├── mod.rs           Index: tree LRU + cache, path lookups (NodeRef)
 │   │   ├── fingerprint.rs   leaf fingerprints
 │   │   ├── folder.rs        tree diffs: differs, counts
 │   │   ├── timeline.rs      timeline set, change points per path, item tracks
-│   │   ├── listing.rs       listing at snapshot n, Δ markers, deleted items (M2/M3)
-│   │   └── versions.rs      runs per file
+│   │   ├── listing.rs       listing at snapshot n, Δ markers, deleted items
+│   │   ├── live.rs          what changed on disk since a snapshot
+│   │   └── versions.rs      runs per path
 │   ├── cache.rs       redb tables (§4.4)
+│   ├── disk.rs        Disk trait: the real file system (never follows symlinks), faked in tests
 │   ├── worker.rs      background pool, Request/Response enums, generation ids
 │   ├── tui.rs         terminal setup/teardown, panic hook, event loop
 │   ├── restore.rs     restore/dump/tar, undo log
-│   ├── diff.rs        load both sides (size limit, binary detection), imara-diff, hunks
+│   ├── diff.rs        imara-diff line diffs, binary detection, margin marks, hunks
 │   ├── app/
 │   │   ├── mod.rs     App state, view stack (Folder, Versions, Diff, Find), overlays (Dialog, Help)
 │   │   ├── keys.rs    key parser: counts, prefixes (g, z, c, ], [), modes (normal, visual, command, search, filter, dialog)

@@ -8,11 +8,12 @@ use clap::{Args, Parser, Subcommand};
 
 use restoric::app::App;
 use restoric::cache::Cache;
+use restoric::disk::RealDisk;
 use restoric::index::timeline::{Filter, explain_empty, timeline_set};
 use restoric::index::{Index, Mode};
 use restoric::repo::Repo;
 use restoric::repo::rustic::{BACKEND, OpenOptions, RusticRepo};
-use restoric::worker::Worker;
+use restoric::worker::{Ctx, Worker};
 
 /// Browse and restore a restic repository by time, anchored on a folder.
 #[derive(Parser)]
@@ -33,6 +34,13 @@ enum Command {
     /// Print the change points of PATH
     Log {
         path: PathBuf,
+        /// Print JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Print the distinct versions of FILE
+    Versions {
+        file: PathBuf,
         /// Print JSON
         #[arg(long)]
         json: bool,
@@ -145,6 +153,21 @@ fn run(cli: Cli) -> Result<()> {
             }
             Ok(())
         }
+        Some(Command::Versions { file, json }) => {
+            let path = std::path::absolute(&file).context("resolving the path")?;
+            let (index, filter) = open(&cli.repo, &cli.view)?;
+            let versions = restoric::log::versions(&index, &filter, &path)?;
+            let mut out = std::io::stdout().lock();
+            if json {
+                serde_json::to_writer_pretty(&mut out, &versions.list)?;
+                writeln!(out)?;
+            } else {
+                let tz = jiff::tz::TimeZone::system();
+                let text = restoric::log::render_versions(&versions, &path, &tz);
+                write!(out, "{text}")?;
+            }
+            Ok(())
+        }
         None => {
             let path = match &cli.path {
                 Some(p) => std::path::absolute(p).context("resolving the path")?,
@@ -166,7 +189,11 @@ fn run(cli: Cli) -> Result<()> {
             let app = App::new(mine, folder, jiff::tz::TimeZone::system(), home);
             let (tx, rx) = crossbeam_channel::unbounded();
             let threads = std::thread::available_parallelism().map_or(2, |n| n.get());
-            let worker = Worker::start(Arc::new(index), threads, tx);
+            let ctx = Ctx {
+                index,
+                disk: Arc::new(RealDisk),
+            };
+            let worker = Worker::start(Arc::new(ctx), threads, tx);
             restoric::tui::run(app, worker, rx)
         }
     }

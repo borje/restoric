@@ -4,8 +4,8 @@ expression: "h.screen(70, 24)"
 ---
  restoric  ~/dev/project/src                     ◀ version 11 of 15 ▶
   Jul 2026                  Sep                  now
-  ●· · ● ●●· ● ● ●· ● ·● ··  ●·●·●·●· ·●··●· ·  ┊ · src/
-
+  ●· · ● ●●· ● ● ●· ● ·● ··  ●·●·●·●· ·●··●· ·  ┊ ● src/
+  •· · • ··· • · ·· • ·· ··  •·•·•··· ······ ·  ┊ • main.go
                                ▲                             − 1× +
 
    ..

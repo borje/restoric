@@ -1,12 +1,14 @@
 //! Popups (PLAN.md §3.4, §3.12, §3.16): which-key, messages, help.
 
 use super::{Grid, TOP, fmt};
-use crate::app::{Action, App};
+use crate::app::{Action, App, View};
 
 /// What can follow a prefix key.
-fn which(prefix: char) -> &'static [(&'static str, &'static str, Action)] {
-    match prefix {
-        'g' => &[
+fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Action)] {
+    match (view, prefix) {
+        (View::Versions(_), 'g') => &[("gg", "newest version", Action::Top)],
+        (_, 'z') => &[("zh", "show / hide deleted", Action::ToggleDeleted)],
+        (_, 'g') => &[
             ("gg", "top of list", Action::Top),
             ("gh", "backup root", Action::Root),
             ("G", "bottom (no prefix)", Action::Bottom),
@@ -17,7 +19,7 @@ fn which(prefix: char) -> &'static [(&'static str, &'static str, Action)] {
 
 pub fn which_key(app: &App, g: &mut Grid) {
     let Some(p) = app.prefix else { return };
-    let items = which(p);
+    let items = which(&app.view, p);
     if items.is_empty() {
         return;
     }

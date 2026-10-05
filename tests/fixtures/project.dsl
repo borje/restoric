@@ -75,3 +75,6 @@ snapshot 2026-09-27 08:52
   append src/server.go // graceful\n
 snapshot 2026-09-29 12:00
 snapshot 2026-10-02 12:21
+
+disk
+  append src/main.go // unsaved edit\n

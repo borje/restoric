@@ -6,9 +6,11 @@ pub mod fmt;
 pub mod folder;
 pub mod icons;
 pub mod popup;
+pub mod preview;
 pub mod statusbar;
 pub mod theme;
 pub mod timeline;
+pub mod versions;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -16,7 +18,7 @@ use ratatui::style::Style;
 use unicode_width::UnicodeWidthChar;
 
 use crate::app::keys::Hits;
-use crate::app::{Action, App};
+use crate::app::{Action, App, View};
 use theme::Theme;
 
 /// A buffer with the mockup's drawing helpers, recording clickable areas.
@@ -166,8 +168,13 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
     }
     app.page = (g.rows() - TOP - 1) as usize;
     timeline::header(app, &mut g);
-    timeline::draw(app, &mut g);
-    folder::draw(app, &mut g);
+    match app.view.clone() {
+        View::Folder => {
+            timeline::draw_folder(app, &mut g);
+            folder::draw(app, &mut g);
+        }
+        View::Versions(v) => versions::draw(app, &mut g, &v),
+    }
     statusbar::draw(app, &mut g);
     popup::which_key(app, &mut g);
     popup::message(app, &mut g);

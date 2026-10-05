@@ -4,15 +4,16 @@ expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project                                                       ◀ version 17 of 17 ▶
   Jul 2026        Aug                         Sep                              now
-  ● ·   ●  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ●    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ · project/
-
+  ● ·   ●  ● ● ●  · ●   ●  ●·    ● ·  ● ·  ●    ●· ·●·● · ● ·  ·●  · ·● ·  ·  ┊ ● project/
+  • ·   ·  · · ·  · ·   ·  ··    · ·  · ·  •    ·· ···· · · ·  ··  · ·· ·  ·  ┊ · docs/
                                                                       ▲                    − 1× +
 
-   ┄ 2 unchanged ┄    │ ▸ docs/                           │
-▶Sep 27 08:52 ~1      │ ▸ scripts/                        │
-   ┄ 2 unchanged ┄    │ ▸ src/                      ~1    │
- Sep 20 20:35 ~1      │ ○ go.mod              27 B        │
-   ┄ 2 unchanged ┄    │ ¶ README.md           15 B        │
+ now  ~1 unsaved      │ ▸ docs/                           │ docs/
+   ┄ 2 unchanged ┄    │ ▸ scripts/                        │
+▶Sep 27 08:52 ~1      │ ▸ src/                      ~1    │ ¶ notes.md
+   ┄ 2 unchanged ┄    │ ○ go.mod              27 B        │
+ Sep 20 20:35 ~1      │ ¶ README.md           15 B        │
+   ┄ 2 unchanged ┄    │                                   │
  Sep 13 20:51 ~2      │                                   │
    ┄ 1 unchanged ┄    │                                   │
  Sep 09 19:23 ~1      │                                   │
@@ -34,5 +35,4 @@ expression: "h.screen(100, 34)"
  Jul 26 11:57 ~1      │                                   │
  Jul 24 12:16 ~1      │                                   │
  Jul 20 12:00 ~1      │                                   │
-   ┄ 1 unchanged ┄    │                                   │
  NOR  Sep 27 08:52  c177b849  project/ ~1                                               1/5  ? help

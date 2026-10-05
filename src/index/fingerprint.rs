@@ -40,6 +40,16 @@ pub fn leaf(node: &Node) -> Fp {
     h.finalize().into()
 }
 
+/// The file's bytes, as a key: equal keys, equal content.
+pub fn content(node: &Node) -> Fp {
+    let mut h = Sha256::new();
+    h.update(node.size.to_le_bytes());
+    for c in &node.content {
+        h.update(c.0.0);
+    }
+    h.finalize().into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

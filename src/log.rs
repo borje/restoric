@@ -139,6 +139,106 @@ pub fn render(log: &Log, path: &Path, tz: &TimeZone) -> String {
     out
 }
 
+/// One distinct version of a file, or a period when it didn't exist.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Version {
+    /// The first snapshot with this version.
+    pub snapshot: String,
+    pub time: String,
+    pub snapshots: usize,
+    pub deleted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+}
+
+pub struct Versions {
+    /// Newest first.
+    pub list: Vec<Version>,
+    pub snapshots: usize,
+}
+
+/// The distinct versions of the file at `path`, newest first.
+pub fn versions(index: &Index, filter: &Filter, path: &Path) -> Result<Versions> {
+    let snaps = index.repo().snapshots()?;
+    let set = timeline_set(&snaps, filter, path);
+    if set.is_empty() {
+        bail!("{}", explain_empty(&snaps, filter, path));
+    }
+    let refs = index.refs(&set, path, &mut |_, _| {})?;
+    if refs.iter().any(|r| matches!(r, NodeRef::Dir(_))) {
+        bail!(
+            "{} is a folder. `restoric log` shows a folder's changes.",
+            path.display()
+        );
+    }
+    let runs = index.runs(&refs)?;
+    if runs.is_empty() {
+        bail!(
+            "{} isn't in any of the {} snapshots that cover it.",
+            path.display(),
+            set.len()
+        );
+    }
+    let mut list = Vec::new();
+    for r in runs.iter().rev() {
+        let s = &set[r.from];
+        let size = if r.exists {
+            index.node_at(s, path)?.map(|n| n.size)
+        } else {
+            None
+        };
+        list.push(Version {
+            snapshot: s.id.to_string(),
+            time: s.time.to_string(),
+            snapshots: r.snapshots(),
+            deleted: !r.exists,
+            size,
+        });
+    }
+    index.flush()?;
+    Ok(Versions {
+        list,
+        snapshots: set.len(),
+    })
+}
+
+/// The versions as text, times in `tz`.
+pub fn render_versions(v: &Versions, path: &Path, tz: &TimeZone) -> String {
+    let n = v.list.iter().filter(|x| !x.deleted).count();
+    let mut out = format!(
+        "{} · {n} version{} in {} snapshots\n\n",
+        path.display(),
+        if n == 1 { "" } else { "s" },
+        v.snapshots
+    );
+    for x in &v.list {
+        let time = x
+            .time
+            .parse::<jiff::Timestamp>()
+            .map(|t| {
+                t.to_zoned(tz.clone())
+                    .strftime("%Y-%m-%d %H:%M")
+                    .to_string()
+            })
+            .unwrap_or_else(|_| x.time.clone());
+        let what = if x.deleted {
+            "deleted".to_string()
+        } else {
+            x.size.map(crate::ui::fmt::size).unwrap_or_default()
+        };
+        let snaps = format!(
+            "{} snapshot{}",
+            x.snapshots,
+            if x.snapshots == 1 { "" } else { "s" }
+        );
+        out.push_str(&format!(
+            "{time}  {}  {what:>7}  {snaps}\n",
+            &x.snapshot[..8]
+        ));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -225,6 +325,26 @@ snapshot 2026-07-31 12:00 host=other
         2026-07-28 12:00  1a66857e  changed
                           ┄ 3 unchanged ┄
         2026-07-24 12:16  fe3121f1  new
+        ");
+    }
+
+    #[test]
+    fn file_versions() {
+        let repo = Arc::new(FakeRepo::parse(HISTORY).unwrap());
+        let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 20);
+        let filter = Filter {
+            hosts: vec!["laptop".into()],
+            tag: None,
+        };
+        let path = Path::new("/home/me/proj/src/main.go");
+        let v = versions(&index, &filter, path).unwrap();
+        insta::assert_snapshot!(render_versions(&v, path, &TimeZone::UTC), @"
+        /home/me/proj/src/main.go · 3 versions in 7 snapshots
+
+        2026-07-30 12:00  c162e2d7      4 B  1 snapshot
+        2026-07-29 12:00  e26edccf  deleted  1 snapshot
+        2026-07-26 12:00  bd65d7c5      6 B  3 snapshots
+        2026-07-24 12:16  fe3121f1      3 B  2 snapshots
         ");
     }
 }

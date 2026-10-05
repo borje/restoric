@@ -5,7 +5,9 @@
 pub mod fingerprint;
 pub mod folder;
 pub mod listing;
+pub mod live;
 pub mod timeline;
+pub mod versions;
 
 use std::ffi::OsString;
 use std::path::{Component, Path};

@@ -3,6 +3,8 @@
 
 pub mod app;
 pub mod cache;
+pub mod diff;
+pub mod disk;
 pub mod index;
 pub mod log;
 pub mod repo;

@@ -4,17 +4,26 @@ use ratatui::style::Style;
 
 use super::timeline::Axis;
 use super::{Grid, fmt};
-use crate::app::{Action, App};
+use crate::app::{Action, App, View};
 
 pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let (cols, r) = (g.cols(), g.rows() - 1);
     g.fill(r, 0, cols - 1, t.status_bar);
-    let mut c = g.put(0, r, " NOR ", t.badge) + 1;
+    let c = g.put(0, r, " NOR ", t.badge) + 1;
 
+    let mut mid: Vec<(String, Style)> = Vec::new();
+    let mut right: Vec<(String, Style, Option<Action>)> = Vec::new();
+    if let View::Versions(v) = &app.view {
+        mid.push((fmt::path(&v.path, app.home.as_deref()), t.dim));
+        if let Some(tr) = app.tracks.get(&v.path).filter(|t| t.loaded()) {
+            right.push((format!("{}/{}", v.sel + 1, tr.runs.len()), t.text, None));
+        }
+        finish(app, g, c, mid, right);
+        return;
+    }
     let set = app.set();
     let i = app.idx();
-    let mut mid: Vec<(String, Style)> = Vec::new();
     if let Some(s) = set.get(i) {
         mid.push((fmt::time(s.time, &app.tz), t.bold));
         mid.push(("  ".into(), t.text));
@@ -50,14 +59,13 @@ pub fn draw(app: &App, g: &mut Grid) {
             ));
         }
     }
-    if let Some(axis) = Axis::new(app, cols) {
-        let share = axis.share(app);
+    if let Some(axis) = Axis::new(&set, i, app.zoom, cols) {
+        let share = axis.share(i);
         if share > 1 {
             mid.push((format!("  {share} in column · zi"), t.dim));
         }
     }
 
-    let mut right: Vec<(String, Style, Option<Action>)> = Vec::new();
     if let Some(e) = app.selected()
         && !e.is_dir()
         && !e.is_deleted()
@@ -75,6 +83,20 @@ pub fn draw(app: &App, g: &mut Grid) {
     if matches!(app.listing(), Some(Some(_))) {
         right.push((format!("{pos}/{total}"), t.text, None));
     }
+    finish(app, g, c, mid, right);
+}
+
+/// The middle parts from column `c`, as many as fit, then the right parts,
+/// the pending count or prefix, and `? help`.
+fn finish(
+    app: &App,
+    g: &mut Grid,
+    mut c: u16,
+    mid: Vec<(String, Style)>,
+    mut right: Vec<(String, Style, Option<Action>)>,
+) {
+    let t = g.theme.clone();
+    let (cols, r) = (g.cols(), g.rows() - 1);
     right.push(("  ? help".into(), t.dim2, Some(Action::Help)));
     let rlen: u16 = right.iter().map(|(s, _, _)| fmt::width(s) as u16).sum();
     let pending = format!(

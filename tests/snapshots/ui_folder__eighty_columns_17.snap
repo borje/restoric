@@ -4,24 +4,24 @@ expression: "h.screen(80, 34)"
 ---
  restoric  ~/dev/project/src                               ◀ between versions ▶
   Jul 2026    Aug                 Sep                      now
-  ● · ·  ●●● · ●  ● ●·   ●· ● · ·  ●··●·●· ●· ·● · ·●· ·  ┊ · src/
-
+  ● · ·  ●●● · ●  ● ●·   ●· ● · ·  ●··●·●· ●· ·● · ·●· ·  ┊ ● src/
+  • · ·  •·· · •  · ··   •· · · ·  •··•·•· ·· ·· · ··· ·  ┊ • main.go
                                                        ▲               − 1× +
 
-   ..                                 │
- ▸ api/                               │
+   ..                                 │ main.go · v7/7 · 108 B       ⇥ content
+ ▸ api/                               │ unchanged since Sep 09 19:23
  ▸ models/                            │
- ◇ config.go              96 B        │
- ◇ main.go               108 B        │
- ◇ server.go              42 B        │
- ◇ util.go               104 B        │
-                                      │
-                                      │
-                                      │
-                                      │
-                                      │
-                                      │
-                                      │
+ ◇ config.go              96 B        │   1  package main
+ ◇ main.go               108 B        │   2
+ ◇ server.go              42 B        │   3  func main() {
+ ◇ util.go               104 B        │   4    run()
+                                      │   5  }
+                                      │   6  // flags
+                                      │   7  // middleware
+                                      │   8  // feature flag
+                                      │   9  // signals
+                                      │  10  // serve
+                                      │  11+ // shutdown
                                       │
                                       │
                                       │
