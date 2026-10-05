@@ -47,27 +47,28 @@ In a restic repository, each snapshot points to a root **tree**. A tree lists **
 If folder `P` has the same subtree id in snapshot *n* and snapshot *n−1*, nothing under `P` changed. This needs a walk of only `depth(P)` trees per snapshot, and unchanged subtrees share ids, so their trees are loaded once.
 
 ### 2.2 Metadata churn and the fingerprint
-Restic stores metadata such as **atime, ctime, inode and device id** in each node. These can change without any content changing, for example when a file is read (atime) or its permissions change. When they do, the subtree id changes too. If change points relied on tree ids alone, the timeline would show too many `●`.
+Restic stores metadata such as **atime, ctime, inode and device id** in each node. These can change without any content changing, for example when a file is read (atime) or rewritten with the same content (ctime, inode). When they do, the subtree id changes too. If change points relied on tree ids alone, the timeline would show too many `●`.
 
 **Decision:** "changed" means the **content fingerprint** changed:
 
 ```
-fingerprint(file)    = H(type, size, content blob ids)          # mode optional, see open questions
+fingerprint(file)    = H(type, size, mode, uid, gid, content blob ids)
 fingerprint(symlink) = H(type, link target)
 fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 ```
 
 - Fingerprints are memoised **by tree id** in the on-disk cache. Tree ids never change, so the cache never needs invalidating.
 - Fast path first: same subtree id means same fingerprint, with no recursion.
-- `--strict` (or `:set strict`) switches to raw tree ids, for people who care about metadata changes.
-- modification time is **excluded** by default: touching a file without changing it is not a change. This is open for discussion.
+- **Permission changes count** (mode), and so do owner and group changes. They show as `~` like a content change.
+- Modification time is **excluded**: touching a file without changing it is not a change.
+- `--strict` (or `:set strict`) switches to raw tree ids, for people who care about every metadata change.
 
 > **Check in M0:** how often do tree ids differ when fingerprints match, on a real repo? If almost never, fingerprints can be computed lazily.
 
 ### 2.3 What gets computed
 | Name | Definition | Used for |
 |---|---|---|
-| Timeline set | Snapshots of the selected host (default: this machine) whose backup paths include the browsed folder, sorted by time | Every view |
+| Timeline set | Snapshots of **this machine** (§2.4) whose backup paths include the browsed folder, sorted by time | Every view |
 | Change points of folder P | Snapshots where `fingerprint(P)` differs from the previous snapshot in the timeline set (or P first appears or disappears) | Row 1 of the timeline, the Versions pane, `H`/`L` |
 | Item track | The same as change points, for the selected entry | Row 2 of the timeline, `{`/`}` |
 | Entry change marker | The entry's node at snapshot n compared with n−1: `+` added, `~` changed, `−` deleted | Δ column |
@@ -76,6 +77,22 @@ fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 | Deleted items | Names seen in P's trees in earlier snapshots that are missing now | `zh` |
 
 Folder counts need a tree diff. Only walk subtrees whose fingerprints differ.
+
+### 2.4 Only this machine
+restoric only shows snapshots made **on this machine**. Snapshots from other computers backing up to the same repository are ignored.
+
+This is possible because every restic snapshot records the **hostname** of the machine that made it (the `hostname` field, shown by `restic snapshots`). restoric compares it with this machine's hostname, the same way `restic snapshots --host` filters.
+
+It works for normal setups. Things that can break it, and what restoric does:
+
+| Situation | What happens | What restoric does |
+|---|---|---|
+| The machine was **renamed** | Older snapshots carry the old hostname and would disappear | Config `host = ["new-name", "old-name"]` accepts several names. If old snapshots seem to be missing (the path exists under another hostname with the same backup paths), the status bar says so once. |
+| Backups use `restic backup --host X` | Snapshots carry X, not the real hostname | Set `host = "X"` in the config, or pass `--host X` |
+| **Two machines with the same hostname** back up to one repo | restic can't tell them apart either | Can't be separated by hostname. Separate them with tags (`restic backup --tag laptop`) and set `tag = "laptop"` in restoric's config. |
+| Containers or VMs with random hostnames | Each run looks like a new machine | Use `--host` when backing up, as above |
+
+So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
 ---
 
@@ -917,7 +934,7 @@ An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :f
 | Need | Crate | Notes |
 |---|---|---|
 | Repository | `rustic_core` | Pin an exact version and wrap it behind our own trait (§4.3) |
-| Backends | `rustic_backend` | local, sftp, S3, rclone, REST… check the backend you actually use in M0 |
+| Backends | `rustic_backend` | **Every backend rustic supports** (all features enabled): local, sftp, REST, rclone, and the OpenDAL-based ones such as S3, B2 and Azure. restoric adds none of its own. |
 | TUI | `ratatui` + `crossterm` | Mouse capture on |
 | Cache | `redb` | One file per repo id |
 | Diff | `imara-diff` | Histogram algorithm. Our own hunk and context formatting. |
@@ -1010,8 +1027,9 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 ### 4.6 Start-up
 1. Read the repository and password from `--repo` / `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE` and `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic. Then the config file.
 2. Open the repo (read only). Load the snapshot list from the cache, then fetch new ones in the background.
-3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of the host (`--host`, default this machine's hostname) whose `paths` contain that path.
-4. If the path isn't in any snapshot: show a clear message listing the backed-up paths for this host.
+3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) whose `paths` contain that path.
+4. If this machine has no snapshots at all: show the hostnames that do have snapshots, explain how to set `host` (§2.4), and stop.
+5. If the path isn't in any of this machine's snapshots: show a clear message listing the paths this machine backs up.
 
 ### 4.7 CLI
 ```
@@ -1034,7 +1052,7 @@ Each milestone ends in something usable and tested.
 
 ### M0: rustic_core test run (1–2 days)
 Throwaway binary `spike/`:
-- Open **your real repo** (and backend) with rustic_core. List snapshots.
+- Open **your real repo** (over its real backend) with rustic_core. List this machine's snapshots.
 - Walk to one folder in every snapshot, timed cold and warm.
 - Count snapshots where the tree id differs vs where the fingerprint differs.
 - Read one file from an old snapshot. Restore one file into a temporary folder.
@@ -1120,18 +1138,19 @@ Throwaway binary `spike/`:
 ---
 
 ## 8. Open questions
-1. **Which backend** does your repo use (local, sftp, S3, rclone, REST)? This decides what M0 tests.
-2. **How big** is the repo: number of snapshots, files per snapshot? Sets the performance targets.
-3. **Should a permission (mode) change count as a change?** The proposal is no by default, yes with `--strict`.
-4. **License:** MIT/Apache-2.0 (like rustic)?
-5. **Is the name `restoric` free** on crates.io and GitHub? Check before publishing.
-6. **Snapshots from several hosts** of the same folder (e.g. a laptop and a desktop syncing a project): merge them into one timeline, or keep one host at a time (current plan)?
+1. **How big** is the repo: number of snapshots, and files per snapshot? This sets the performance targets for M0. `restic snapshots --host $(hostname) | tail -2` gives the snapshot count, and `restic stats latest` the files in the newest one.
+2. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
 - Labels at the right edge of the timeline rows replace the legend.
 - `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
 - Restored copies are named with the snapshot time after the full name: `main.go.2026-09-09_1923`, `src.2026-09-09_1923/`. If that name already exists (the same version restored twice), add `-2`, `-3`, …
 - restoric is a separate app and doesn't read yazi's config or theme. The yazi plugin (M8) is only a launcher.
+- Backends: everything rustic supports. M0 tests against the backend of your real repo.
+- Permission, owner and group changes count as changes. Modification time alone doesn't.
+- License: AGPLv3. Fine with the dependencies, which are MIT or Apache-2.0 (rustic_core, ratatui and the rest).
+- Name: `restoric` is free on crates.io and the AUR, and the GitHub account name `restoric` is free. One existing GitHub repo has the same name: [leaanthony/restoric](https://github.com/leaanthony/restoric), "A PoC Restic GUI using the Wails Framework" (12 stars, no license, last push January 2023). It's an abandoned proof of concept, but it's in the same space, so expect some confusion in search results.
+- Only snapshots from this machine are shown (§2.4).
 
 ---
 
