@@ -1,0 +1,37 @@
+[package]
+name = "restoric"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+description = "Browse and restore a restic repository by time, anchored on a folder"
+license = "AGPL-3.0-or-later"
+exclude = ["docs/mockup.html", "spike/"]
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+directories = "6.0.0"
+gethostname = "1.1.0"
+jiff = "0.2.37"
+quick_cache = "0.7.0"
+redb = "4.3.0"
+rustic_backend = { version = "=0.7.0", features = ["opendal", "rclone", "rest"] }
+rustic_core = "=0.13.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.10"
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+insta = "1.49.0"
+tempfile = "3.27.0"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false

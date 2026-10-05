@@ -57,13 +57,13 @@ fingerprint(symlink) = H(type, link target)
 fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 ```
 
-- Fingerprints are memoised **by tree id** in the on-disk cache. Tree ids never change, so the cache never needs invalidating.
-- Fast path first: same subtree id means same fingerprint, with no recursion.
+- **How it's computed (M1):** files, links and other entries get their fingerprint from their own node, with no lookups. Folder fingerprints are never stored. Instead, two versions of a folder are compared by **diffing their trees**: walk both side by side, go only into subtrees whose ids differ, and stop at the first real difference. This gives the same answer as comparing `fingerprint(folder)`, but the cost follows what changed, not the size of the folder (§4.8). Computing a folder fingerprint means reading every tree under it once. The results are cached by **pairs of tree ids**. Tree ids never change, so the cache never needs invalidating.
+- Fast path first: the same subtree id means no change, with no recursion.
 - **Permission changes count** (mode), and so do owner and group changes. They show as `~` like a content change.
 - Modification time is **excluded**: touching a file without changing it is not a change.
 - `--strict` (or `:set strict`) switches to raw tree ids, for people who care about every metadata change.
 
-> **Check in M0:** how often do tree ids differ when fingerprints match, on a real repo? If almost never, fingerprints can be computed lazily.
+> **Check in M0:** how often do tree ids differ when fingerprints match, on a real repo? Results are in §11 (M0). The tree diff above is lazy either way.
 
 ### 2.3 What gets computed
 | Name | Definition | Used for |
@@ -76,7 +76,7 @@ fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 | Versions | Consecutive runs of snapshots with an identical file fingerprint | Versions view |
 | Deleted items | Names seen in P's trees in earlier snapshots that are missing now | `zh` |
 
-Folder counts need a tree diff. Only walk subtrees whose fingerprints differ.
+Folder counts need a tree diff. Only walk subtrees whose ids differ. An **item** is anything but a folder, or an empty folder, so a change always counts as at least one.
 
 ### 2.4 Only this machine
 restoric only shows snapshots made **on this machine**. Snapshots from other computers backing up to the same repository are ignored.
@@ -958,15 +958,19 @@ restoric/
 ├── docs/            mockup.html, screens/*.txt
 ├── src/
 │   ├── main.rs        clap args, env (RESTIC_*), start-up, terminal setup/teardown, panic hook
+│   ├── lib.rs         the modules below, so tests/ can use them
+│   ├── log.rs         `restoric log`
 │   ├── config.rs      ~/.config/restoric/config.toml
 │   ├── repo/
 │   │   ├── mod.rs     trait Repo + our own types (SnapshotInfo, TreeId, Node, NodeKind)
 │   │   ├── rustic.rs  RusticRepo: rustic_core implementation
 │   │   └── fake.rs    FakeRepo: in-memory, built from a small DSL (tests, UI work, demo mode)
 │   ├── index/
-│   │   ├── fingerprint.rs   memoised by tree id
+│   │   ├── mod.rs           Index: tree LRU + cache, path lookups (NodeRef)
+│   │   ├── fingerprint.rs   leaf fingerprints
+│   │   ├── folder.rs        tree diffs: differs, counts
 │   │   ├── timeline.rs      timeline set, change points per path, item tracks
-│   │   ├── folder.rs        listing at snapshot n, Δ markers, counts, deleted items
+│   │   ├── listing.rs       listing at snapshot n, Δ markers, deleted items (M2/M3)
 │   │   └── versions.rs      runs per file
 │   ├── cache.rs       redb tables (§4.4)
 │   ├── worker.rs      background pool, Request/Response enums, generation ids
@@ -999,23 +1003,27 @@ Our own trait wraps rustic_core: it isolates API changes and lets the UI run aga
 
 ```rust
 pub trait Repo: Send + Sync {
+    fn id(&self) -> Id;                                         // repository id, names the cache file
     fn snapshots(&self) -> Result<Vec<SnapshotInfo>>;          // id, time, host, paths, tags, root tree
-    fn tree(&self, id: &TreeId) -> Result<Arc<Tree>>;           // nodes: name, kind, size, mtime, content ids, subtree id
-    fn read_file(&self, snap: &SnapshotId, path: &Path, limit: u64) -> Result<FileBytes>;
-    fn restore(&self, snap: &SnapshotId, path: &Path, dest: &Path, opts: RestoreOpts) -> Result<RestoreReport>;
-    fn dump_tar(&self, snap: &SnapshotId, path: &Path, out: &mut dyn Write) -> Result<()>;
+    fn tree(&self, id: &TreeId) -> Result<Arc<Tree>>;           // nodes: name, kind, size, mode, owner, mtime, content ids, subtree id, raw hash
+    fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes>;
+    fn restore(&self, snap: &SnapshotId, path: &Path, dest: &Path, opts: RestoreOpts) -> Result<RestoreReport>;   // M5
+    fn dump_tar(&self, snap: &SnapshotId, path: &Path, out: &mut dyn Write) -> Result<()>;                      // M5
 }
 ```
-Everything in `index/` is written against this trait and holds no rustic types.
+Everything in `index/` is written against this trait and holds no rustic types. A node's `raw` hash covers everything restic stored for it; `--strict` compares that.
+
+`RusticRepo` walks trees with rustic's smaller **trees-only index** (`to_indexed_ids`). It loads the full index, which also locates data blobs, only on the first file read.
 
 ### 4.4 Cache (redb, `~/.cache/restoric/<repo-id>.redb`)
 | Table | Key → value | Notes |
 |---|---|---|
-| `snapshots` | snapshot id → time, host, paths, tags, root tree | Refreshed at start-up; only new snapshots are read |
-| `fingerprint` | tree id → fingerprint | Never needs invalidating |
-| `path_tree` | (snapshot id, path) → subtree id | Makes later walks O(1) |
-| `change_points` | (filter hash, path) → list of snapshot ids + counts | Recomputed when a new snapshot arrives (only the new tail) |
+| `path_ref` | (snapshot id, path) → missing, folder tree id, or leaf fingerprint + raw hash | Every folder on the way is stored too, so later walks are O(1) |
+| `differs` | (mode, tree id, tree id) → whether the content differs | §2.2 |
+| `counts` | (mode, tree id or none, tree id or none) → added, changed, deleted | Folder counts. (none, tree) is the number of items under a tree. |
 | `meta` | schema version, rustic_core version | Wipe if they don't match |
+
+There's no `snapshots` table: rustic_core keeps snapshot files in its own local cache, and listing them is fast (timing in §11, M0). Every key is content-addressed, so nothing is ever invalidated. Change points are cheap to rebuild from `path_ref` and `differs`, so they aren't stored. A new snapshot costs one lookup per path. Writes collect in memory and go to disk in one transaction per operation.
 
 rustic_core has its own cache for index and tree packs. Check in M0 that tree packs are cached locally, so walks are fast after the first run.
 
@@ -1035,7 +1043,8 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 ### 4.7 CLI
 ```
 restoric [PATH]                       open the TUI at PATH (default: current folder)
-  -r, --repo REPO       --password-command CMD     (plus all RESTIC_* env vars)
+  -r, --repo REPO       --repository-file FILE
+  --password-file FILE  --password-command CMD     (plus RESTIC_REPOSITORY, _FILE, RESTIC_PASSWORD, _FILE, _COMMAND)
   --host HOST           --tag TAG                  --strict
   --select NAME         start with NAME selected (used by the yazi plugin)
   --no-icons
