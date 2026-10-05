@@ -1,0 +1,21 @@
+[package]
+name = "restoric-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+rustic_core = "=0.13.0"
+rustic_backend = { version = "=0.7.0", features = ["opendal", "rclone", "rest"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tempfile = "3"
+sha2 = "0.10"
+gethostname = "1"
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+debug = 0
