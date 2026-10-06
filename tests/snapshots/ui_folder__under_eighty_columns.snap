@@ -3,7 +3,7 @@ source: tests/ui_folder.rs
 expression: "h.screen(70, 24)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026                  Sep                  now
+  Jul 2026                  Sep                  on disk
   ●· · ● ○○· ● ○ ○· ● ·○ ··  ●·●·●·○· ·○··○· ·  ┊ ● main.go  ○ src/
                                ▲                             − 1× +
 

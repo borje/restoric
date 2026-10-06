@@ -3,11 +3,11 @@ source: tests/ui_folder.rs
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
                                                                       ▲                    − 1× +
 
- now  ~1 unsa╭─ Help ─────────────────────────────────────────────────────────────────╮
+ on disk  ~1 ╭─ Help ─────────────────────────────────────────────────────────────────╮
    ┄ 2 unchan│                                                                        │
 ▶Sep 27 08:52│  Folder view                                                           │
    ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │

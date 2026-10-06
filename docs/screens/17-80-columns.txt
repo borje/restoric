@@ -1,5 +1,5 @@
  restoric  ~/dev/project/src
-  Jul 2026    Aug                 Sep                      now
+  Jul 2026    Aug                 Sep                      on disk
   ●· · ○·○○●  ·● ·○·○· ··○ ·●·· ·· ○· ● ●· ○·· ○· · ○ ··  ┊ ● main.go  ○ src/
                                                        ▲               − 1× +
 

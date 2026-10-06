@@ -3,11 +3,11 @@ source: tests/ui_folder.rs
 expression: "h.screen(100, 20)"
 ---
  restoric  ~/trading
-  Sep 2026                                                                     now
+  Sep 2026                                                                     on disk
   ●                                                                        ●  ┊ · logs/  ○ trading/
                                                                            ▲               − 1× +
 
- now  = latest        │ ▸ logs/                             ~1 │ logs/
+ on disk  = latest    │ ▸ logs/                             ~1 │ logs/
 ▶Sep 02 10:00 ~1      │                                        │
  Sep 01 10:00 +1      │                                        │ ≡ run.log                        ~
                       │                                        │

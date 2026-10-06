@@ -97,11 +97,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                     let here = on(row);
                     match row {
                         VRow::Now => {
-                            let c = g.put(v0 + 1, y, "now  ", t.live);
+                            let c = g.put(v0 + 1, y, "on disk  ", t.live);
                             match app.live.get(&app.folder) {
                                 Some(lc) if !lc.is_empty() => {
-                                    let c = put_counts(g, c, y, lc, "", v1 + 1);
-                                    g.put_to(c, y, " unsaved", t.dim, v1 + 1);
+                                    put_counts(g, c, y, lc, "", v1 + 1);
                                 }
                                 Some(_) => {
                                     g.put(c, y, "= latest", t.dim);

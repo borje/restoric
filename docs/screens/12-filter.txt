@@ -1,9 +1,9 @@
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ○      ○ ○ ○ ○    ● · ○· ○·  ··○  · ○· · · · ·○·  ● ○ · ● · · ○ · · ○  · ·  ┊ ○ config.go  ○ src/
                                                                            ▲               − 1× +
 
- now  ~1 unsaved      │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
+ on disk  ~1          │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
 ▶  ┄ 2 unchanged ┄    │ ◇ config.go          789 B        │ unchanged since Sep 13 20:51              ◂
  Sep 27 08:52 ~1      │ ◇ main.go             1.3K        │
    ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │   9  func retry(ctx context.Context) er…

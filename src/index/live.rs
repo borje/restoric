@@ -1,4 +1,4 @@
-//! What changed on disk since a snapshot (PLAN.md §3.1, the `now` row).
+//! What changed on disk since a snapshot (PLAN.md §3.1, the `on disk` row).
 //! A file counts as changed when its kind, size, modification time or
 //! permissions differ, which is how restic decides to read it again.
 

@@ -1,9 +1,9 @@
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
 
- now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
+ on disk  ~1          │   ..                              │ legacy.go · deleted          ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ last version Aug 22, gone Sep 06
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          789 B  ~     │   4    "context"

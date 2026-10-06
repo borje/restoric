@@ -3,7 +3,7 @@ source: tests/ui_folder.rs
 expression: "h.screen(100, 34)"
 ---
  restoric  Versions  ~/dev/project/src/main.go                           7 versions in 32 snapshots
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ● · ·  · ●   ·  ··    ● ·  · ·  ·    ●· ·●·● · · ·  ··  · ·· ·  ·  ┊ ● main.go
                                                       ▲                                    − 1× +
 

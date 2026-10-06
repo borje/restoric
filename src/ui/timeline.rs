@@ -228,7 +228,7 @@ pub fn draw(
             }
         }
     }
-    g.put(x0 + tw + 3, r, "now", t.dim);
+    g.put(x0 + tw + 3, r, "on disk", t.dim);
 
     let columns = axis.columns();
     let rr = r + 1;

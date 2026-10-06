@@ -95,10 +95,10 @@ It works for normal setups. Things that can break it, and what restoric does:
 So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
 ### 2.5 Changes on disk since the newest snapshot
-The `now` row, the live marker at the right end of the timeline row, "vs disk" and the versions view compare with the files on disk (M3):
+The `on disk` row, the `on disk` marker at the right end of the timeline row, "vs disk" and the versions view compare with the files on disk (M3):
 
 - A file **counts as changed on disk** when its kind, size, modification time or permissions differ from the newest snapshot. That's the same test restic uses to decide whether to read a file again. Content isn't hashed, so a file that's only touched counts as changed here, unlike between snapshots (§2.2).
-- A folder's `now` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done.
+- A folder's `on disk` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done.
 - "vs disk" and the VS DISK column diff the first 64 KB of each side.
 - Disk access goes through a `Disk` trait, so tests use a fake disk built from the same DSL as `FakeRepo` (a `disk` block after the snapshots). Symlinks are never followed.
 
@@ -117,11 +117,11 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                     ▲                                      − 1× +
 
- now  ~1 unsaved      │   ..                              │ main.go · v5/6 · 1.3K        ⇥ content
+ on disk  ~1          │   ..                              │ main.go · v5/6 · 1.3K        ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ changed here · + new line · − removed
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B  ~     │  27    var req CreateOrderRequest
@@ -155,14 +155,14 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 | Rows | Content |
 |---|---|
 | 0 | Header: `restoric` and the clickable breadcrumb. While indexing, `indexing 3/16` on the right |
-| 1 | Timeline labels: months, or dates and day numbers when zoomed, plus `now` |
+| 1 | Timeline labels: months, or dates and day numbers when zoomed, plus `on disk` at the right end |
 | 2 | **The row of dots, one per snapshot column.** `●` = the selected entry changed. `○` = the current folder changed but the selected entry didn't. `·` = neither changed. Blank = the entry didn't exist (and the folder didn't change). With nothing selected (`..`), `●` marks the folder's changes. Highlighted cell = the snapshot being viewed. The cell under `now` uses the same symbols for changes on disk since the newest snapshot. **Labels at the right edge:** the entry, then `○` and the folder (`main.go  ○ src/`). |
 | 3 | `▲` under the viewed snapshot · zoom control `− 1× +` |
 | 4 | Blank |
 | 5–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (40% of the rest, 40 to 50 wide) · **preview** (the rest) |
 | 33 | **Status bar** (or the `:` / `/` / `f` input line) |
 
-**Versions column:** the top row is `now`, showing what changed on disk since the last backup ("~1 unsaved", in purple). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
+**Versions column:** the top row is `on disk`, showing what changed on disk since the last backup (`on disk  ~1`, in purple; `= latest` when nothing has). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
 
 **Listing:** mark bar (`┃` for selected items), icon, name (folders end in `/`, a deleted name is crossed out), size, Δ (`+` added, `~` changed, `−` deleted in this snapshot, compact counts for folders, `gone` for items deleted earlier; the Δ column is as wide as its widest visible entry). No column headers. With items deleted earlier hidden, the bottom says `1 deleted · . to show`.
 
@@ -184,11 +184,11 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
+ on disk  ~1          │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │  26    return json.NewEncoder(w).Encode…
@@ -226,11 +226,11 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
+ on disk  ~1          │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
    ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │ ┄ line 18
@@ -268,11 +268,11 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
+ on disk  ~1          │   ..                              │ main.go · v6/6 · 1.3K        ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │  26    return json.NewEncoder(w).Encode…
@@ -314,11 +314,11 @@ Restoring works like yazi's copy and paste, out of the past.
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
+ on disk  ~1          │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                            │ unchanged since Sep 06 18:03
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │┃◇ config.go          737 B        │   1  package main
@@ -353,11 +353,11 @@ Restoring works like yazi's copy and paste, out of the past.
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
+ on disk  ~1          │   ..                     ╭────────────────────────────────────────────────╮
    ┄ 2 unchanged ┄    │ ▸ api/                   │ Yanked 2 items from Sep 09 19:23. p restores   │
  Sep 27 08:52 ~1      │ ▸ models/                │ next to the original, P overwrites.            │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 ╰────────────────────────────────────────────────╯
@@ -392,11 +392,11 @@ Restoring works like yazi's copy and paste, out of the past.
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
+ on disk  ~1          │   ..                              │ server.go · v1/1 · 845 B     ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                            │ unchanged since Sep 06 18:03
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │   1  package main
@@ -434,11 +434,11 @@ Restoring works like yazi's copy and paste, out of the past.
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ○  · ○ · ○· ○·  ··○  · ○· · · · ·○·  ○ ○ · ○ · · ○ · · ○  · ·  ┊ ○ util.go  ○ src/
                                                 ▲                                          − 1× +
 
- now  ~1 unsaved      │   ..                              │ util.go · v1/1 · 823 B       ⇥ content
+ on disk  ~1          │   ..                              │ util.go · v1/1 · 823 B       ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ unchanged since Jul 14 09:00
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          634 B        │   1  package main
@@ -518,11 +518,11 @@ How it works (M6): the search starts at the backup root and matches paths relati
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                  ▲                                         − 1× +
 
- now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
+ on disk  ~1          │   ..                     ╭────────────────────────────────────────────────╮
    ┄ 2 unchanged ┄    │ ▸ api/                   │ Jumped to Sep 04 08:08, the last snapshot that │
  Sep 27 08:52 ~1      │ ▸ models/                │ has legacy.go                                  │
    ┄ 2 unchanged ┄    │ ◇ config.go          634 ╰────────────────────────────────────────────────╯
@@ -560,11 +560,11 @@ How it works (M6): the search starts at the backup root and matches paths relati
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
 
- now  ~1 unsaved      │   ..                              │ legacy.go · deleted          ⇥ content
+ on disk  ~1          │   ..                              │ legacy.go · deleted          ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ last version Aug 22, gone Sep 06
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          789 B  ~     │   4    "context"
@@ -602,11 +602,11 @@ How it works (M6): the search starts at the backup root and matches paths relati
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ○      ○ ○ ○ ○    ● · ○· ○·  ··○  · ○· · · · ·○·  ● ○ · ● · · ○ · · ○  · ·  ┊ ○ config.go  ○ src/
                                                                            ▲               − 1× +
 
- now  ~1 unsaved      │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
+ on disk  ~1          │   ..                              │ config.go · v3/3 · 789 B     ⇥ content
 ▶  ┄ 2 unchanged ┄    │ ◇ config.go          789 B        │ unchanged since Sep 13 20:51              ◂
  Sep 27 08:52 ~1      │ ◇ main.go             1.3K        │
    ┄ 2 unchanged ┄    │ ◇ server.go          845 B        │   9  func retry(ctx context.Context) er…
@@ -644,7 +644,7 @@ One row per **distinct version**, newest first, with deleted periods as their ow
 
 ```text
  restoric  Versions  ~/dev/project/src/main.go                           6 versions in 43 snapshots
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ··· · ●  · ● · ·· ··  ···  · ●· · · · ···  ● ● · · · · · · · ·  · ·  ┊ ● main.go
                                                       ▲                                    − 1× +
 
@@ -781,7 +781,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                                            ▲               − 1× +
              ╭─ Help ─────────────────────────────────────────────────────────────────╮
@@ -823,7 +823,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 
 ```text
  restoric  ~/dev/project/src
-  Jul 2026    Aug                 Sep                      now
+  Jul 2026    Aug                 Sep                      on disk
   ●· · ○·○○●  ·● ·○·○· ··○ ·●·· ·· ○· ● ●· ○·· ○· · ○ ··  ┊ ● main.go  ○ src/
                                                        ▲               − 1× +
 
@@ -1133,7 +1133,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 
 ### M3: preview, item track, versions, deleted items
 - Preview column: file content in the snapshot with `+`/`−` margin marks, folder contents, deleted items. `⇥` content / vs disk, `J` `K`. Loaded in the background and cached by content id.
-- The Versions column's `now` row and the timeline's live marker (what changed on disk since the newest snapshot). Moved here from M2, because they need the comparison with disk.
+- The Versions column's `on disk` row and the timeline's `on disk` marker (what changed on disk since the newest snapshot). Moved here from M2, because they need the comparison with disk.
 - The selected entry's changes in the timeline row (`●` over the folder's `○`) with its label, `{` `}`.
 - Versions view with on-disk row, compared-to-disk stats (computed lazily for visible rows) and preview.
 - Deleted items (`.` `zh`), jump on deleted items.
@@ -1205,6 +1205,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 Settled during review:
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
+- The state of the files on disk is called `on disk` everywhere (2026-10-06): the Versions column's top row (`on disk  ~1`), the timeline's right-hand label, the versions view's first row and the messages. It was `now  ~1 unsaved` in the column and `now` on the timeline; "unsaved" suggested work at risk, which is the opposite of what a backup browser should say.
 - `o` shows a file in `$PAGER` (2026-10-06). It was restore option 4, but it isn't a restore; the dialog has three options for a file and the tar archive as a fourth for a folder.
 - Plain `←` `→` are `h` `l`, as in vim and yazi (2026-10-06). Time moves with `H` `L`, `[` `]`, `{` `}` and `Shift-←` `Shift-→`.
 - `q` quits from every view, as in yazi (2026-10-06). The versions, diff and find views go back with `h`, `esc` and `⌫`. Dialogs and confirmations still close on `q`.

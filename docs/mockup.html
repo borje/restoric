@@ -292,7 +292,7 @@ function timeline(r,tr,sel,onPick){
   const da=new Date(a);const first=S.zoom===1?M[da.getMonth()]+' 2026':fmtD(da);put(r,X0,first,'dim');let end=X0+first.length+1;
   for(let d=addDays(da,1);+d<=b;d=addDays(d,1)){const m1=d.getDate()===1,mon=d.getDay()===1;if(!(m1||(S.zoom>1&&mon)))continue;
     const txt=m1?M[d.getMonth()]:String(d.getDate());const c=col(+d);if(c>end&&c+txt.length<X0+TW){put(r,c,txt,m1?'dim':'dim2');end=c+txt.length+1}}
-  put(r,X0+TW+3,'now','dim');
+  put(r,X0+TW+3,'on disk','dim');
   const by=new Map();for(let i=0;i<N;i++){const t=+snaps[i].t;if(!vis(t))continue;const c=col(t);if(!by.has(c))by.set(c,[]);by.get(c).push(i)}
   const rr=r+1,o=tr.outer,oc=j=>!!o&&o.isChange(j);
   if(a>t0)put(rr,0,'‹','acc');if(b<t1)put(rr,X0+TW,'›','acc');put(rr,X0+TW+2,'┊','dim2');
@@ -365,7 +365,7 @@ function renderMain(){
       if(fold>0)V.push({fold,from:cp[k]+1,to:cp[k]+fold});V.push({cp:cp[k]});}
     const sr=V.findIndex(x=>x.cp===i||(x.fold&&i>=x.from&&i<=x.to));const off=clamp(sr-Math.floor(BH/2),0,Math.max(0,V.length-BH));
     V.slice(off,off+BH).forEach((x,k)=>{const r=T+k;
-      if(x.live){const c=put(r,v0+1,'now  ','live');if(nonzero(lc)){const c2=putCounts(r,c,lc,'');put(r,c2,' unsaved','dim')}else put(r,c,'= latest','dim');return}
+      if(x.live){const c=put(r,v0+1,'on disk  ','live');if(nonzero(lc))putCounts(r,c,lc,'');else put(r,c,'= latest','dim');return}
       if(x.fold){const on=i>=x.from&&i<=x.to;put(r,v0,on?'▶':' ','acc');put(r,v0+3,`┄ ${x.fold} unchanged ┄`,on?'acc':'dim2',()=>{S.snap=x.to});return}
       const on=x.cp===i;fill(r,v0,v1,on?'sel':'',()=>{S.snap=x.cp});put(r,v0,on?'▶':' ','acc');
       put(r,v0+1,fmt(snaps[x.cp].t),on?'b':'');putCounts(r,v0+14,counts[dir][x.cp],'');});}

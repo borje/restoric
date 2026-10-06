@@ -3,11 +3,11 @@ source: tests/ui_folder.rs
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
   ▲                                                                                        − 1× +
 
- now  ~1 unsaved      │   ..                     ╭────────────────────────────────────────────────╮
+ on disk  ~1          │   ..                     ╭────────────────────────────────────────────────╮
    ┄ 2 unchanged ┄    │ ▸ api/                   │ This is the oldest version of this folder.     │
  Sep 27 08:52 ~1      │ ▸ models/                ╰────────────────────────────────────────────────╯
    ┄ 2 unchanged ┄    │ ◇ config.go                   47 B  +  │ ◇ routes.go                      +

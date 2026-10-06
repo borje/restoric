@@ -3,11 +3,11 @@ source: tests/ui_nav.rs
 expression: "h.screen(100, 14)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·○ ·  ·  ┊ ○ config.go  ○ src/
                                                                       ▲                    − 1× +
 
- now  ~1 unsaved      │   ..                                   │ config.go · v5/5 · 96…  ⇥ content
+ on disk  ~1          │   ..                                   │ config.go · v5/5 · 96…  ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                                 │ unchanged since Sep 20 20:35
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │
    ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │   5  }

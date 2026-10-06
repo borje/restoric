@@ -1,9 +1,9 @@
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
+ on disk  ~1          │   ..                              │ main.go · v6/6 · 1.3K        ⇥ vs disk
    ┄ 2 unchanged ┄    │ ▸ api/                            │ changed here · + new line · − removed
  Sep 27 08:52 ~1      │ ▸ models/                         │
    ┄ 2 unchanged ┄    │ ◇ config.go          737 B        │ ┄ line 18

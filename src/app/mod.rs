@@ -1241,7 +1241,7 @@ impl App {
     }
 
     /// Whether files changed on disk since the newest snapshot of the folder.
-    pub fn unsaved(&self) -> bool {
+    pub fn changed_on_disk(&self) -> bool {
         self.live.get(&self.folder).is_some_and(|c| !c.is_empty())
     }
 
@@ -1411,7 +1411,7 @@ impl App {
                         self.go_index(set.len() - 1)
                     }
                     None => {
-                        let msg = if self.unsaved() {
+                        let msg = if self.changed_on_disk() {
                             "Newest snapshot. Newer changes exist only on disk."
                         } else {
                             "Newest snapshot. Nothing changed on disk since."

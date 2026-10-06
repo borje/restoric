@@ -3,7 +3,7 @@ source: tests/ui_folder.rs
 expression: "ui::text(&buf)"
 ---
  restoric  /home/bege/dev/project/src                                                     indexing…
-  Jul 2026        Aug                         Sep                              now
+  Jul 2026        Aug                         Sep                              on disk
   · ·   ·  · · ·  · ·   ·  ··    · ·  · ·  ·    ·· ···· · · ·  ··  · ·· ·  ·  ┊ · src/
                                                                            ▲               − 1× +
 
