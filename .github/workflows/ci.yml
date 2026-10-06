@@ -16,8 +16,13 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      # Ubuntu's restic is too old for --insecure-no-password (needs 0.17+).
       - name: Install restic
-        run: sudo apt-get update && sudo apt-get install -y restic
+        run: |
+          curl -sSfL https://github.com/restic/restic/releases/download/v0.19.1/restic_0.19.1_linux_amd64.bz2 \
+            | bunzip2 > "$RUNNER_TEMP/restic"
+          sudo install -m 755 "$RUNNER_TEMP/restic" /usr/local/bin/restic
+          restic version
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
