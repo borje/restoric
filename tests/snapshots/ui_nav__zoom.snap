@@ -2,7 +2,7 @@
 source: tests/ui_nav.rs
 expression: "h.screen(100, 12)"
 ---
- restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
+ restoric  ~/dev/project/src
   Sep 22                                   28                    Oct           now
 ‹         ·                ·           ○              ·                     › ┊ ○ api/  ○ src/
                                        ▲                                                   − 8× +

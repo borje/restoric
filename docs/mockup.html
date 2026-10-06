@@ -353,8 +353,7 @@ function renderMain(){
   if(S.selKey){const k=rows.findIndex(r=>rowKey(r)===S.selKey);if(k>=0)S.sel=k}
   S.sel=clamp(S.sel,0,rows.length-1);const selRow=rows[S.sel];
   const pk=`${dir}|${selRow?rowKey(selRow):''}|${i}|${S.pmode}`;if(pk!==S.pkey){S.pkey=pk;S.pscroll=null}
-  const label=pos>=0?`version ${pos+1} of ${cp.length}`:`between versions`;
-  header(crumbs(),[['◀ ','acc b',()=>key('H')],[label,''],[' ▶','acc b',()=>key('L')]]);
+  header(crumbs());
   const dname=(dir?base(dir):'project')+'/',tr=track(selRow);
   const folder={isChange:j=>nonzero(counts[dir][j]),live:nonzero(liveC[dir]),on:'●',cls:'mk',label:dname,labelCls:'b'};
   const share=timeline(1,tr?{...tr,on:'●',cls:'mod',label:tr.name,labelCls:'mod',outer:{...folder,on:'○'}}:folder,i,j=>{S.snap=j});

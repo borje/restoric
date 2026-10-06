@@ -2,7 +2,7 @@
 source: tests/ui_restore.rs
 expression: "h.screen(100, 12)"
 ---
- restoric  ~/dev/project/src                                                   ◀ version 12 of 15 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ○        ○ ○ ○    ○   ○  ○     ○    ○         ○   ●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +

@@ -2,7 +2,7 @@
 source: tests/ui_folder.rs
 expression: "h.screen(100, 20)"
 ---
- restoric  ~/trading                                                             ◀ version 2 of 2 ▶
+ restoric  ~/trading
   Sep 2026                                                                     now
   ●                                                                        ●  ┊ · logs/  ○ trading/
                                                                            ▲               − 1× +

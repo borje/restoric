@@ -167,19 +167,7 @@ pub fn header(app: &App, g: &mut Grid) {
                 };
                 right.push((p, t.dim, None));
             }
-            Some(s) => {
-                let versions = s.versions();
-                let i = app.idx();
-                let label = match versions.iter().position(|&v| v == i) {
-                    Some(k) => format!("version {} of {}", k + 1, versions.len()),
-                    None => "between versions".to_string(),
-                };
-                let arrows = t.accent.patch(t.bold);
-                right.push(("◀ ".into(), arrows, Some(Action::OlderChange)));
-                right.push((label, t.text, None));
-                right.push((" ▶".into(), arrows, Some(Action::NewerChange)));
-            }
-            None => {}
+            _ => {}
         }
     }
 

@@ -2,7 +2,7 @@
 source: tests/ui_folder.rs
 expression: "h.screen(100, 34)"
 ---
- restoric  ~/dev/project                                                       ◀ version 17 of 17 ▶
+ restoric  ~/dev/project
   Jul 2026        Aug                         Sep                              now
   ● ·   ○  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ●    ○· ·○·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ docs/  ○ project/
                                                                       ▲                    − 1× +

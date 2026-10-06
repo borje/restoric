@@ -1,4 +1,4 @@
- restoric  ~/dev/project/src                                                   ◀ version 12 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                     ▲                                      − 1× +

@@ -116,7 +116,7 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 <sub>`docs/screens/01-folder-view.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 12 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                     ▲                                      − 1× +
@@ -154,7 +154,7 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 
 | Rows | Content |
 |---|---|
-| 0 | Header: `restoric`, clickable breadcrumb, and `◀ version 12 of 16 ▶` on the right (`between versions` when viewing an unchanged snapshot) |
+| 0 | Header: `restoric` and the clickable breadcrumb. While indexing, `indexing 3/16` on the right |
 | 1 | Timeline labels: months, or dates and day numbers when zoomed, plus `now` |
 | 2 | **The row of dots, one per snapshot column.** `●` = the selected entry changed. `○` = the current folder changed but the selected entry didn't. `·` = neither changed. Blank = the entry didn't exist (and the folder didn't change). With nothing selected (`..`), `●` marks the folder's changes. Highlighted cell = the snapshot being viewed. The cell under `now` uses the same symbols for changes on disk since the newest snapshot. **Labels at the right edge:** the entry, then `○` and the folder (`main.go  ○ src/`). |
 | 3 | `▲` under the viewed snapshot · zoom control `− 1× +` |
@@ -183,7 +183,7 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
 <sub>`docs/screens/02-file-track.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
@@ -225,7 +225,7 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
 <sub>`docs/screens/03-preview-diff.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
@@ -267,7 +267,7 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
 <sub>`docs/screens/04-which-key.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                       ▲                                    − 1× +
@@ -313,7 +313,7 @@ Restoring works like yazi's copy and paste, out of the past.
 <sub>`docs/screens/05-selection.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
@@ -352,7 +352,7 @@ Restoring works like yazi's copy and paste, out of the past.
 <sub>`docs/screens/06-yank-toast.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
@@ -391,7 +391,7 @@ Restoring works like yazi's copy and paste, out of the past.
 <sub>`docs/screens/07-confirm-overwrite.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 13 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ○      ○ ○ ○ ○    ○   ○  ○     ○    ○         ○   ● ○ · ○ · · ○ · · ○  · ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
@@ -433,7 +433,7 @@ Restoring works like yazi's copy and paste, out of the past.
 <sub>`docs/screens/08-command-line.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 11 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ○  · ○ · ○· ○·  ··○  · ○· · · · ·○·  ○ ○ · ○ · · ○ · · ○  · ·  ┊ ○ util.go  ○ src/
                                                 ▲                                          − 1× +
@@ -517,7 +517,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 <sub>`docs/screens/10-find-jump.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ between versions ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                  ▲                                         − 1× +
@@ -559,7 +559,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 <sub>`docs/screens/11-deleted-shown.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ version 14 of 16 ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ● ○  · ○ · ○· ○·  ··○  · ●· · · · ·○·  ● ○   ○     ○     ○       ┊ ○ legacy.go  ○ src/
                                                           ▲                                − 1× +
@@ -601,7 +601,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 <sub>`docs/screens/12-filter.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ between versions ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ○      ○ ○ ○ ○    ● · ○· ○·  ··○  · ○· · · · ·○·  ● ○ · ● · · ○ · · ○  · ·  ┊ ○ config.go  ○ src/
                                                                            ▲               − 1× +
@@ -778,7 +778,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
 <sub>`docs/screens/16-help.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                                                   ◀ between versions ▶
+ restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              now
   ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
                                                                            ▲               − 1× +
@@ -820,7 +820,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 <sub>`docs/screens/17-80-columns.txt`</sub>
 
 ```text
- restoric  ~/dev/project/src                               ◀ between versions ▶
+ restoric  ~/dev/project/src
   Jul 2026    Aug                 Sep                      now
   ●· · ○·○○●  ·● ·○·○· ··○ ·●·· ·· ○· ● ●· ○·· ○· · ○ ··  ┊ ● main.go  ○ src/
                                                        ▲               − 1× +
@@ -896,7 +896,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 
 **Restore dialog:** `j` `k` / `1`–`4` · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
 
-Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `◀ ▶`, `− +`, the preview mode, which-key entries, dialog options and `? help`. Clicking a selected row opens it. Wheel scrolls the column under the pointer.
+Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `− +`, the preview mode, which-key entries, dialog options and `? help`. Clicking a selected row opens it. Wheel scrolls the column under the pointer.
 
 **yazi alignment:** these keys mean the same as in yazi: `hjkl`, `gg` `G`, `Space`, `v`, `y`, `p`, `P`, `cc` `cd` `cf`, `.`, `/` `n` `N`, `f`, `s`, `J` `K`, `~`, `esc`. Differences: `H` `L` move through time, `[ ]` `{ }` step through snapshots, `d` diffs (yazi: delete; restoric never deletes), and `r` opens restore options (yazi: rename).
 
@@ -1202,6 +1202,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 Settled during review:
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
+- No `◀ version 12 of 16 ▶` counter in the header (removed 2026-10-06). The timeline's ▲ and the Versions column already show where you are, and the counter was read as a second version counter beside the preview's `v5/6`.
 - The timeline has one row of dots, not two: `●` where the selected entry changed, `○` where only the current folder did (§3.1, §3.2). The folder's own row repeated the Versions column; merged, the panes get a row back.
 - `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
 - Restored copies are named with the snapshot time after the full name: `main.go.2026-09-09_1923`, `src.2026-09-09_1923/`. If that name already exists (the same version restored twice), add `-2`, `-3`, …

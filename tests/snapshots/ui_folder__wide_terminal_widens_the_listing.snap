@@ -2,7 +2,7 @@
 source: tests/ui_folder.rs
 expression: "h.screen(171, 34)"
 ---
- restoric  ~/dev/project/src                                                                                                                          ◀ version 11 of 15 ▶
+ restoric  ~/dev/project/src
   Jul 2026                        Aug                                                    Sep                                                   Oct    now
   ●   ·      ·      ●   ○   ○    ·    ●      ○     ○  ·         ●   ·   ○    ·     ·         ● ·  · ●  · ●   ·  ○    ·   ·   ○    ·   ·  ○   ·    ·  ┊ ● main.go  ○ src/
                                                                                                     ▲                                                             − 1× +
