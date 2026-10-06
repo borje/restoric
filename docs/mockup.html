@@ -85,7 +85,7 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-r
     <section class="card">
       <h2>Try this</h2>
       <ol>
-        <li>Press <kbd>H</kbd> (or <kbd>←</kbd>) a few times. You step through versions of <b>src/</b>, and the preview marks lines that changed in each version with <b>+</b>.</li>
+        <li>Press <kbd>H</kbd> a few times. You step through versions of <b>src/</b>, and the preview marks lines that changed in each version with <b>+</b>.</li>
         <li>Press <kbd>Tab</kbd> to switch the preview to a diff against disk. <kbd>J</kbd> <kbd>K</kbd> scroll it.</li>
         <li>Press <kbd>Space</kbd> on two files, then <kbd>y</kbd> to yank them and <kbd>p</kbd> to restore them next to the originals. <kbd>P</kbd> overwrites instead.</li>
         <li>Press <kbd>z</kbd> or <kbd>c</kbd> and wait: a popup lists what can follow.</li>
@@ -96,7 +96,7 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-r
     <section class="card">
       <h2>Keys</h2>
       <div class="keys">
-        <div><button data-k="H">H</button><button data-k="L">L</button></div><span>Older / newer change in this folder (← →)</span>
+        <div><button data-k="H">H</button><button data-k="L">L</button></div><span>Older / newer change in this folder</span>
         <div><button data-k="[">[</button><button data-k="]">]</button></div><span>Every snapshot</span>
         <div><button data-k="{">{</button><button data-k="}">}</button></div><span>Previous / next change of the selected item</span>
         <div><button data-k="j">j</button><button data-k="k">k</button></div><span>Move (gg G, Ctrl-d Ctrl-u)</span>
@@ -488,7 +488,7 @@ function renderToast(){if(!S.msg)return;const w=Math.min(50,COLS-4),lines=wrap(S
   rbox(y,x,h,w,'');lines.forEach((l,k)=>put(y+1+k,x+2,l,S.msg.cls||''));}
 function renderHelp(){
   const L=[['Folder view',''],['j k  gg G  C-d C-u','move, top, bottom, half page'],['h l  - ⏎','parent / open (a file opens its versions)'],
-    ['H L  ← →','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
+    ['H L','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
     ['⇥  J K','preview: content or diff vs disk, scroll'],['␣  v','select / visual select'],['y  p  P','yank, restore next to it, overwrite'],
     ['r  d','restore options / full-screen diff'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
     ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
@@ -578,7 +578,7 @@ function runCmd(t){t=t.trim();if(!t)return;const tl=t.toLowerCase();
   flash(`Unknown command ":${t}". Try :sep 1, :yesterday, :3d, :find NAME, :undo`,'del');}
 
 const PREFIX={main:['g','z','c'],hist:['g'],diff:['g',']','['],find:['g']};
-const REP=new Set(['j','k','ArrowDown','ArrowUp','H','L','ArrowLeft','ArrowRight','[',']','{','}','n','N',']c','[c','C-d','C-u','J','K']);
+const REP=new Set(['j','k','ArrowDown','ArrowUp','H','L','[',']','{','}','n','N',']c','[c','C-d','C-u','J','K']);
 function keySeq(s){s.split(' ').forEach(k=>key(k))}
 function key(k){
   if(S.help){S.help=false;render();return}
@@ -614,8 +614,8 @@ function dlgKey(k){const d=S.dlg;
 function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
   const mv=n=>{S.sel=clamp(S.sel+n,0,rows.length-1);S.selKey=rows[S.sel]?rowKey(rows[S.sel]):null};
   switch(k){
-    case 'H':case 'ArrowLeft':{const p=cp.filter(x=>x<S.snap);if(p.length)S.snap=p[p.length-1];else flash('This is the oldest version of this folder.');break}
-    case 'L':case 'ArrowRight':{const n=cp.find(x=>x>S.snap);if(n!==undefined)S.snap=n;else if(S.snap<LAST)S.snap=LAST;else flash(nonzero(liveC[S.dir])?'Newest snapshot. Newer changes exist only on disk.':'Newest snapshot. Nothing changed on disk since.');break}
+    case 'H':{const p=cp.filter(x=>x<S.snap);if(p.length)S.snap=p[p.length-1];else flash('This is the oldest version of this folder.');break}
+    case 'L':{const n=cp.find(x=>x>S.snap);if(n!==undefined)S.snap=n;else if(S.snap<LAST)S.snap=LAST;else flash(nonzero(liveC[S.dir])?'Newest snapshot. Newer changes exist only on disk.':'Newest snapshot. Nothing changed on disk since.');break}
     case '[':if(S.snap>0&&dirExists(S.dir,S.snap-1))S.snap--;else flash('No older snapshot of this folder.');break;
     case ']':if(S.snap<LAST)S.snap++;else flash('This is the newest snapshot.');break;
     case '{':case '}':{const tr=track(rows[S.sel]);if(!tr){flash('Select a file or folder first.');break}
@@ -625,8 +625,8 @@ function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
     case 'j':case 'ArrowDown':mv(1);break;case 'k':case 'ArrowUp':mv(-1);break;
     case 'C-d':case 'PageDown':mv(13);break;case 'C-u':case 'PageUp':mv(-13);break;
     case 'gg':mv(-1e6);break;case 'G':mv(1e6);break;case 'gh':goDir('');break;
-    case 'l':case 'Enter':case 'i':openRow(rows[S.sel]);break;
-    case 'h':case '-':case 'Backspace':goUp();break;
+    case 'l':case 'ArrowRight':case 'Enter':case 'i':openRow(rows[S.sel]);break;
+    case 'h':case 'ArrowLeft':case '-':case 'Backspace':goUp();break;
     case ' ':{const r=rows[S.sel];if(r&&r.kind!=='up'){const mk=markKey(r);S.marks.has(mk)?S.marks.delete(mk):S.marks.add(mk)}mv(1);break}
     case 'v':if(S.visual==null)S.visual=S.sel;else{const lo=Math.min(S.visual,S.sel),hi=Math.max(S.visual,S.sel);rows.slice(lo,hi+1).forEach(r=>{if(r.kind!=='up')S.marks.add(markKey(r))});S.visual=null}break;
     case 'd':{const r=rows[S.sel];if(r&&r.kind==='file'){const at=r.del||r.ghost?r.last:S.snap;openDiff(r.f,fileRuns(r.f).findIndex(x=>at>=x.from&&at<=x.to),'current','main')}else flash('Select a file to diff.');break}
@@ -639,32 +639,35 @@ function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
     case 'f':S.input={kind:'f',text:S.filter,prev:S.filter};break;
     case 'n':searchStep(1);break;case 'N':searchStep(-1);break;
     case 'Escape':if(S.visual!=null)S.visual=null;else if(S.marks.size)S.marks.clear();else{S.search='';S.filter=''}break;
-    case 'q':flash('q quits restoric in the real tool. This is the top level.');break;}}
+    case 'q':flash('q quits restoric in the real tool.');break;}}
 function stepHist(k){const runs=fileRuns(S.hist.f),H=S.hist;
-  switch(k){case 'j':case 'ArrowDown':case 'H':case 'ArrowLeft':case '{':if(H.sel<runs.length-1)H.sel++;else flash('This is the oldest version.');break;
-    case 'k':case 'ArrowUp':case 'L':case 'ArrowRight':case '}':if(H.sel>0)H.sel--;else flash('This is the newest version.');break;
+  switch(k){case 'j':case 'ArrowDown':case 'H':case '{':if(H.sel<runs.length-1)H.sel++;else flash('This is the oldest version.');break;
+    case 'k':case 'ArrowUp':case 'L':case '}':if(H.sel>0)H.sel--;else flash('This is the newest version.');break;
     case 'gg':H.sel=0;break;case 'G':H.sel=runs.length-1;break;case 'C-d':H.sel=Math.min(runs.length-1,H.sel+10);break;case 'C-u':H.sel=Math.max(0,H.sel-10);break;
     case 'Enter':case 'd':case 'l':openDiff(H.f,H.sel,'current','hist');break;
     case 'p':openDiff(H.f,H.sel,'previous','hist');break;
     case 'r':openRestore();break;case 'y':yank();break;
     case 'zi':zoom(1);break;case 'zo':zoom(-1);break;
-    case 'Escape':case 'q':case 'h':case 'Backspace':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;}}
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;
+    case 'q':flash('q quits restoric in the real tool. h goes back.');break;}}
 function stepDiff(k){const D=S.diff,runs=fileRuns(D.f),{lines}=diffLines();const hdrs=lines.map((o,i)=>o.hdr?i:-1).filter(i=>i>=0);
   switch(k){case 'j':case 'ArrowDown':D.scroll++;break;case 'k':case 'ArrowUp':D.scroll=Math.max(0,D.scroll-1);break;
     case 'C-d':case 'PageDown':case ' ':D.scroll+=15;break;case 'C-u':case 'PageUp':D.scroll=Math.max(0,D.scroll-15);break;
     case 'gg':D.scroll=0;break;case 'G':D.scroll=1e6;break;
     case ']c':case 'n':{const h=hdrs.find(i=>i>D.scroll);if(h!==undefined)D.scroll=h;else flash('No more changes below.');break}
     case '[c':case 'N':{const h=hdrs.filter(i=>i<D.scroll);if(h.length)D.scroll=h[h.length-1];else flash('No more changes above.');break}
-    case 'H':case 'ArrowLeft':case '{':{let n=D.run+1;while(n<runs.length&&runs[n].s<0)n++;if(n<runs.length){D.run=n;D.scroll=0}else flash('This is the oldest version.');break}
-    case 'L':case 'ArrowRight':case '}':{let n=D.run-1;while(n>=0&&runs[n].s<0)n--;if(n>=0){D.run=n;D.scroll=0}else flash('This is the newest saved version.');break}
+    case 'H':case '{':{let n=D.run+1;while(n<runs.length&&runs[n].s<0)n++;if(n<runs.length){D.run=n;D.scroll=0}else flash('This is the oldest version.');break}
+    case 'L':case '}':{let n=D.run-1;while(n>=0&&runs[n].s<0)n--;if(n>=0){D.run=n;D.scroll=0}else flash('This is the newest saved version.');break}
     case 'c':D.mode='current';D.scroll=0;break;case 'p':D.mode='previous';D.scroll=0;break;
     case 'r':openRestore();break;case 'y':yank();break;
-    case 'Escape':case 'q':case 'h':case 'Backspace':if(D.from==='hist'){S.view='hist';S.hist={f:D.f,sel:D.run}}else{S.view='main';S.selKey='f:'+D.f.name}break;}}
+    case 'q':flash('q quits restoric in the real tool. h goes back.');break;
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':if(D.from==='hist'){S.view='hist';S.hist={f:D.f,sel:D.run}}else{S.view='main';S.selKey='f:'+D.f.name}break;}}
 function stepFind(k){const F=S.find;
   switch(k){case 'j':case 'ArrowDown':F.sel++;break;case 'k':case 'ArrowUp':F.sel=Math.max(0,F.sel-1);break;
     case 'gg':F.sel=0;break;case 'G':F.sel=F.res.length-1;break;case 'C-d':F.sel+=10;break;case 'C-u':F.sel=Math.max(0,F.sel-10);break;
     case 'Enter':case 'l':goFind(F.res[F.sel]);break;
-    case 'Escape':case 'q':case 'h':case 'Backspace':S.view=F.from==='find'?'main':F.from;break;}}
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':S.view=F.from==='find'?'main':F.from;break;
+    case 'q':flash('q quits restoric in the real tool. h goes back.');break;}}
 
 // ---------- "under the hood" ----------
 function renderCmds(){const L=[];

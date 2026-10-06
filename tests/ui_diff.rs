@@ -82,8 +82,8 @@ fn keys_move_between_versions() {
         h.app.message.as_deref(),
         Some("This is the newest saved version.")
     );
-    // Back to where the diff was opened from.
-    h.keys("q");
+    // Back to where the diff was opened from. `q` quits instead.
+    h.keys("h");
     assert_eq!(h.app.view, View::Folder);
     h.keys("l").key(KeyCode::Enter);
     assert!(diff_view(&h).from_versions);

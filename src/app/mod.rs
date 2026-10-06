@@ -1253,6 +1253,10 @@ impl App {
     /// Does an action. Returns false if it stopped at a boundary (with a message).
     pub fn act(&mut self, a: Action) -> bool {
         match a {
+            Action::Quit => {
+                self.quit = true;
+                return true;
+            }
             Action::Yank => return self.yank(),
             Action::Paste => return self.paste(false),
             Action::PasteOver => return self.paste(true),
@@ -1628,7 +1632,7 @@ impl App {
             Action::DiffPrevious => {
                 return self.open_diff(v.path, sel, DiffMode::Previous, true);
             }
-            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
+            Action::Back | Action::Parent | Action::Escape => {
                 self.view = View::Folder;
                 self.moved_on();
                 return true;
@@ -1720,7 +1724,7 @@ impl App {
                 next.scroll = 0;
             }
             Action::Open => next.force = true,
-            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
+            Action::Back | Action::Parent | Action::Escape => {
                 self.view = if d.from_versions {
                     View::Versions(VersionsView {
                         path: d.path,
@@ -1922,7 +1926,7 @@ impl App {
                 }
                 return true;
             }
-            Action::Back | Action::Parent | Action::Quit | Action::Escape => {
+            Action::Back | Action::Parent | Action::Escape => {
                 f.cancel.cancel();
                 self.view = View::Folder;
                 self.moved_on();

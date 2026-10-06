@@ -67,8 +67,8 @@ pub fn message(app: &App, g: &mut Grid) {
 const HELP: &[(&str, &str)] = &[
     ("Folder view", ""),
     ("j k  gg G  C-d C-u", "move, top, bottom, half page"),
-    ("h l  - ⏎", "parent / open (a file opens its versions)"),
-    ("H L  ← →", "older / newer change in this folder"),
+    ("h l  ← →  ⏎", "parent / open (a file opens its versions)"),
+    ("H L", "older / newer change in this folder"),
     ("[ ]   { }", "every snapshot / changes of the selected item"),
     ("⇥  J K", "preview: content or diff vs disk, scroll"),
     ("␣  v", "select / visual select"),

@@ -205,7 +205,7 @@ fn item_changes_and_versions_keys() {
         h.app.message.as_deref(),
         Some("This is the oldest version.")
     );
-    h.keys("q");
+    h.keys("h");
     assert!(matches!(h.app.view, restoric::app::View::Folder));
     assert_eq!(h.app.selected().unwrap().node.name, "main.go");
 }

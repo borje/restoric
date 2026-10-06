@@ -786,8 +786,8 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
  now  ~1 unsa│                                                                        │  ⇥ content
 ▶  ┄ 2 unchan│  Folder view                                                           │3
  Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
-   ┄ 2 unchan│  h l  - ⏎               parent / open (a file opens its versions)      │er(w).Encode…
- Sep 20 20:35│  H L  ← →               older / newer change in this folder            │equest
+   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │er(w).Encode…
+ Sep 20 20:35│  H L                    older / newer change in this folder            │equest
    ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │, "id")
  Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │etUser(ctx, …
    ┄ 1 unchan│  ␣  v                   select / visual select                         │ORT", 8080)
@@ -863,10 +863,10 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 |---|---|
 | `j` `k` / `↓` `↑` | Move |
 | `gg` `G`, `Ctrl-d` `Ctrl-u`, `PgDn` `PgUp` | Top, bottom, half page |
-| `h` `-` `⌫` | Parent folder (selects the folder you came from) |
-| `l` `⏎` `i` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
+| `h` `←` `-` `⌫` | Parent folder (selects the folder you came from) |
+| `l` `→` `⏎` `i` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
 | `gh` | Backup root |
-| `H` `L` / `←` `→` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot. |
+| `H` `L` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot. |
 | `[` `]` / `Shift-←` `Shift-→` | Every snapshot, changed or not |
 | `{` `}` | Older / newer change of the **selected item** |
 | `Home` `End` | Oldest / newest change |
@@ -885,14 +885,14 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `:` | Command line |
 | `?` `~` | Help (any key closes it) |
 | `esc` | Leave visual mode, then clear the selection, then clear search and filter |
-| `q` | Quit |
+| `q` | Quit, in every view (the sub-views go back with `h` `esc` `⌫`) |
 | *count* | `3H`, `5j`, `2J`, … repeat a motion. Stops at the first boundary message. |
 
-**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `y` yank · `zi` `zo` · `q` `h` `esc` back.
+**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `y` yank · `zi` `zo` · `h` `←` `esc` `⌫` back.
 
-**Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `y` · `q` `h` `esc` back.
+**Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `y` · `h` `←` `esc` `⌫` back.
 
-**Find view:** `j` `k` · `gg` `G` · `⏎` `l` go to the last snapshot with it · `q` `h` `esc` back.
+**Find view:** `j` `k` · `gg` `G` · `⏎` `l` go to the last snapshot with it · `h` `←` `esc` `⌫` back.
 
 **Restore dialog:** `j` `k` / `1`–`4` · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
 
@@ -1202,6 +1202,8 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 Settled during review:
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
+- Plain `←` `→` are `h` `l`, as in vim and yazi (2026-10-06). Time moves with `H` `L`, `[` `]`, `{` `}` and `Shift-←` `Shift-→`.
+- `q` quits from every view, as in yazi (2026-10-06). The versions, diff and find views go back with `h`, `esc` and `⌫`. Dialogs and confirmations still close on `q`.
 - No `◀ version 12 of 16 ▶` counter in the header (removed 2026-10-06). The timeline's ▲ and the Versions column already show where you are, and the counter was read as a second version counter beside the preview's `v5/6`.
 - The timeline has one row of dots, not two: `●` where the selected entry changed, `○` where only the current folder did (§3.1, §3.2). The folder's own row repeated the Versions column; merged, the panes get a row back.
 - `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.

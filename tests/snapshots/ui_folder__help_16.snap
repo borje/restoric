@@ -11,8 +11,8 @@ expression: "h.screen(100, 34)"
    ┄ 2 unchan│                                                                        │
 ▶Sep 27 08:52│  Folder view                                                           │
    ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
- Sep 20 20:35│  h l  - ⏎               parent / open (a file opens its versions)      │
-   ┄ 2 unchan│  H L  ← →               older / newer change in this folder            │
+ Sep 20 20:35│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+   ┄ 2 unchan│  H L                    older / newer change in this folder            │
  Sep 13 20:51│  [ ]   { }              every snapshot / changes of the selected item  │
    ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
  Sep 09 19:23│  ␣  v                   select / visual select                         │

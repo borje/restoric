@@ -51,7 +51,7 @@ fn find_nothing_and_back() {
     let mut h = Harness::new(SRC);
     command(&mut h, "find nosuchthing");
     insta::assert_snapshot!(h.screen(100, 10));
-    h.keys("q");
+    h.keys("h");
     assert_eq!(h.app.view, View::Folder);
 }
 
@@ -92,6 +92,28 @@ fn search_and_next() {
     // esc while typing goes back to where it was.
     h.keys("/mod").key(KeyCode::Esc);
     assert_eq!(h.app.search, "zzz");
+}
+
+#[test]
+fn arrows_are_hjkl_and_q_quits_everywhere() {
+    let mut h = Harness::new(SRC);
+    let start = when(&h);
+    // Plain arrows move in the tree, not in time.
+    h.select("api").key(KeyCode::Right);
+    assert!(h.app.folder.ends_with("api"));
+    assert_eq!(when(&h), start);
+    h.key(KeyCode::Left);
+    assert!(h.app.folder.ends_with("src"));
+    assert_eq!(when(&h), start);
+    // Sub-views go back with h, esc and backspace; q quits from any of them.
+    h.select("main.go").keys("l");
+    assert!(matches!(h.app.view, View::Versions(_)));
+    h.key(KeyCode::Left);
+    assert_eq!(h.app.view, View::Folder);
+    h.keys("l");
+    assert!(!h.app.quit);
+    h.keys("q");
+    assert!(h.app.quit);
 }
 
 #[test]
