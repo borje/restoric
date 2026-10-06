@@ -46,6 +46,33 @@ fn restore_dialog_15() {
 }
 
 #[test]
+fn o_shows_a_file_and_the_dialog_has_three_options() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-08-17 16:04").select("main.go").keys("o");
+    assert!(matches!(&h.app.effects[..], [Effect::Pager { name, .. }] if name == "main.go"));
+    h.app.effects.clear();
+    h.select("api").keys("o");
+    assert!(h.app.effects.is_empty());
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Select a file to show. o shows a file in $PAGER.")
+    );
+    // A file: three options, so 4 and a third j wrap to the first.
+    h.select("main.go").keys("r4");
+    assert_eq!(h.app.dialog.as_ref().unwrap().sel, 1);
+    h.keys("jj");
+    assert_eq!(h.app.dialog.as_ref().unwrap().sel, 0);
+    h.key(KeyCode::Esc);
+    // A folder: the tar archive is the fourth.
+    h.select("api").keys("r4");
+    assert_eq!(h.app.dialog.as_ref().unwrap().sel, 3);
+    h.key(KeyCode::Esc);
+    // The versions view shows the selected version.
+    h.select("main.go").keys("lo");
+    assert!(matches!(&h.app.effects[..], [Effect::Pager { name, .. }] if name == "main.go"));
+}
+
+#[test]
 fn visual_mode_and_escape() {
     let mut h = Harness::new(SRC);
     h.at("2026-09-09 19:23").select("config.go").keys("vjj");

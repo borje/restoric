@@ -175,6 +175,7 @@ const ACTIONS: &[(&str, Action)] = &[
     ("paste", Action::Paste),
     ("overwrite", Action::PasteOver),
     ("restore", Action::RestoreDialog),
+    ("show", Action::Pager),
     ("search", Action::Search),
     ("filter", Action::FilterInput),
     ("find", Action::Find),

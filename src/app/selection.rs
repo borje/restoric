@@ -14,10 +14,21 @@ use crate::worker::Request;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dialog {
     pub target: Target,
-    /// 0 to 3: overwrite, next to it, restore folder, pager or tar.
+    /// 0 to 2: overwrite, next to it, restore folder; 3: tar, for a folder.
     pub sel: usize,
     /// Overwriting asks for ⏎ twice.
     pub confirm: bool,
+}
+
+impl Dialog {
+    /// How many options: a folder has the tar archive as a fourth.
+    pub fn options(&self) -> usize {
+        if self.target.node.kind == NodeKind::Dir {
+            4
+        } else {
+            3
+        }
+    }
 }
 
 /// The confirmation popup before `P` overwrites.
@@ -235,8 +246,8 @@ impl App {
         self.exists.get(&t.path).copied().unwrap_or(true)
     }
 
-    /// The dialog's four options: label and where it goes.
-    pub fn dialog_options(&self, d: &Dialog) -> [(String, String); 4] {
+    /// The dialog's options: label and where it goes.
+    pub fn dialog_options(&self, d: &Dialog) -> Vec<(String, String)> {
         let t = &d.target;
         let home = self.home.as_deref();
         let is_dir = t.node.kind == NodeKind::Dir;
@@ -264,26 +275,45 @@ impl App {
             format!("→ {}{slash}", show(&t.path))
         };
         let dir = planned(t, How::RestoreDir, &self.places);
-        let fourth = if is_dir {
-            (
-                "Write a tar archive".to_string(),
-                format!("→ {}", file_name(planned(t, How::Tar, &self.places))),
-            )
-        } else {
-            (
-                "Show in $PAGER".to_string(),
-                "read only, writes nothing".to_string(),
-            )
-        };
-        [
+        let mut options = vec![
             first,
             ("Restore next to it".to_string(), next),
             (
                 format!("Restore to {}/", show(&self.places.restore_dir)),
                 format!("→ {}{slash}", show(&dir)),
             ),
-            fourth,
-        ]
+        ];
+        if is_dir {
+            options.push((
+                "Write a tar archive".to_string(),
+                format!("→ {}", file_name(planned(t, How::Tar, &self.places))),
+            ));
+        }
+        options
+    }
+
+    /// `o`: show the selected file, as it was in that snapshot, in `$PAGER`.
+    pub(super) fn pager(&mut self) -> bool {
+        let t = match self.targets() {
+            Ok(t) if t.len() == 1 => t[0].clone(),
+            Ok(_) => {
+                self.message = Some("Select one file to show.".into());
+                return false;
+            }
+            Err(e) => {
+                if !e.is_empty() {
+                    self.message = Some(e);
+                }
+                return false;
+            }
+        };
+        if t.node.kind == NodeKind::Dir {
+            self.message = Some("Select a file to show. o shows a file in $PAGER.".into());
+            return false;
+        }
+        let name = t.name();
+        self.outbox.push(Request::ReadAll { node: t.node, name });
+        true
     }
 
     /// ⏎ in the dialog.
@@ -307,14 +337,10 @@ impl App {
                 targets: vec![t],
                 how: How::RestoreDir,
             }),
-            _ if t.node.kind == NodeKind::Dir => self.outbox.push(Request::Restore {
+            _ => self.outbox.push(Request::Restore {
                 targets: vec![t],
                 how: How::Tar,
             }),
-            _ => {
-                let name = t.name();
-                self.outbox.push(Request::ReadAll { node: t.node, name });
-            }
         }
         self.dialog = None;
     }

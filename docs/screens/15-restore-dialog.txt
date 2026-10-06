@@ -15,7 +15,7 @@
    44   44 │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
    45      │  2 (•) Restore next to it             → main.go.2026-08-22_1159            │
         45 │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-22_1159/main.…  │
-   46   46 │  4 ( ) Show in $PAGER                 read only, writes nothing            │
+   46   46 │                                                                            │
         47 │                                                                            │
    47   48 │                                                                            │
    48   49 │                                                                            │

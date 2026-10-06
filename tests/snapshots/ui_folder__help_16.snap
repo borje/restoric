@@ -17,7 +17,7 @@ expression: "h.screen(100, 34)"
    ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
  Sep 09 19:23│  ␣  v                   select / visual select                         │
    ┄ 1 unchan│  y  p  P                yank, restore next to it, overwrite            │
- Sep 06 18:03│  r  d                   restore options / full-screen diff             │
+ Sep 06 18:03│  r  d  o                restore options / full-screen diff / $PAGER    │
    ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
  Sep 02 20:16│  / n N   f              search / next, previous / filter               │
    ┄ 2 unchan│  .  zh   zi zo          show deleted items / zoom timeline             │

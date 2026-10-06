@@ -238,6 +238,8 @@ pub enum Action {
     ClickFound(usize),
     /// A click on a restore dialog option: select it, or restore if selected.
     DialogOption(usize),
+    /// `o`: show the file in `$PAGER`.
+    Pager,
     DialogRestore,
     DialogCancel,
     ConfirmYes,
@@ -1261,6 +1263,7 @@ impl App {
             Action::Paste => return self.paste(false),
             Action::PasteOver => return self.paste(true),
             Action::RestoreDialog => return self.open_dialog(),
+            Action::Pager => return self.pager(),
             Action::Copy(c) => return self.copy(c),
             Action::CommandLine => {
                 self.start_input(InputKind::Command, "");
@@ -1544,6 +1547,7 @@ impl App {
             | Action::Paste
             | Action::PasteOver
             | Action::RestoreDialog
+            | Action::Pager
             | Action::Copy(_)
             | Action::CommandLine
             | Action::DialogOption(_)

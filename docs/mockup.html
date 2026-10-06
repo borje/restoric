@@ -465,7 +465,7 @@ function restoreOpts(d){const t=d.t,isDir=t.kind==='dir',st=stamp(snaps[t.snap].
     [d.onDisk?'Overwrite original':'Restore to original location',d.onDisk?t.disp:t.disp+' (missing now)'],
     ['Restore next to it','→ '+t.name+'.'+st+(isDir?'/':'')],
     ['Restore to ~/Restored/','→ ~/Restored/'+st+'/'+nm],
-    isDir?['Write a tar archive','→ '+t.name+'-'+st+'.tar']:['Show in $PAGER','read only, writes nothing']];}
+    ...(isDir?[['Write a tar archive','→ '+t.name+'-'+st+'.tar']]:[])];}
 function renderDlg(){const d=S.dlg,t=d.t,w=Math.min(78,COLS-2),h=d.confirm?15:14,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2)-1;
   rbox(y,x,h,w,'Restore');
   let c=put(y+2,x+3,t.name+(t.kind==='dir'?'/':''),'b');c=put(y+2,c,'  @ '+fmt(snaps[t.snap].t)+'  ','');put(y+2,c,snaps[t.snap].id,'acc');
@@ -487,10 +487,10 @@ function renderWhichKey(){const items=(WK[S.view]||{})[S.pend];if(!items)return;
 function renderToast(){if(!S.msg)return;const w=Math.min(50,COLS-4),lines=wrap(S.msg.text,w-4),h=lines.length+2,x=COLS-w-1,y=5;
   rbox(y,x,h,w,'');lines.forEach((l,k)=>put(y+1+k,x+2,l,S.msg.cls||''));}
 function renderHelp(){
-  const L=[['Folder view',''],['j k  gg G  C-d C-u','move, top, bottom, half page'],['h l  - ⏎','parent / open (a file opens its versions)'],
+  const L=[['Folder view',''],['j k  gg G  C-d C-u','move, top, bottom, half page'],['h l  ← →  ⏎','parent / open (a file opens its versions)'],
     ['H L','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
     ['⇥  J K','preview: content or diff vs disk, scroll'],['␣  v','select / visual select'],['y  p  P','yank, restore next to it, overwrite'],
-    ['r  d','restore options / full-screen diff'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
+    ['r  d  o','restore options / full-screen diff / $PAGER'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
     ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
     ['Commands',''],[':sep 1  :2026-09-01','jump to a date (:yesterday :3d :2w)'],[':find NAME   s','search every snapshot for a name'],
     [':latest :oldest :undo',''],['',''],['Diff','']];
@@ -547,9 +547,10 @@ function paste(over){const Y=S.yanked;if(!Y){flash('Nothing yanked. Press y on a
 function copy(what){const t=target();if(!t){flash('Select a file or folder first.');return}
   const s=what==='c'?`${snaps[t.snap].id}:${t.abs}`:what==='d'?(S.view==='main'?absDir(S.dir):ROOT+'/'+parent(t.f.path)):t.name;
   try{navigator.clipboard.writeText(s).catch(()=>{})}catch(e){}flash('Copied '+s);}
+function showFile(){const t=target();if(!t)return;if(t.kind==='dir'){flash('Select a file to show. o shows a file in $PAGER.');return}flash(`Opened ${t.name} @ ${fmt(snaps[t.snap].t)} in $PAGER (mockup)`,'add');}
 function openRestore(){const t=target();if(!t)return;S.dlg={t,sel:t.onDisk?1:0,confirm:false,onDisk:t.onDisk};}
 function doRestore(){const d=S.dlg,t=d.t,det=restoreOpts(d)[d.sel][1];
-  const msgs=[`Restored ${t.name} to ${t.disp}`,`Restored as ${det.slice(2)}`,`Restored to ${det.slice(2)}`,t.kind==='dir'?`Wrote ${det.slice(2)}`:`Opened ${t.name} @ ${fmt(snaps[t.snap].t)} in $PAGER`];
+  const msgs=[`Restored ${t.name} to ${t.disp}`,`Restored as ${det.slice(2)}`,`Restored to ${det.slice(2)}`,`Wrote ${det.slice(2)}`];
   flash(msgs[d.sel]+' (mockup: nothing was written)','add');S.dlg=null;}
 function searchStep(dir){const {rows}=mainRows();if(!S.search){flash('No search yet. Press / to search this folder.');return}
   for(let n=1;n<=rows.length;n++){const k=(S.sel+dir*n+rows.length*2)%rows.length;if(matches(rows[k])){S.sel=k;S.selKey=rowKey(rows[k]);return}}
@@ -607,8 +608,9 @@ function inputKey(k){const I=S.input;
   if(I.kind==='/'){S.search=I.text;const {rows}=mainRows();if(!I.text){S.sel=I.origin;return}
     for(let n=0;n<rows.length;n++){const j=(I.origin+n)%rows.length;if(matches(rows[j])){S.sel=j;S.selKey=rowKey(rows[j]);break}}}}
 function dlgKey(k){const d=S.dlg;
-  if(k==='ArrowDown'||k==='j'){d.sel=(d.sel+1)%4;d.confirm=false}else if(k==='ArrowUp'||k==='k'){d.sel=(d.sel+3)%4;d.confirm=false}
-  else if(/^[1-4]$/.test(k)){d.sel=+k-1;d.confirm=false}
+  const n=restoreOpts(d).length;
+  if(k==='ArrowDown'||k==='j'){d.sel=(d.sel+1)%n;d.confirm=false}else if(k==='ArrowUp'||k==='k'){d.sel=(d.sel+n-1)%n;d.confirm=false}
+  else if(/^[1-4]$/.test(k)&&+k<=n){d.sel=+k-1;d.confirm=false}
   else if(k==='Enter'){if(d.sel===0&&d.onDisk&&!d.confirm)d.confirm=true;else doRestore()}
   else if(k==='Escape'||k==='q')S.dlg=null;}
 function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
@@ -625,12 +627,12 @@ function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
     case 'j':case 'ArrowDown':mv(1);break;case 'k':case 'ArrowUp':mv(-1);break;
     case 'C-d':case 'PageDown':mv(13);break;case 'C-u':case 'PageUp':mv(-13);break;
     case 'gg':mv(-1e6);break;case 'G':mv(1e6);break;case 'gh':goDir('');break;
-    case 'l':case 'ArrowRight':case 'Enter':case 'i':openRow(rows[S.sel]);break;
+    case 'l':case 'ArrowRight':case 'Enter':openRow(rows[S.sel]);break;
     case 'h':case 'ArrowLeft':case '-':case 'Backspace':goUp();break;
     case ' ':{const r=rows[S.sel];if(r&&r.kind!=='up'){const mk=markKey(r);S.marks.has(mk)?S.marks.delete(mk):S.marks.add(mk)}mv(1);break}
     case 'v':if(S.visual==null)S.visual=S.sel;else{const lo=Math.min(S.visual,S.sel),hi=Math.max(S.visual,S.sel);rows.slice(lo,hi+1).forEach(r=>{if(r.kind!=='up')S.marks.add(markKey(r))});S.visual=null}break;
     case 'd':{const r=rows[S.sel];if(r&&r.kind==='file'){const at=r.del||r.ghost?r.last:S.snap;openDiff(r.f,fileRuns(r.f).findIndex(x=>at>=x.from&&at<=x.to),'current','main')}else flash('Select a file to diff.');break}
-    case 'r':openRestore();break;
+    case 'r':openRestore();break;case 'o':showFile();break;
     case 'y':yank();break;case 'p':paste(false);break;case 'P':paste(true);break;
     case 'cc':copy('c');break;case 'cd':copy('d');break;case 'cf':copy('f');break;
     case 'zh':case '.':S.ghosts=!S.ghosts;break;
@@ -646,7 +648,7 @@ function stepHist(k){const runs=fileRuns(S.hist.f),H=S.hist;
     case 'gg':H.sel=0;break;case 'G':H.sel=runs.length-1;break;case 'C-d':H.sel=Math.min(runs.length-1,H.sel+10);break;case 'C-u':H.sel=Math.max(0,H.sel-10);break;
     case 'Enter':case 'd':case 'l':openDiff(H.f,H.sel,'current','hist');break;
     case 'p':openDiff(H.f,H.sel,'previous','hist');break;
-    case 'r':openRestore();break;case 'y':yank();break;
+    case 'r':openRestore();break;case 'o':showFile();break;case 'y':yank();break;
     case 'zi':zoom(1);break;case 'zo':zoom(-1);break;
     case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;
     case 'q':flash('q quits restoric in the real tool. h goes back.');break;}}
@@ -659,7 +661,7 @@ function stepDiff(k){const D=S.diff,runs=fileRuns(D.f),{lines}=diffLines();const
     case 'H':case '{':{let n=D.run+1;while(n<runs.length&&runs[n].s<0)n++;if(n<runs.length){D.run=n;D.scroll=0}else flash('This is the oldest version.');break}
     case 'L':case '}':{let n=D.run-1;while(n>=0&&runs[n].s<0)n--;if(n>=0){D.run=n;D.scroll=0}else flash('This is the newest saved version.');break}
     case 'c':D.mode='current';D.scroll=0;break;case 'p':D.mode='previous';D.scroll=0;break;
-    case 'r':openRestore();break;case 'y':yank();break;
+    case 'r':openRestore();break;case 'o':showFile();break;case 'y':yank();break;
     case 'q':flash('q quits restoric in the real tool. h goes back.');break;
     case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':if(D.from==='hist'){S.view='hist';S.hist={f:D.f,sel:D.run}}else{S.view='main';S.selKey='f:'+D.f.name}break;}}
 function stepFind(k){const F=S.find;
@@ -675,7 +677,7 @@ function renderCmds(){const L=[];
     const cmd=[`restic restore ${id} --include ${t.abs} --target /`,
       isDir?`restic restore ${id}:${t.abs} --target ${t.abs}.${st}`:`restic dump ${id} ${t.abs} > ${t.abs}.${st}`,
       `restic restore ${id} --include ${t.abs} --target ~/Restored/${st}`,
-      isDir?`restic dump --archive tar ${id} ${t.abs} > ${t.name}-${st}.tar`:`restic dump ${id} ${t.abs} | $PAGER`][d.sel];
+      `restic dump --archive tar ${id} ${t.abs} > ${t.name}-${st}.tar`][d.sel];
     L.push([cmd,'The command for the selected restore option.']);}
   else if(S.confirm||(S.yanked&&S.view==='main')){const Y=S.yanked;if(Y){const t=Y.items[0],id=snaps[t.snap].id;
     L.push([`restic dump ${id} ${t.abs} > ${t.abs}.${stamp(snaps[t.snap].t)}   # p`,'p restores each yanked item next to the original (or to its original place if it is missing on disk).']);

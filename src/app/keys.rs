@@ -97,7 +97,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Left if shift => OlderSnapshot,
         KeyCode::Right if shift => NewerSnapshot,
         KeyCode::Char('h') | KeyCode::Char('-') | KeyCode::Backspace | KeyCode::Left => Parent,
-        KeyCode::Char('l') | KeyCode::Char('i') | KeyCode::Enter | KeyCode::Right => Open,
+        KeyCode::Char('l') | KeyCode::Enter | KeyCode::Right => Open,
         KeyCode::Char('H') => OlderChange,
         KeyCode::Char('L') => NewerChange,
         KeyCode::Char('[') => OlderSnapshot,
@@ -117,6 +117,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('p') => Paste,
         KeyCode::Char('P') => PasteOver,
         KeyCode::Char('r') => RestoreDialog,
+        KeyCode::Char('o') => Pager,
         KeyCode::Char('c') => Prefix('c'),
         KeyCode::Char(':') => CommandLine,
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
@@ -176,14 +177,14 @@ impl App {
         if let Some(d) = &mut self.dialog {
             match k.code {
                 KeyCode::Char('j') | KeyCode::Down => {
-                    d.sel = (d.sel + 1) % 4;
+                    d.sel = (d.sel + 1) % d.options();
                     d.confirm = false;
                 }
                 KeyCode::Char('k') | KeyCode::Up => {
-                    d.sel = (d.sel + 3) % 4;
+                    d.sel = (d.sel + d.options() - 1) % d.options();
                     d.confirm = false;
                 }
-                KeyCode::Char(c @ '1'..='4') => {
+                KeyCode::Char(c @ '1'..='4') if (c as usize - '1' as usize) < d.options() => {
                     d.sel = c as usize - '1' as usize;
                     d.confirm = false;
                 }

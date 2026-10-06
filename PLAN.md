@@ -637,7 +637,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
  filter: go█                                                    type to filter · ⏎ keep · esc clear
 ```
 
-### 3.9 Versions of a file (`⏎`, `l` or `i` on a file)
+### 3.9 Versions of a file (`⏎` or `l` on a file)
 One row per **distinct version**, newest first, with deleted periods as their own rows. The `on disk` row is always first. "VS DISK" shows lines added and removed, or `identical`. The preview on the right shows the selected version, with its changes marked.
 
 <sub>`docs/screens/13-versions.txt`</sub>
@@ -746,7 +746,7 @@ For targets other than "next to it" and "overwrite". Works on files and folders,
    44   44 │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
    45      │  2 (•) Restore next to it             → main.go.2026-08-22_1159            │
         45 │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-22_1159/main.…  │
-   46   46 │  4 ( ) Show in $PAGER                 read only, writes nothing            │
+   46   46 │                                                                            │
         47 │                                                                            │
    47   48 │                                                                            │
    48   49 │                                                                            │
@@ -770,7 +770,9 @@ For targets other than "next to it" and "overwrite". Works on files and folders,
 | 1 | Overwrite original, or "Restore to original location" if it's missing on disk | **Asks for confirmation** when something exists on disk. Moves the current file to `~/.local/share/restoric/undo/<timestamp>/` first (`:undo`). Same as `P`. |
 | 2 | Restore next to it (**default**) | `name.2026-09-06_1803` or `dir.2026-09-06_1803/`. Same as `p`. |
 | 3 | Restore to `~/Restored/` | `~/Restored/<stamp>/<name>` |
-| 4 | File: show in `$PAGER` · folder: write a tar archive | Read only / `name-<stamp>.tar` |
+| 4 | Folder only: write a tar archive | `name-<stamp>.tar` |
+
+Showing a file in `$PAGER` is not a restore, so it isn't in the dialog: `o` does it from the folder, versions and diff views.
 
 How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restorer, which keeps mode, modification time and symlinks; owner and group are set only when running as root. Folder tar archives are written by restoric from the trees. An overwrite moves what's on disk into `undo/<time>/files/<absolute path>` with a `manifest.json`. If the restore fails, the old version is moved back. `:undo` undoes the newest overwrite, all of its items at once. Moves fall back to copy and delete across file systems. The dialog's "next to it" name comes without the `-2` a clash would add, because the UI doesn't look at the disk; the message after the restore gives the real name. The `:` line handles `:undo`, `:q`, `:help`, `:deleted`, `:latest`/`:now` and `:oldest`/`:first`; the rest of §3.15 comes in M6.
 
@@ -792,7 +794,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
  Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │etUser(ctx, …
    ┄ 1 unchan│  ␣  v                   select / visual select                         │ORT", 8080)
  Sep 09 19:23│  y  p  P                yank, restore next to it, overwrite            │
-   ┄ 1 unchan│  r  d                   restore options / full-screen diff             │
+   ┄ 1 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
  Sep 06 18:03│  cc cd cf               copy snapshot:path, folder, name               │ontext.Conte…
    ┄ 2 unchan│  / n N   f              search / next, previous / filter               │equest
  Sep 02 20:16│  .  zh   zi zo          show deleted items / zoom timeline             │
@@ -864,7 +866,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `j` `k` / `↓` `↑` | Move |
 | `gg` `G`, `Ctrl-d` `Ctrl-u`, `PgDn` `PgUp` | Top, bottom, half page |
 | `h` `←` `-` `⌫` | Parent folder (selects the folder you came from) |
-| `l` `→` `⏎` `i` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
+| `l` `→` `⏎` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
 | `gh` | Backup root |
 | `H` `L` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot. |
 | `[` `]` / `Shift-←` `Shift-→` | Every snapshot, changed or not |
@@ -875,6 +877,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `Space` / `v` | Select and move down / visual select |
 | `y` `p` `P` | Yank / restore next to the original / overwrite (with confirmation) |
 | `r` | Restore options |
+| `o` | Show the file, as it was in that snapshot, in `$PAGER` (yazi's open; read only) |
 | `d` | Full-screen diff against disk |
 | `cc` `cd` `cf` | Copy `snapshotid:/abs/path` / folder path / file name |
 | `.` `zh` | Show / hide deleted items |
@@ -888,13 +891,13 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `q` | Quit, in every view (the sub-views go back with `h` `esc` `⌫`) |
 | *count* | `3H`, `5j`, `2J`, … repeat a motion. Stops at the first boundary message. |
 
-**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `y` yank · `zi` `zo` · `h` `←` `esc` `⌫` back.
+**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `o` pager · `y` yank · `zi` `zo` · `h` `←` `esc` `⌫` back.
 
-**Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `y` · `h` `←` `esc` `⌫` back.
+**Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `o` · `y` · `h` `←` `esc` `⌫` back.
 
 **Find view:** `j` `k` · `gg` `G` · `⏎` `l` go to the last snapshot with it · `h` `←` `esc` `⌫` back.
 
-**Restore dialog:** `j` `k` / `1`–`4` · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
+**Restore dialog:** `j` `k` / `1`–`3` (`4` tar, for a folder) · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
 
 Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `− +`, the preview mode, which-key entries, dialog options and `? help`. Clicking a selected row opens it. Wheel scrolls the column under the pointer.
 
@@ -1202,11 +1205,12 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 Settled during review:
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
+- `o` shows a file in `$PAGER` (2026-10-06). It was restore option 4, but it isn't a restore; the dialog has three options for a file and the tar archive as a fourth for a folder.
 - Plain `←` `→` are `h` `l`, as in vim and yazi (2026-10-06). Time moves with `H` `L`, `[` `]`, `{` `}` and `Shift-←` `Shift-→`.
 - `q` quits from every view, as in yazi (2026-10-06). The versions, diff and find views go back with `h`, `esc` and `⌫`. Dialogs and confirmations still close on `q`.
 - No `◀ version 12 of 16 ▶` counter in the header (removed 2026-10-06). The timeline's ▲ and the Versions column already show where you are, and the counter was read as a second version counter beside the preview's `v5/6`.
 - The timeline has one row of dots, not two: `●` where the selected entry changed, `○` where only the current folder did (§3.1, §3.2). The folder's own row repeated the Versions column; merged, the panes get a row back.
-- `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.
+- `v` is visual mode, as in yazi, and file versions open with `⏎`/`l` (`i` was a third key until 2026-10-06; a vim user reads it as insert).
 - Restored copies are named with the snapshot time after the full name: `main.go.2026-09-09_1923`, `src.2026-09-09_1923/`. If that name already exists (the same version restored twice), add `-2`, `-3`, …
 - restoric is a separate app and doesn't read yazi's config or theme. The yazi plugin (M8) is only a launcher.
 - Backends: everything rustic supports. M0 tests against the backend of your real repo.
@@ -1266,7 +1270,7 @@ restore_dir = "~/Restored"
 # accent = "magenta"          # ANSI names, "#rrggbb" or 0–255
 ```
 
-How it works (M7): `--host` and `--tag` win over the config, and the config over the hostname. A mistake in the file (an unknown key, action, key name or colour) stops start-up with a message naming it. Key overrides apply in every view, before the built-in keys. Actions: `down up top bottom half_down half_up parent open versions root older_change newer_change older_snapshot newer_snapshot oldest_change newest_change older_item_change newer_item_change preview_mode scroll_down scroll_up deleted diff select visual yank paste overwrite restore search filter find next_match prev_match command zoom_in zoom_out help quit`. Keys: a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, arrows, `Home`, `End`, `PageUp`, `PageDown`, `F1`–`F12`.
+How it works (M7): `--host` and `--tag` win over the config, and the config over the hostname. A mistake in the file (an unknown key, action, key name or colour) stops start-up with a message naming it. Key overrides apply in every view, before the built-in keys. Actions: `down up top bottom half_down half_up parent open versions root older_change newer_change older_snapshot newer_snapshot oldest_change newest_change older_item_change newer_item_change preview_mode scroll_down scroll_up deleted diff select visual yank paste overwrite restore show search filter find next_match prev_match command zoom_in zoom_out help quit`. Keys: a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, arrows, `Home`, `End`, `PageUp`, `PageDown`, `F1`–`F12`.
 
 **Mockup vs implementation:** the mockup's sample data is randomly generated, so the screens in §3 are the **layout and behaviour spec**, not byte-exact expected output. `FakeRepo` gets its own small, readable fixture. The insta snapshots generated from it become the exact expected output, reviewed against §3 when first accepted.
 

@@ -19,7 +19,7 @@ expression: "h.screen(100, 34)"
            │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
            │  2 (•) Restore next to it             → main.go.2026-08-17_1604            │
            │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-17_1604/main.…  │
-           │  4 ( ) Show in $PAGER                 read only, writes nothing            │
+           │                                                                            │
            │                                                                            │
            │                                                                            │
            │                                                                            │

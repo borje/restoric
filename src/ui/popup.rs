@@ -73,7 +73,7 @@ const HELP: &[(&str, &str)] = &[
     ("⇥  J K", "preview: content or diff vs disk, scroll"),
     ("␣  v", "select / visual select"),
     ("y  p  P", "yank, restore next to it, overwrite"),
-    ("r  d", "restore options / full-screen diff"),
+    ("r  d  o", "restore options / full-screen diff / $PAGER"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
     (".  zh   zi zo", "show deleted items / zoom timeline"),
