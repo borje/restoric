@@ -39,6 +39,13 @@ fn eighty_columns_17() {
 }
 
 #[test]
+fn wide_terminal_widens_the_listing() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("main.go");
+    insta::assert_snapshot!(h.screen(171, 34));
+}
+
+#[test]
 fn under_eighty_columns() {
     let mut h = Harness::new(SRC);
     h.at("2026-09-06 18:03").select("main.go");

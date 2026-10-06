@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 53
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 12 of 15 ▶
@@ -8,10 +7,10 @@ expression: "h.screen(100, 12)"
   ○        ○ ○ ○    ○   ○  ○     ○    ○         ○   ●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
-   ┄ 2 unchanged ┄    │ ▸ api/                            │ server.go · v1/2 · 30 B      ⇥ content
- Sep 13 20:51 ~2      │ ▸ models/                         │ unchanged since Sep 06 18:03
-   ┄ 1 unchanged ┄    │┃◇ config.go           89 B        │
-▶Sep 09 19:23 ~1      │┃◇ main.go            108 B  ~     │   1  package main
-   ┄ 1 unchanged ┄    │┃◇ server.go           30 B        │   2
- Sep 06 18:03 +1~3−1  │ ◇ util.go             94 B        │   3  func serve() {}
+   ┄ 2 unchanged ┄    │ ▸ api/                                 │ server.go · v1/2 · 30…  ⇥ content
+ Sep 13 20:51 ~2      │ ▸ models/                              │ unchanged since Sep 06 18:03
+   ┄ 1 unchanged ┄    │┃◇ config.go                    89 B    │
+▶Sep 09 19:23 ~1      │┃◇ main.go                     108 B  ~ │   1  package main
+   ┄ 1 unchanged ┄    │┃◇ server.go                    30 B    │   2
+ Sep 06 18:03 +1~3−1  │ ◇ util.go                      94 B    │   3  func serve() {}
  VIS  Sep 09 19:23  811fc3af  src/ ~1                                     Sep 06 18:03  5/6  ? help

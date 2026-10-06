@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 219
 expression: "h.screen(100, 20)"
 ---
  restoric  ~/trading                                                             ◀ version 2 of 2 ▶
@@ -8,18 +7,18 @@ expression: "h.screen(100, 20)"
   ●                                                                        ●  ┊ · logs/  ○ trading/
                                                                            ▲               − 1× +
 
- now  = latest        │ ▸ logs/                     ~1    │ logs/
-▶Sep 02 10:00 ~1      │                                   │
- Sep 01 10:00 +1      │                                   │ ≡ run.log                             ~
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
-                      │                                   │
+ now  = latest        │ ▸ logs/                             ~1 │ logs/
+▶Sep 02 10:00 ~1      │                                        │
+ Sep 01 10:00 +1      │                                        │ ≡ run.log                        ~
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
  NOR  Sep 02 10:00  afde6ef6  trading/ ~1                                               1/1  ? help

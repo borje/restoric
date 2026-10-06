@@ -159,12 +159,12 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 | 2 | **The row of dots, one per snapshot column.** `●` = the selected entry changed. `○` = the current folder changed but the selected entry didn't. `·` = neither changed. Blank = the entry didn't exist (and the folder didn't change). With nothing selected (`..`), `●` marks the folder's changes. Highlighted cell = the snapshot being viewed. The cell under `now` uses the same symbols for changes on disk since the newest snapshot. **Labels at the right edge:** the entry, then `○` and the folder (`main.go  ○ src/`). |
 | 3 | `▲` under the viewed snapshot · zoom control `− 1× +` |
 | 4 | Blank |
-| 5–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (35) · **preview** (the rest) |
+| 5–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (40% of the rest, 40 to 50 wide) · **preview** (the rest) |
 | 33 | **Status bar** (or the `:` / `/` / `f` input line) |
 
 **Versions column:** the top row is `now`, showing what changed on disk since the last backup ("~1 unsaved", in purple). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
 
-**Listing:** mark bar (`┃` for selected items), icon, name (folders end in `/`, a deleted name is crossed out), size, Δ (`+` added, `~` changed, `−` deleted in this snapshot, compact counts for folders, `gone` for items deleted earlier). No column headers. With items deleted earlier hidden, the bottom says `1 deleted · . to show`.
+**Listing:** mark bar (`┃` for selected items), icon, name (folders end in `/`, a deleted name is crossed out), size, Δ (`+` added, `~` changed, `−` deleted in this snapshot, compact counts for folders, `gone` for items deleted earlier; the Δ column is as wide as its widest visible entry). No column headers. With items deleted earlier hidden, the bottom says `1 deleted · . to show`.
 
 **Preview** of the selected entry *as it was in this snapshot*:
 - **File:** a heading (`main.go · v5/6 · 1.3K`) and a second line saying whether it changed here ("changed here · + new line · − removed", "new in this snapshot", or "unchanged since Sep 09 19:23"). Below that, the content with line numbers. The margin marks `+` for lines that are new in this version and `−` where lines were removed, compared with the previous version. It scrolls to the first change automatically.
@@ -815,7 +815,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
 ```
 
 ### 3.13 Narrow terminals
-At **under 100 columns** the Versions column folds away, leaving listing and preview. **Under 80 columns** the preview goes too. The timeline scales to the width.
+At **under 100 columns** the Versions column folds away, leaving listing (40% of the width, 38 to 50) and preview. **Under 80 columns** the preview goes too. The timeline scales to the width.
 
 <sub>`docs/screens/17-80-columns.txt`</sub>
 
@@ -1200,6 +1200,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
 - The timeline has one row of dots, not two: `●` where the selected entry changed, `○` where only the current folder did (§3.1, §3.2). The folder's own row repeated the Versions column; merged, the panes get a row back.
 - `v` is visual mode, as in yazi, and file versions open with `⏎`/`l`/`i`.

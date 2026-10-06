@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 38
 expression: "h.screen(80, 34)"
 ---
  restoric  ~/dev/project/src                               ◀ between versions ▶
@@ -11,10 +10,10 @@ expression: "h.screen(80, 34)"
    ..                                 │ main.go · v7/7 · 108 B       ⇥ content
  ▸ api/                               │ unchanged since Sep 09 19:23
  ▸ models/                            │
- ◇ config.go              96 B        │   1  package main
- ◇ main.go               108 B        │   2
- ◇ server.go              42 B        │   3  func main() {
- ◇ util.go               104 B        │   4    run()
+ ◇ config.go                     96 B │   1  package main
+ ◇ main.go                      108 B │   2
+ ◇ server.go                     42 B │   3  func main() {
+ ◇ util.go                      104 B │   4    run()
                                       │   5  }
                                       │   6  // flags
                                       │   7  // middleware

@@ -1,6 +1,5 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 62
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
@@ -8,10 +7,10 @@ expression: "h.screen(100, 12)"
   ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·○ ·  ·  ┊ ○ config.go  ○ src/
                                                                       ▲                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ config.go · v5/5 · 96 B      ⇥ content
-   ┄ 2 unchanged ┄    │ ◇ config.go           96 B        │ unchanged since Sep 20 20:35
-▶Sep 27 08:52 ~1      │                                   │
-   ┄ 2 unchanged ┄    │                                   │   5  }
- Sep 20 20:35 ~1      │                                   │   6  // defaults
-   ┄ 2 unchanged ┄    │   2 deleted · . to show           │   7  // timeouts
+ now  ~1 unsaved      │   ..                                   │ config.go · v5/5 · 96…  ⇥ content
+   ┄ 2 unchanged ┄    │ ◇ config.go                       96 B │ unchanged since Sep 20 20:35
+▶Sep 27 08:52 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │   5  }
+ Sep 20 20:35 ~1      │                                        │   6  // defaults
+   ┄ 2 unchanged ┄    │   2 deleted · . to show                │   7  // timeouts
  filter: co█                                                    type to filter · ⏎ keep · esc clear

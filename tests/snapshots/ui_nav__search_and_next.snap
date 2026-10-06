@@ -1,6 +1,5 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 80
 expression: "h.screen(100, 14)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
@@ -8,12 +7,12 @@ expression: "h.screen(100, 14)"
   ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·○ ·  ·  ┊ ○ config.go  ○ src/
                                                                       ▲                    − 1× +
 
- now  ~1 unsaved      │   ..                              │ config.go · v5/5 · 96 B      ⇥ content
-   ┄ 2 unchanged ┄    │ ▸ api/                            │ unchanged since Sep 20 20:35
-▶Sep 27 08:52 ~1      │ ▸ models/                         │
-   ┄ 2 unchanged ┄    │ ◇ config.go           96 B        │   5  }
- Sep 20 20:35 ~1      │ ◇ main.go            108 B        │   6  // defaults
-   ┄ 2 unchanged ┄    │ ◇ server.go           42 B  ~     │   7  // timeouts
- Sep 13 20:51 ~2      │ ◇ util.go            104 B        │   8  // listen address
-   ┄ 1 unchanged ┄    │   2 deleted · . to show           │   9+ // tls
+ now  ~1 unsaved      │   ..                                   │ config.go · v5/5 · 96…  ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                                 │ unchanged since Sep 20 20:35
+▶Sep 27 08:52 ~1      │ ▸ models/                              │
+   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │   5  }
+ Sep 20 20:35 ~1      │ ◇ main.go                     108 B    │   6  // defaults
+   ┄ 2 unchanged ┄    │ ◇ server.go                    42 B  ~ │   7  // timeouts
+ Sep 13 20:51 ~2      │ ◇ util.go                     104 B    │   8  // listen address
+   ┄ 1 unchanged ┄    │   2 deleted · . to show                │   9+ // tls
  /.go█                                             type to search this folder · ⏎ keep · esc cancel

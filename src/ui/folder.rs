@@ -149,14 +149,28 @@ pub fn draw(app: &App, g: &mut Grid) {
         l1 - l0 + 1,
         height as u16,
     ));
-    let dx = l1 - 5;
-    let se = l1 - 7;
-    let nw = se.saturating_sub(6 + l0 + 3) as usize;
     let rows = app.rows();
     let off = app
         .sel
         .saturating_sub(height / 2)
         .min(rows.len().saturating_sub(height));
+    // The Δ column is as wide as its widest visible entry, one cell from the divider.
+    let dw = rows
+        .iter()
+        .skip(off)
+        .take(height)
+        .filter_map(|r| app.entry(*r))
+        .map(|e| match &e.delta {
+            Delta::Same => 0,
+            Delta::Gone(_) => 4,
+            Delta::Counts(c) => counts_width(c, ""),
+            _ => 1,
+        })
+        .max()
+        .unwrap_or(0);
+    let dx = l1 - dw;
+    let se = if dw > 0 { dx - 2 } else { l1 };
+    let nw = se.saturating_sub(6 + l0 + 3) as usize;
     let ghost = t.dim.add_modifier(Modifier::ITALIC);
     for (k, row) in rows.iter().enumerate().skip(off).take(height) {
         let y = TOP + (k - off) as u16;

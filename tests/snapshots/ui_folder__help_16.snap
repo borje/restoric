@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 66
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src                                                   ◀ version 15 of 15 ▶
@@ -32,8 +31,8 @@ expression: "h.screen(100, 34)"
    ┄ 1 unchan│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │
  Jul 28 15:59│  Press any key to close                                                │
  Jul 26 11:57╰────────────────────────────────────────────────────────────────────────╯
- Jul 24 12:16 ~1      │                                   │
-   ┄ 2 unchanged ┄    │                                   │
- Jul 14 09:00 +7      │                                   │
-                      │   2 deleted · . to show           │
+ Jul 24 12:16 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │
+ Jul 14 09:00 +7      │                                        │
+                      │   2 deleted · . to show                │
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help

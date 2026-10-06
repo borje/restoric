@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 45
 expression: "h.screen(70, 24)"
 ---
  restoric  ~/dev/project/src                     ◀ version 11 of 15 ▶
@@ -9,13 +8,13 @@ expression: "h.screen(70, 24)"
                                ▲                             − 1× +
 
    ..
- ▸ api/                                                         ~1
+ ▸ api/                                                            ~1
  ▸ models/
- ◇ config.go                                              89 B  ~
- ◇ legacy.go                                              62 B  −
- ◇ main.go                                                96 B  ~
- ◇ server.go                                              30 B  +
- ◇ util.go                                                94 B
+ ◇ config.go                                                 89 B  ~
+ ◇ legacy.go                                                 62 B  −
+ ◇ main.go                                                   96 B  ~
+ ◇ server.go                                                 30 B  +
+ ◇ util.go                                                   94 B
 
 
 

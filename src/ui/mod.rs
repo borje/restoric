@@ -132,17 +132,22 @@ pub struct Panes {
 }
 
 pub fn panes(cols: u16) -> Panes {
+    // The listing takes 40% of what's left after the Versions column,
+    // within these bounds; the preview gets the rest.
+    let listing = |room: u16, min: u16| (room * 40 / 100).clamp(min, 50);
     if cols >= 100 {
+        let l1 = 23 + listing(cols - 23, 40) - 1;
         Panes {
             versions: Some((0, 21)),
-            listing: (23, 57),
-            preview: Some((59, cols - 1)),
+            listing: (23, l1),
+            preview: Some((l1 + 2, cols - 1)),
         }
     } else if cols >= 80 {
+        let l1 = listing(cols, 38) - 1;
         Panes {
             versions: None,
-            listing: (0, 37),
-            preview: Some((39, cols - 1)),
+            listing: (0, l1),
+            preview: Some((l1 + 2, cols - 1)),
         }
     } else {
         Panes {
