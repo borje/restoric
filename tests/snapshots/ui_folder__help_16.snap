@@ -6,22 +6,22 @@ expression: "h.screen(100, 34)"
   Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
                                                                       ▲                    − 1× +
-             ╭─ Help ─────────────────────────────────────────────────────────────────╮
- on disk  ~1 │                                                                        │
-   ┄ 2 unchan│  Folder view                                                           │
-▶Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
-   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
- Sep 20 20:35│  H L                    older / newer change in this folder            │
-   ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │
- Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │
-   ┄ 1 unchan│  ␣  v                   select / visual select                         │
- Sep 09 19:23│  y  p  P                yank, restore next to it, overwrite            │
-   ┄ 1 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
- Sep 06 18:03│  cc cd cf               copy snapshot:path, folder, name               │
-   ┄ 2 unchan│  / n N   f              search / next, previous / filter               │
- Sep 02 20:16│  .  zh   zi zo          show deleted items / zoom timeline             │
-   ┄ 2 unchan│  gh   3H 5j             backup root / counts with motions              │
- Aug 22 11:59│  d  r                   diff / restore, not yazi's trash and rename    │
+
+ on disk  ~1 ╭─ Help ─────────────────────────────────────────────────────────────────╮
+   ┄ 2 unchan│                                                                        │
+▶Sep 27 08:52│  Folder view                                                           │
+   ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+ Sep 20 20:35│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+   ┄ 2 unchan│  H L                    older / newer change in this folder            │
+ Sep 13 20:51│  [ ]   { }              every snapshot / changes of the selected item  │
+   ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+ Sep 09 19:23│  ␣  v                   select / visual select                         │
+   ┄ 1 unchan│  y  p  P                yank, restore next to it, overwrite            │
+ Sep 06 18:03│  r  d  o                restore options / full-screen diff / $PAGER    │
+   ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
+ Sep 02 20:16│  / n N   f              search / next, previous / filter               │
+   ┄ 2 unchan│  .  zh   zi zo          show deleted items / zoom timeline             │
+ Aug 22 11:59│  gh   3H 5j             backup root / counts with motions              │
    ┄ 1 unchan│                                                                        │
  Aug 17 16:04│  Commands                                                              │
    ┄ 1 unchan│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
