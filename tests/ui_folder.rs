@@ -225,3 +225,22 @@ snapshot 2026-09-02 10:00
     let mut h = Harness::with(dsl, "/home/bege/trading");
     insta::assert_snapshot!(h.screen(100, 20));
 }
+
+#[test]
+fn j_k_scroll_the_preview() {
+    let body: String = (1..=60).map(|n| format!("line {n}\\n")).collect();
+    let dsl = format!(
+        "host bege-laptop\nroot /home/bege/data\nsnapshot 2026-07-01 10:00\n  write long.txt {body}\n"
+    );
+    let mut h = Harness::with(&dsl, "/home/bege/data");
+    h.select("long.txt");
+    let before = h.screen(100, 34);
+    assert!(before.contains("line 1"));
+    h.keys("J");
+    assert_eq!(h.app.scroll, Some(3));
+    let after = h.screen(100, 34);
+    assert_ne!(before, after, "J should scroll the preview");
+    assert!(after.contains("line 4"));
+    h.keys("K");
+    assert_eq!(h.screen(100, 34), before);
+}
