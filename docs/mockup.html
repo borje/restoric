@@ -491,7 +491,7 @@ function renderHelp(){
     ['H L','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
     ['⇥  J K','preview: content or diff vs disk, scroll'],['␣  v','select / visual select'],['y  p  P','yank, restore next to it, overwrite'],
     ['r  d  o','restore options / full-screen diff / $PAGER'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
-    ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
+    ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['d  r',"diff / restore, not yazi's trash and rename"],['',''],
     ['Commands',''],[':sep 1  :2026-09-01','jump to a date (:yesterday :3d :2w)'],[':find NAME   s','search every snapshot for a name'],
     [':latest :oldest :undo',''],['',''],['Diff','']];
   const w=Math.min(74,COLS-4),h=L.length+4,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2);rbox(y,x,h,w,'Help');

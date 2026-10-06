@@ -78,6 +78,7 @@ const HELP: &[(&str, &str)] = &[
     ("/ n N   f", "search / next, previous / filter"),
     (".  zh   zi zo", "show deleted items / zoom timeline"),
     ("gh   3H 5j", "backup root / counts with motions"),
+    ("d  r", "diff / restore, not yazi's trash and rename"),
     ("", ""),
     ("Commands", ""),
     (":sep 1  :2026-09-01", "jump to a date (:yesterday :3d :2w)"),
