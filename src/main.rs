@@ -102,9 +102,8 @@ struct ViewArgs {
 }
 
 fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
-    let dirs = directories::ProjectDirs::from("", "", "restoric")?;
-    let dir = dirs.state_dir().unwrap_or(dirs.data_local_dir());
-    std::fs::create_dir_all(dir).ok()?;
+    let dir = restoric::dirs::state()?;
+    std::fs::create_dir_all(&dir).ok()?;
     let (writer, guard) =
         tracing_appender::non_blocking(tracing_appender::rolling::never(dir, "restoric.log"));
     let filter = tracing_subscriber::EnvFilter::try_from_env("RESTORIC_LOG")
@@ -235,7 +234,7 @@ fn start(
     folder: &Path,
     browse: bool,
 ) -> Result<Start> {
-    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    let home = restoric::dirs::home();
     let home = home.as_deref();
     let flags = args.access();
     let env = env_access();
@@ -497,7 +496,7 @@ fn run(cli: Cli) -> Result<()> {
 /// The folder view on `folder`, through the picker when the folder
 /// isn't in this machine's snapshots or `--browse` says so.
 fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf) -> Result<()> {
-    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    let home = restoric::dirs::home();
     let tz = jiff::tz::TimeZone::system();
     let now = jiff::Timestamp::now();
     let tty = std::io::stdout().is_terminal();

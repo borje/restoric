@@ -5,6 +5,7 @@ pub mod app;
 pub mod cache;
 pub mod config;
 pub mod diff;
+pub mod dirs;
 pub mod disk;
 pub mod index;
 pub mod log;

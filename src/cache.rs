@@ -58,8 +58,7 @@ impl Cache {
 
     /// `~/.cache/restoric/<repo id>.redb`
     pub fn default_path(repo: Id) -> Option<PathBuf> {
-        let dirs = directories::ProjectDirs::from("", "", "restoric")?;
-        Some(dirs.cache_dir().join(format!("{}.redb", repo.to_hex())))
+        Some(crate::dirs::cache()?.join(format!("{}.redb", repo.to_hex())))
     }
 
     /// Opens the cache file, starting a new one if it was written by another

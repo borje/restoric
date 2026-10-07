@@ -40,8 +40,7 @@ pub struct ProbeCache {
 
 impl ProbeCache {
     pub fn default_path() -> Option<PathBuf> {
-        let dirs = directories::ProjectDirs::from("", "", "restoric")?;
-        Some(dirs.cache_dir().join("repos.json"))
+        Some(crate::dirs::cache()?.join("repos.json"))
     }
 
     /// The file at `p`, or an empty cache if it's missing or unreadable:

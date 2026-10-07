@@ -61,12 +61,11 @@ pub struct Places {
 
 impl Places {
     pub fn default_for(tz: TimeZone) -> Self {
-        let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
-        let data = directories::ProjectDirs::from("", "", "restoric")
-            .map(|d| d.data_local_dir().to_path_buf());
         Places {
-            restore_dir: home.unwrap_or_default().join("Restored"),
-            undo_dir: data.unwrap_or_else(std::env::temp_dir).join("undo"),
+            restore_dir: crate::dirs::home().unwrap_or_default().join("Restored"),
+            undo_dir: crate::dirs::data()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("undo"),
             tz,
         }
     }

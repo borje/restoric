@@ -10,3 +10,4 @@ The mockup for the UI is `docs/mockup.html`.
 - Work scales with what's on screen. Code that walks a whole snapshot or loads a whole list needs a reason the user asked for it.
 - restoric never writes to the repository.
 - Every new screen or state gets an insta snapshot test driven by `FakeRepo`.
+- Files restoric keeps live in the XDG folders on every platform, through `src/dirs.rs`. Nothing else calls `directories` directly, and nothing goes under `~/Library` on macOS.

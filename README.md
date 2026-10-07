@@ -83,7 +83,7 @@ The mouse works too: click dots, rows, the breadcrumb and the arrows.
 
 ## Config
 
-`~/.config/restoric/config.toml`. Every key is optional:
+`~/.config/restoric/config.toml` (or `$XDG_CONFIG_HOME/restoric/`), on macOS too. Every key is optional:
 
 ```toml
 host = ["laptop", "old-laptop-name"]   # this machine's hostnames, if it was renamed
@@ -103,7 +103,9 @@ half_down = "C-f"
 accent = "magenta"
 ```
 
-Colours follow your terminal's 16-colour theme, and `NO_COLOR` turns them off. restoric keeps a cache in `~/.cache/restoric/` and a log in `~/.local/state/restoric/restoric.log` (`RESTORIC_LOG=debug` for more).
+Keys are a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, the arrows, `Home`, `End`, `PageUp`, `PageDown` or `F1`–`F12`, and they win over the built-in ones in every view. The actions are `down` `up` `top` `bottom` `half_down` `half_up` `parent` `open` `versions` `root` `older_change` `newer_change` `older_snapshot` `newer_snapshot` `oldest_change` `newest_change` `older_item_change` `newer_item_change` `preview_mode` `scroll_down` `scroll_up` `deleted` `diff` `select` `visual` `yank` `paste` `overwrite` `restore` `show` `search` `filter` `find` `next_match` `prev_match` `command` `zoom_in` `zoom_out` `help` `quit`. The colours are `accent` `added` `changed` `deleted` `live` `dim` `dir` `code` `selected` (`selected` sets the background). A mistake in the file stops restoric with a message naming it.
+
+Colours follow your terminal's 16-colour theme, and `NO_COLOR` turns them off. restoric keeps a cache in `~/.cache/restoric/`, what `:undo` needs in `~/.local/share/restoric/undo/` and a log in `~/.local/state/restoric/restoric.log` (`RESTORIC_LOG=debug` for more). These are the same on Linux and macOS, and follow the `XDG_*_HOME` variables when they're set.
 
 ## Status
 
