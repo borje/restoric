@@ -38,7 +38,9 @@ use jiff::civil::DateTime;
 use jiff::tz::TimeZone;
 use sha2::{Digest, Sha256};
 
-use super::{BlobId, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
+use super::{
+    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Tree, TreeId,
+};
 
 #[derive(Clone)]
 enum Entry {
@@ -491,7 +493,15 @@ impl Repo for FakeRepo {
         Ok(data[start..end].to_vec())
     }
 
-    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()> {
+    fn restore(
+        &self,
+        snap: &SnapshotInfo,
+        path: &Path,
+        dest: &Path,
+        progress: &mut dyn FnMut(RestoreStep),
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        progress(RestoreStep::Preparing);
         if dest.symlink_metadata().is_ok() {
             bail!("{} already exists", dest.display());
         }
@@ -507,19 +517,46 @@ impl Repo for FakeRepo {
             }
             node = Some(n);
         }
-        self.write_node(&node.context("nothing to restore")?, dest)
+        let node = node.context("nothing to restore")?;
+        // Like rustic: the last chance to stop is before contents are copied.
+        if cancelled() {
+            return Err(Stopped.into());
+        }
+        let total = self.size_of(&node)?;
+        let mut done = 0;
+        progress(RestoreStep::Bytes { done, total });
+        self.write_node(&node, dest, &mut |n| {
+            done += n;
+            progress(RestoreStep::Bytes { done, total });
+        })
     }
 }
 
 impl FakeRepo {
-    /// Writes a node (and what's under it) to `dest`, like a restore.
-    fn write_node(&self, node: &Node, dest: &Path) -> Result<()> {
+    /// The size of the files in a node and under it.
+    fn size_of(&self, node: &Node) -> Result<u64> {
+        Ok(match (&node.kind, node.subtree) {
+            (NodeKind::File, _) => node.size,
+            (NodeKind::Dir, Some(sub)) => {
+                let mut n = 0;
+                for c in &self.tree(&sub)?.nodes {
+                    n += self.size_of(c)?;
+                }
+                n
+            }
+            _ => 0,
+        })
+    }
+
+    /// Writes a node (and what's under it) to `dest`, like a restore,
+    /// telling `wrote` the size of each file written.
+    fn write_node(&self, node: &Node, dest: &Path, wrote: &mut dyn FnMut(u64)) -> Result<()> {
         match &node.kind {
             NodeKind::Dir => {
                 std::fs::create_dir(dest)?;
                 if let Some(sub) = node.subtree {
                     for n in &self.tree(&sub)?.nodes {
-                        self.write_node(n, &dest.join(&n.name))?;
+                        self.write_node(n, &dest.join(&n.name), wrote)?;
                     }
                 }
             }
@@ -539,6 +576,7 @@ impl FakeRepo {
                     let f = std::fs::File::options().write(true).open(dest)?;
                     f.set_modified(std::time::SystemTime::from(t))?;
                 }
+                wrote(node.size);
             }
             NodeKind::Other(_) => {}
         }

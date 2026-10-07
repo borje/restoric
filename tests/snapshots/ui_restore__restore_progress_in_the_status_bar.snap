@@ -1,0 +1,9 @@
+---
+source: tests/ui_restore.rs
+expression: "lines.join(\"\\n\")"
+---
+ NOR  restoring 2 items … preparing  esc stop                             Sep 06 18:03  5/6  ? help
+ NOR  restoring 1/2 config.go … preparing  esc stop                       Sep 06 18:03  5/6  ? help
+ NOR  restoring 2/2 main.go  ━━━━━───────────  37%  3.0M / 8.0M           Sep 06 18:03  5/6  ? help
+ NOR  restoring 2/2 main.go  ━────  37%  3.0M / 8.0M  Sep 06 18:03  5/6  ? help
+ NOR  restoring api/  ━━━━━───────────  37%  3.0M / 8.0M  esc stop        Sep 06 18:03  5/6  ? help

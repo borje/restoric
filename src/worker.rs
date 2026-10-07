@@ -83,7 +83,12 @@ pub enum Request {
         snaps: Vec<usize>,
     },
     /// Restore these items (writes to disk, never to the repository).
-    Restore { targets: Vec<Target>, how: How },
+    Restore {
+        targets: Vec<Target>,
+        how: How,
+        /// Set when the user stops the restore.
+        cancel: Cancel,
+    },
     /// Undo the last overwrite.
     Undo,
     /// Whether these paths exist on disk.
@@ -108,7 +113,8 @@ pub enum Request {
     },
 }
 
-/// Stops a long request (`:find`) when the user leaves it.
+/// Stops a long request: `:find` when the user leaves it, a restore when
+/// the user stops it.
 #[derive(Clone, Debug, Default)]
 pub struct Cancel(Arc<AtomicBool>);
 
@@ -204,10 +210,16 @@ pub enum Response {
         key: DiffKey,
         diff: Arc<FileDiff>,
     },
+    /// How far the running restore has got.
+    RestoreProgress(restore::Progress),
     Restored {
         how: How,
         done: Vec<Done>,
+        /// Stopped by the user before the end.
+        stopped: bool,
     },
+    /// The restore failed; what it had done is cleaned up.
+    RestoreFailed(String),
     Undone(Vec<PathBuf>),
     Exists(Vec<(PathBuf, bool)>),
     Pager {
@@ -309,9 +321,30 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 }
                 send(Response::Nodes { path, nodes });
             }
-            Request::Restore { targets, how } => {
-                let done = restore::run(index.repo().as_ref(), &targets, how, &ctx.places)?;
-                send(Response::Restored { how, done });
+            Request::Restore {
+                targets,
+                how,
+                cancel,
+            } => {
+                let res = restore::run(
+                    index.repo().as_ref(),
+                    &targets,
+                    how,
+                    &ctx.places,
+                    &mut |p| send(Response::RestoreProgress(p)),
+                    &cancel,
+                );
+                match res {
+                    Ok(o) => send(Response::Restored {
+                        how,
+                        done: o.done,
+                        stopped: o.stopped,
+                    }),
+                    Err(e) => {
+                        tracing::warn!("restore: {e:#}");
+                        send(Response::RestoreFailed(format!("{e:#}")));
+                    }
+                }
             }
             Request::Undo => match restore::undo(&ctx.places) {
                 Ok(paths) => send(Response::Undone(paths)),

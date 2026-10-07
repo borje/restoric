@@ -108,8 +108,15 @@ impl App {
         };
         match (word.as_str(), rest.as_str()) {
             ("", _) => {}
-            ("undo", "") => self.outbox.push(Request::Undo),
-            ("q" | "quit" | "q!", "") => self.quit = true,
+            ("undo", "") => {
+                if !self.restore_busy() {
+                    self.outbox.push(Request::Undo);
+                }
+            }
+            ("cancel", "") => self.stop_restore(false),
+            ("q" | "quit" | "q!", "") => {
+                self.act(Action::Quit);
+            }
             ("help" | "h", "") => self.help = true,
             ("deleted", "") => {
                 self.act(Action::ToggleDeleted);

@@ -5,13 +5,15 @@
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 
-use crate::repo::{Node, NodeKind, Repo, SnapshotInfo};
+use crate::repo::{Node, NodeKind, Repo, RestoreStep, SnapshotInfo, Stopped, is_stopped};
+use crate::worker::Cancel;
 
 /// Something to restore: what was at `path` in `snapshot`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -110,13 +112,87 @@ pub struct Done {
     pub dest: PathBuf,
 }
 
+/// How a restore ended. A stopped overwrite has put everything back, so
+/// `done` is empty; stopped copies keep the items that were finished.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Outcome {
+    pub done: Vec<Done>,
+    pub stopped: bool,
+}
+
+/// How far a restore has got, for the status bar.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Progress {
+    /// Which item, from 0, of `items`.
+    pub item: usize,
+    pub items: usize,
+    /// `main.go` or `src/`.
+    pub name: String,
+    pub step: RestoreStep,
+}
+
+/// Passes progress on, at most every 100 ms within one item and step.
+struct Reporter<'a> {
+    out: &'a mut dyn FnMut(Progress),
+    items: usize,
+    last: Option<(usize, bool, Instant)>,
+}
+
+impl Reporter<'_> {
+    fn send(&mut self, item: usize, t: &Target, step: RestoreStep) {
+        let copying = matches!(step, RestoreStep::Bytes { .. });
+        let finished = matches!(step, RestoreStep::Bytes { done, total } if done >= total);
+        let now = Instant::now();
+        if let Some((i, c, at)) = self.last
+            && i == item
+            && c == copying
+            && !finished
+            && now.duration_since(at) < Duration::from_millis(100)
+        {
+            return;
+        }
+        self.last = Some((item, copying, now));
+        let mut name = t.name();
+        if t.node.kind == NodeKind::Dir {
+            name.push('/');
+        }
+        (self.out)(Progress {
+            item,
+            items: self.items,
+            name,
+            step,
+        });
+    }
+}
+
 /// Restores every target; an overwrite of several items is one undo step.
-pub fn run(repo: &dyn Repo, targets: &[Target], how: How, places: &Places) -> Result<Vec<Done>> {
+/// `cancel` stops it between items, or before an item's contents are
+/// copied (a tar archive stops anywhere).
+pub fn run(
+    repo: &dyn Repo,
+    targets: &[Target],
+    how: How,
+    places: &Places,
+    progress: &mut dyn FnMut(Progress),
+    cancel: &Cancel,
+) -> Result<Outcome> {
+    let mut rep = Reporter {
+        out: progress,
+        items: targets.len(),
+        last: None,
+    };
     if how == How::Overwrite {
-        return overwrite(repo, targets, places);
+        return overwrite(repo, targets, places, &mut rep, cancel);
     }
     let mut done = Vec::new();
-    for t in targets {
+    for (i, t) in targets.iter().enumerate() {
+        if cancel.cancelled() {
+            return Ok(Outcome {
+                done,
+                stopped: true,
+            });
+        }
+        let mut report = |step| rep.send(i, t, step);
         let st = stamp(t.snapshot.time, &places.tz);
         let name = t.name();
         let parent = t.path.parent().context("can't restore /")?;
@@ -131,25 +207,38 @@ pub fn run(repo: &dyn Repo, targets: &[Target], how: How, places: &Places) -> Re
                 fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
                 free(&dir, &name, "")
             }
-            How::Tar => {
-                let dest = free(parent, &format!("{name}-{st}"), ".tar");
-                write_tar(repo, t, &dest)?;
-                done.push(Done {
-                    target: t.path.clone(),
-                    dest,
-                });
-                continue;
-            }
+            How::Tar => free(parent, &format!("{name}-{st}"), ".tar"),
             How::Overwrite => unreachable!(),
         };
-        repo.restore(&t.snapshot, &t.path, &dest)
-            .with_context(|| format!("restoring {}", t.path.display()))?;
-        done.push(Done {
-            target: t.path.clone(),
-            dest,
-        });
+        let res = if how == How::Tar {
+            write_tar(repo, t, &dest, &mut report, cancel)
+        } else {
+            repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {
+                cancel.cancelled()
+            })
+        };
+        match res {
+            Ok(()) => done.push(Done {
+                target: t.path.clone(),
+                dest,
+            }),
+            Err(e) if is_stopped(&e) => {
+                return Ok(Outcome {
+                    done,
+                    stopped: true,
+                });
+            }
+            Err(e) => {
+                // Nothing was at `dest` before: what's there is the partial copy.
+                let _ = remove_path(&dest);
+                return Err(e.context(format!("restoring {}", t.path.display())));
+            }
+        }
     }
-    Ok(done)
+    Ok(Outcome {
+        done,
+        stopped: false,
+    })
 }
 
 /// One undo step: what an overwrite replaced.
@@ -169,12 +258,29 @@ struct UndoEntry {
 const MANIFEST: &str = "manifest.json";
 
 /// Moves what's on disk into a new undo folder, then restores over it.
-/// If a restore fails, what was moved away is put back.
-fn overwrite(repo: &dyn Repo, targets: &[Target], places: &Places) -> Result<Vec<Done>> {
+/// If a restore fails, what was moved away is put back. If it's stopped,
+/// every item of this step is put back.
+fn overwrite(
+    repo: &dyn Repo,
+    targets: &[Target],
+    places: &Places,
+    rep: &mut Reporter,
+    cancel: &Cancel,
+) -> Result<Outcome> {
+    let stopped = |session: &Path, manifest: &Manifest| -> Result<Outcome> {
+        rollback(session, manifest)?;
+        Ok(Outcome {
+            done: Vec::new(),
+            stopped: true,
+        })
+    };
     let session = new_session(&places.undo_dir)?;
     let mut manifest = Manifest::default();
     let mut done = Vec::new();
-    for t in targets {
+    for (i, t) in targets.iter().enumerate() {
+        if cancel.cancelled() {
+            return stopped(&session, &manifest);
+        }
         let saved = if exists(&t.path) {
             let rel = t.path.strip_prefix("/").unwrap_or(&t.path);
             let to = session.join("files").join(rel);
@@ -193,7 +299,13 @@ fn overwrite(repo: &dyn Repo, targets: &[Target], places: &Places) -> Result<Vec
             saved: saved.clone(),
         });
         write_manifest(&session, &manifest)?;
-        if let Err(e) = repo.restore(&t.snapshot, &t.path, &t.path) {
+        let mut report = |step| rep.send(i, t, step);
+        if let Err(e) = repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
+            cancel.cancelled()
+        }) {
+            if is_stopped(&e) {
+                return stopped(&session, &manifest);
+            }
             // Put the old version back and stop.
             let _ = remove_path(&t.path);
             if let Some(s) = &saved {
@@ -211,7 +323,14 @@ fn overwrite(repo: &dyn Repo, targets: &[Target], places: &Places) -> Result<Vec
             dest: t.path.clone(),
         });
     }
-    Ok(done)
+    // Stopped while the last item was being copied: still all or nothing.
+    if cancel.cancelled() {
+        return stopped(&session, &manifest);
+    }
+    Ok(Outcome {
+        done,
+        stopped: false,
+    })
 }
 
 fn new_session(undo_dir: &Path) -> Result<PathBuf> {
@@ -241,6 +360,12 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
         bail!("Nothing to undo.");
     };
     let m: Manifest = serde_json::from_slice(&fs::read(session.join(MANIFEST))?)?;
+    rollback(&session, &m)
+}
+
+/// Puts back everything an undo step replaced, then removes the step.
+/// Returns the paths it put back.
+fn rollback(session: &Path, m: &Manifest) -> Result<Vec<PathBuf>> {
     let mut back = Vec::new();
     for e in m.entries.iter().rev() {
         remove_path(&e.path).with_context(|| format!("removing {}", e.path.display()))?;
@@ -249,7 +374,7 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
         }
         back.push(e.path.clone());
     }
-    fs::remove_dir_all(&session)?;
+    fs::remove_dir_all(session)?;
     back.reverse();
     Ok(back)
 }
@@ -345,18 +470,90 @@ impl Read for NodeReader<'_> {
     }
 }
 
-/// Writes a folder (or file) from a snapshot as a tar archive.
-fn write_tar(repo: &dyn Repo, t: &Target, dest: &Path) -> Result<()> {
+/// How far a tar archive has got.
+struct TarProgress<'a> {
+    done: u64,
+    total: u64,
+    report: &'a mut dyn FnMut(RestoreStep),
+    cancel: &'a Cancel,
+}
+
+impl TarProgress<'_> {
+    fn add(&mut self, n: u64) -> io::Result<()> {
+        if self.cancel.cancelled() {
+            return Err(io::Error::other(Stopped));
+        }
+        self.done += n;
+        (self.report)(RestoreStep::Bytes {
+            done: self.done,
+            total: self.total,
+        });
+        Ok(())
+    }
+}
+
+/// A reader that counts what goes through it.
+struct Counted<'a, 'b, R> {
+    inner: R,
+    p: &'a mut TarProgress<'b>,
+}
+
+impl<R: Read> Read for Counted<'_, '_, R> {
+    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+        let n = self.inner.read(out)?;
+        self.p.add(n as u64)?;
+        Ok(n)
+    }
+}
+
+/// The size of the files in a node and under it.
+fn size_of(repo: &dyn Repo, node: &Node) -> Result<u64> {
+    Ok(match (&node.kind, node.subtree) {
+        (NodeKind::File, _) => node.size,
+        (NodeKind::Dir, Some(sub)) => {
+            let mut n = 0;
+            for c in &repo.tree(&sub)?.nodes {
+                n += size_of(repo, c)?;
+            }
+            n
+        }
+        _ => 0,
+    })
+}
+
+/// Writes a folder (or file) from a snapshot as a tar archive. Stopped,
+/// it removes the archive and fails with [`Stopped`].
+fn write_tar(
+    repo: &dyn Repo,
+    t: &Target,
+    dest: &Path,
+    report: &mut dyn FnMut(RestoreStep),
+    cancel: &Cancel,
+) -> Result<()> {
+    report(RestoreStep::Preparing);
+    // Walking the trees first gives a total; writing reads them again from
+    // the cache.
+    let total = size_of(repo, &t.node)?;
+    let mut p = TarProgress {
+        done: 0,
+        total,
+        report,
+        cancel,
+    };
+    p.add(0)?;
     let file =
         fs::File::create_new(dest).with_context(|| format!("creating {}", dest.display()))?;
     let mut b = tar::Builder::new(io::BufWriter::new(file));
     b.follow_symlinks(false);
-    let res = append(repo, &mut b, &t.node, Path::new(&t.name())).and_then(|()| {
+    let res = append(repo, &mut b, &t.node, Path::new(&t.name()), &mut p).and_then(|()| {
         b.into_inner()?.flush()?;
         Ok(())
     });
     if res.is_err() {
         let _ = fs::remove_file(dest);
+        if cancel.cancelled() {
+            return Err(Stopped.into());
+        }
     }
     res
 }
@@ -366,7 +563,9 @@ fn append<W: Write>(
     b: &mut tar::Builder<W>,
     node: &Node,
     path: &Path,
+    p: &mut TarProgress,
 ) -> Result<()> {
+    p.add(0)?;
     let mut h = tar::Header::new_gnu();
     h.set_mode(node.mode.unwrap_or(0o644) & 0o7777);
     h.set_mtime(node.mtime.map_or(0, |t| t.as_second().max(0) as u64));
@@ -379,14 +578,18 @@ fn append<W: Write>(
             b.append_data(&mut h, path, io::empty())?;
             if let Some(sub) = node.subtree {
                 for n in &repo.tree(&sub)?.nodes {
-                    append(repo, b, n, &path.join(&n.name))?;
+                    append(repo, b, n, &path.join(&n.name), p)?;
                 }
             }
         }
         NodeKind::File => {
             h.set_entry_type(tar::EntryType::Regular);
             h.set_size(node.size);
-            b.append_data(&mut h, path, NodeReader::new(repo, node))?;
+            let r = Counted {
+                inner: NodeReader::new(repo, node),
+                p,
+            };
+            b.append_data(&mut h, path, r)?;
         }
         NodeKind::Symlink { target } => {
             h.set_entry_type(tar::EntryType::Symlink);

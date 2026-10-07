@@ -4,10 +4,13 @@ mod common;
 
 use std::path::PathBuf;
 
-use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use common::{Harness, SRC};
 use restoric::app::Effect;
+use restoric::repo::RestoreStep;
+use restoric::restore::{Done, How, Progress};
+use restoric::worker::{Request, Response};
 
 #[test]
 fn selection_05() {
@@ -157,4 +160,175 @@ fn paste_overwrite_and_undo() {
     assert_eq!(h.app.message.as_deref(), Some("Put back a.txt."));
     h.keys(":undo").key(KeyCode::Enter);
     assert_eq!(h.app.message.as_deref(), Some("Nothing to undo."));
+}
+
+/// Presses `keys` and keeps the restore they start from running: it stays
+/// "in progress" until the test applies a response. Nothing is written.
+fn start_held(h: &mut Harness, keys: &str) {
+    for c in keys.chars() {
+        h.app
+            .key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    h.app
+        .outbox
+        .retain(|r| !matches!(r, Request::Restore { .. }));
+    h.pump();
+}
+
+fn progress(item: usize, items: usize, name: &str, step: RestoreStep) -> Response {
+    Response::RestoreProgress(Progress {
+        item,
+        items,
+        name: name.into(),
+        step,
+    })
+}
+
+fn status(h: &mut Harness, cols: u16) -> String {
+    h.screen(cols, 34).lines().last().unwrap().to_string()
+}
+
+#[test]
+fn restore_progress_in_the_status_bar() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("config.go").keys("  y");
+    start_held(&mut h, "p");
+    assert_eq!(h.app.restoring.as_ref().unwrap().items, 2);
+    let mut lines = vec![status(&mut h, 100)];
+    h.app
+        .apply(progress(0, 2, "config.go", RestoreStep::Preparing));
+    lines.push(status(&mut h, 100));
+    let mid = RestoreStep::Bytes {
+        done: 3 << 20,
+        total: 8 << 20,
+    };
+    h.app.apply(progress(1, 2, "main.go", mid));
+    lines.push(status(&mut h, 100));
+    lines.push(status(&mut h, 80));
+    h.app.apply(progress(0, 1, "api/", mid));
+    lines.push(status(&mut h, 100));
+    insta::assert_snapshot!(lines.join("\n"));
+
+    // It shows in every view: here the versions view.
+    h.keys("l");
+    assert!(matches!(h.app.view, restoric::app::View::Versions(_)));
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
+fn stop_restore_18() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("config.go").keys("y");
+    start_held(&mut h, "p");
+    h.app.apply(progress(
+        0,
+        1,
+        "config.go",
+        RestoreStep::Bytes { done: 1, total: 4 },
+    ));
+    // Esc clears the selection first.
+    h.keys(" ");
+    assert_eq!(h.app.marks.len(), 1);
+    h.key(KeyCode::Esc);
+    assert!(h.app.marks.is_empty() && h.app.confirm.is_none());
+    // Then asks.
+    h.key(KeyCode::Esc);
+    insta::assert_snapshot!(h.screen(100, 34));
+    h.keys("n");
+    assert!(h.app.confirm.is_none());
+    let cancel = h.app.restoring.as_ref().unwrap().cancel.clone();
+    assert!(!cancel.cancelled());
+    h.key(KeyCode::Esc).keys("y");
+    assert!(cancel.cancelled());
+    assert!(h.app.restoring.as_ref().unwrap().stopping);
+    insta::assert_snapshot!(status(&mut h, 100));
+    // A second esc doesn't ask again.
+    h.key(KeyCode::Esc);
+    assert!(h.app.confirm.is_none());
+    h.app.apply(Response::Restored {
+        how: How::NextTo,
+        done: Vec::new(),
+        stopped: true,
+    });
+    assert!(h.app.restoring.is_none());
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Stopped · nothing was restored")
+    );
+}
+
+#[test]
+fn one_restore_at_a_time_and_cancel() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("config.go").keys("  y");
+    start_held(&mut h, "p");
+    let busy = Some("A restore is running · esc to stop");
+    for keys in ["p", "P", "r"] {
+        h.keys(keys);
+        assert_eq!(h.app.message.as_deref(), busy, "{keys}");
+        assert!(h.app.confirm.is_none() && h.app.dialog.is_none());
+    }
+    h.keys(":undo").key(KeyCode::Enter);
+    assert_eq!(h.app.message.as_deref(), busy);
+    // :cancel doesn't ask.
+    h.keys(":cancel").key(KeyCode::Enter);
+    assert!(h.app.confirm.is_none());
+    assert!(h.app.restoring.as_ref().unwrap().cancel.cancelled());
+    h.app.apply(Response::Restored {
+        how: How::NextTo,
+        done: vec![Done {
+            target: PathBuf::from(SRC).join("config.go"),
+            dest: PathBuf::from(SRC).join("config.go.2026-09-09_1923"),
+        }],
+        stopped: true,
+    });
+    assert_eq!(h.app.message.as_deref(), Some("Stopped · restored 1 of 2"));
+    h.keys(":cancel").key(KeyCode::Enter);
+    assert_eq!(h.app.message.as_deref(), Some("No restore is running."));
+}
+
+#[test]
+fn a_restore_that_ends_closes_the_stop_popup() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("config.go").keys("y");
+    start_held(&mut h, "p");
+    h.key(KeyCode::Esc);
+    assert!(h.app.confirm.is_some());
+    h.app.apply(Response::Restored {
+        how: How::NextTo,
+        done: vec![Done {
+            target: PathBuf::from(SRC).join("config.go"),
+            dest: PathBuf::from(SRC).join("config.go.2026-09-09_1923"),
+        }],
+        stopped: false,
+    });
+    assert!(h.app.confirm.is_none());
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Restored as config.go.2026-09-09_1923")
+    );
+}
+
+#[test]
+fn quitting_during_a_restore_asks_and_waits() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("config.go").keys("yP");
+    start_held(&mut h, "y");
+    assert_eq!(h.app.restoring.as_ref().unwrap().how, How::Overwrite);
+    h.keys("q");
+    assert!(!h.app.quit);
+    insta::assert_snapshot!(h.screen(100, 34));
+    h.keys("y");
+    assert!(!h.app.quit, "waits for the restore to stop");
+    assert!(h.app.restoring.as_ref().unwrap().cancel.cancelled());
+    h.app.apply(Response::Restored {
+        how: How::Overwrite,
+        done: Vec::new(),
+        stopped: true,
+    });
+    assert!(h.app.quit);
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Stopped · nothing was overwritten")
+    );
 }

@@ -1,18 +1,23 @@
 //! [`Repo`] on top of rustic_core. The only file that sees rustic types.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
 use rustic_backend::BackendOptions;
 use rustic_core::repofile::{Node as RNode, NodeType, SnapshotFile};
 use rustic_core::{
     CommandInput, CredentialOptions, Credentials, IndexedFullStatus, IndexedIdsStatus,
-    LocalDestination, LsOptions, Repository, RepositoryBackends, RepositoryOptions, RestoreOptions,
+    LocalDestination, LsOptions, Progress, ProgressBars, ProgressType, Repository,
+    RepositoryBackends, RepositoryOptions, RestoreOptions, RusticProgress,
 };
 use sha2::{Digest, Sha256};
 
-use super::{BlobId, Id, Node, NodeKind, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
+use super::{
+    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Tree, TreeId,
+};
 
 /// Names the cache's backend version: a new rustic_core starts a new cache.
 pub const BACKEND: &str = "rustic_core 0.13.0";
@@ -38,6 +43,60 @@ pub struct RusticRepo {
     /// The full index, loaded on the first file read. It costs more memory.
     full: Mutex<Option<Arc<Repository<IndexedFullStatus>>>>,
     reopen: Reopen,
+    /// Where the full repository reports how far a restore has copied.
+    meter: Arc<Meter>,
+    /// One restore at a time: they share `meter`.
+    restoring: Mutex<()>,
+}
+
+/// The byte count of the restore that's running, as rustic reports it.
+#[derive(Debug, Default)]
+struct Meter {
+    total: AtomicU64,
+    done: AtomicU64,
+    /// rustic has started copying file contents.
+    copying: AtomicBool,
+}
+
+impl Meter {
+    fn reset(&self) {
+        self.total.store(0, Ordering::Relaxed);
+        self.done.store(0, Ordering::Relaxed);
+        self.copying.store(false, Ordering::Relaxed);
+    }
+}
+
+/// Hands rustic a progress that fills `Meter` for byte counts (only the
+/// restore's content step uses one) and hides spinners and counters.
+#[derive(Debug, Clone)]
+struct ToMeter(Arc<Meter>);
+
+impl ProgressBars for ToMeter {
+    fn progress(&self, kind: ProgressType, _prefix: &str) -> Progress {
+        match kind {
+            ProgressType::Bytes => Progress::new(self.clone()),
+            _ => Progress::hidden(),
+        }
+    }
+}
+
+impl RusticProgress for ToMeter {
+    fn is_hidden(&self) -> bool {
+        false
+    }
+
+    fn set_length(&self, len: u64) {
+        self.0.total.store(len, Ordering::Relaxed);
+        self.0.copying.store(true, Ordering::Relaxed);
+    }
+
+    fn set_title(&self, _title: &str) {}
+
+    fn inc(&self, n: u64) {
+        self.0.done.fetch_add(n, Ordering::Relaxed);
+    }
+
+    fn finish(&self) {}
 }
 
 /// What it takes to open the repository again. No `Debug`: it holds the password.
@@ -107,6 +166,8 @@ impl RusticRepo {
                 backends,
                 credentials,
             },
+            meter: Arc::default(),
+            restoring: Mutex::new(()),
         })
     }
 
@@ -116,7 +177,7 @@ impl RusticRepo {
             return Ok(r.clone());
         }
         let r = &self.reopen;
-        let repo = Repository::new(&r.opts, &r.backends)
+        let repo = Repository::new_with_progress(&r.opts, &r.backends, ToMeter(self.meter.clone()))
             .and_then(|repo| repo.open(&r.credentials))
             .and_then(|repo| repo.to_indexed())
             .map_err(|e| anyhow!("{e}"))?;
@@ -220,36 +281,98 @@ impl Repo for RusticRepo {
         Ok(data.to_vec())
     }
 
-    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()> {
+    fn restore(
+        &self,
+        snap: &SnapshotInfo,
+        path: &Path,
+        dest: &Path,
+        progress: &mut dyn FnMut(RestoreStep),
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        let _one = self.restoring.lock().unwrap_or_else(|e| e.into_inner());
+        progress(RestoreStep::Preparing);
         if dest.symlink_metadata().is_ok() {
             bail!("{} already exists", dest.display());
         }
         let repo = self.full()?;
-        let tree = rustic_core::TreeId::from(rustic_core::Id::new(snap.tree.0.0));
-        let rel: PathBuf = path.components().skip(1).collect();
-        let node = repo
-            .node_from_path(tree, &rel)
-            .map_err(|e| anyhow!("{e}"))?;
-        let is_dir = node.is_dir();
-        // RestoreOptions is `non_exhaustive`: no struct literal.
-        #[allow(clippy::field_reassign_with_default)]
-        let opts = {
-            let mut o = RestoreOptions::default();
-            o.no_ownership = !super::is_root();
-            o
-        };
-        let dest_str = dest
-            .to_str()
-            .context("restoring to a path that isn't UTF-8 isn't supported")?;
-        let dest = LocalDestination::new(dest_str, true, !is_dir).map_err(|e| anyhow!("{e}"))?;
-        let ls = repo
-            .ls(&node, &LsOptions::default())
-            .map_err(|e| anyhow!("{e}"))?;
-        let plan = repo
-            .prepare_restore(&opts, ls.clone(), &dest, false)
-            .map_err(|e| anyhow!("{e}"))?;
-        repo.restore(plan, &opts, ls, &dest)
-            .map_err(|e| anyhow!("{e}"))?;
-        Ok(())
+        let meter = &self.meter;
+        meter.reset();
+        let stop = AtomicBool::new(false);
+        // rustic runs on its own thread; this one watches the meter and
+        // `cancelled`, which needn't be shareable between threads.
+        let res = std::thread::scope(|s| {
+            let run = s.spawn(|| restore_with(&repo, snap, path, dest, &stop));
+            while !run.is_finished() {
+                if cancelled() {
+                    stop.store(true, Ordering::Relaxed);
+                }
+                if meter.copying.load(Ordering::Relaxed) {
+                    progress(RestoreStep::Bytes {
+                        done: meter.done.load(Ordering::Relaxed),
+                        total: meter.total.load(Ordering::Relaxed),
+                    });
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            let res = run
+                .join()
+                .unwrap_or_else(|_| Err(anyhow!("the restore panicked")));
+            // The last count, which a short restore may finish before.
+            if res.is_ok() && meter.copying.load(Ordering::Relaxed) {
+                progress(RestoreStep::Bytes {
+                    done: meter.done.load(Ordering::Relaxed),
+                    total: meter.total.load(Ordering::Relaxed),
+                });
+            }
+            res
+        });
+        if res.as_ref().is_err_and(super::is_stopped) {
+            let _ = match dest.symlink_metadata() {
+                Ok(m) if m.is_dir() => std::fs::remove_dir_all(dest),
+                Ok(_) => std::fs::remove_file(dest),
+                Err(_) => Ok(()),
+            };
+        }
+        res
     }
+}
+
+/// rustic's restore of `path` to `dest`; gives up with [`Stopped`] if `stop`
+/// is set by the time the plan is made.
+fn restore_with(
+    repo: &Repository<IndexedFullStatus>,
+    snap: &SnapshotInfo,
+    path: &Path,
+    dest: &Path,
+    stop: &AtomicBool,
+) -> Result<()> {
+    let tree = rustic_core::TreeId::from(rustic_core::Id::new(snap.tree.0.0));
+    let rel: PathBuf = path.components().skip(1).collect();
+    let node = repo
+        .node_from_path(tree, &rel)
+        .map_err(|e| anyhow!("{e}"))?;
+    let is_dir = node.is_dir();
+    // RestoreOptions is `non_exhaustive`: no struct literal.
+    #[allow(clippy::field_reassign_with_default)]
+    let opts = {
+        let mut o = RestoreOptions::default();
+        o.no_ownership = !super::is_root();
+        o
+    };
+    let dest_str = dest
+        .to_str()
+        .context("restoring to a path that isn't UTF-8 isn't supported")?;
+    let dest = LocalDestination::new(dest_str, true, !is_dir).map_err(|e| anyhow!("{e}"))?;
+    let ls = repo
+        .ls(&node, &LsOptions::default())
+        .map_err(|e| anyhow!("{e}"))?;
+    let plan = repo
+        .prepare_restore(&opts, ls.clone(), &dest, false)
+        .map_err(|e| anyhow!("{e}"))?;
+    if stop.load(Ordering::Relaxed) {
+        return Err(Stopped.into());
+    }
+    repo.restore(plan, &opts, ls, &dest)
+        .map_err(|e| anyhow!("{e}"))?;
+    Ok(())
 }

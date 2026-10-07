@@ -1,0 +1,5 @@
+---
+source: tests/ui_restore.rs
+expression: "status(&mut h, 100)"
+---
+ NOR  stopping after config.go…                                           Sep 09 19:23  4/6  ? help

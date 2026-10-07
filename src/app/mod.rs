@@ -31,6 +31,7 @@ use crate::ui::fmt;
 use crate::worker::{Cancel, Request, Response, Side};
 use cmdline::{Input, InputKind};
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+pub use selection::Restoring;
 use selection::{Confirm, Dialog};
 
 /// Things the event loop does outside the app: they need the terminal.
@@ -388,6 +389,8 @@ pub struct App {
     pub yanked: Option<Vec<Target>>,
     pub dialog: Option<Dialog>,
     pub confirm: Option<Confirm>,
+    /// The restore that's running.
+    pub restoring: Option<Restoring>,
     /// The `:` line being typed.
     pub input: Option<Input>,
     pub effects: Vec<Effect>,
@@ -469,6 +472,7 @@ impl App {
             yanked: None,
             dialog: None,
             confirm: None,
+            restoring: None,
             input: None,
             effects: Vec::new(),
             places: Places::default_for(tz.clone()),
@@ -1063,7 +1067,31 @@ impl App {
                 self.pending.remove(&Pending::Diff(key.clone()));
                 self.diffs.insert(key, diff);
             }
-            Response::Restored { how, done } => {
+            Response::RestoreProgress(p) => {
+                if let Some(r) = &mut self.restoring {
+                    r.progress = Some(p);
+                }
+            }
+            Response::RestoreFailed(e) => {
+                self.restore_ended();
+                self.message = Some(e);
+                self.disk_changed();
+            }
+            Response::Restored {
+                how,
+                done,
+                stopped: true,
+            } => {
+                let items = self.restore_ended().map_or(done.len(), |r| r.items);
+                self.message = Some(match (how, done.len()) {
+                    (How::Overwrite, _) => "Stopped · nothing was overwritten".into(),
+                    (_, 0) => "Stopped · nothing was restored".into(),
+                    (_, n) => format!("Stopped · restored {n} of {items}"),
+                });
+                self.disk_changed();
+            }
+            Response::Restored { how, done, .. } => {
+                self.restore_ended();
                 let home = self.home.clone();
                 let show = |p: &Path| fmt::path(p, home.as_deref());
                 let base = |p: &Path| {
@@ -1256,7 +1284,11 @@ impl App {
     pub fn act(&mut self, a: Action) -> bool {
         match a {
             Action::Quit => {
-                self.quit = true;
+                if self.restoring.is_some() {
+                    self.confirm = Some(Confirm::QuitRestore);
+                } else {
+                    self.quit = true;
+                }
                 return true;
             }
             Action::Yank => return self.yank(),
@@ -1294,11 +1326,15 @@ impl App {
                 return true;
             }
             Action::ConfirmYes => {
-                if let Some(c) = self.confirm.take() {
-                    self.outbox.push(Request::Restore {
-                        targets: c.targets,
-                        how: How::Overwrite,
-                    });
+                match self.confirm.take() {
+                    Some(Confirm::Overwrite { targets, .. }) => {
+                        if !self.restore_busy() {
+                            self.start_restore(targets, How::Overwrite);
+                        }
+                    }
+                    Some(Confirm::StopRestore) => self.stop_restore(false),
+                    Some(Confirm::QuitRestore) => self.stop_restore(true),
+                    None => {}
                 }
                 return true;
             }
@@ -1529,6 +1565,11 @@ impl App {
                 if self.visual.take().is_some() {
                 } else if !self.marks.is_empty() {
                     self.marks.clear();
+                } else if self.search.is_empty()
+                    && self.name_filter.is_empty()
+                    && self.restoring.as_ref().is_some_and(|r| !r.stopping)
+                {
+                    self.confirm = Some(Confirm::StopRestore);
                 } else {
                     self.search.clear();
                     self.name_filter.clear();

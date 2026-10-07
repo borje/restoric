@@ -2,10 +2,12 @@
 
 use ratatui::style::Style;
 
+use super::theme::Theme;
 use super::timeline::Axis;
 use super::{Grid, fmt};
 use crate::app::cmdline::InputKind;
-use crate::app::{Action, App, View};
+use crate::app::{Action, App, Restoring, View};
+use crate::repo::RestoreStep;
 
 pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
@@ -175,6 +177,10 @@ fn finish(
     let plen = fmt::width(&pending) as u16;
 
     let limit = cols.saturating_sub(rlen + plen + 3);
+    let mid = match &app.restoring {
+        Some(rs) if app.dialog.is_none() => restoring(rs, &t, limit.saturating_sub(c) as usize),
+        _ => mid,
+    };
     for (s, style) in mid {
         if c + fmt::width(&s) as u16 > limit {
             break;
@@ -196,4 +202,44 @@ fn finish(
             None => g.put(rc, r, &s, style),
         };
     }
+}
+
+/// The middle of the status bar while restoring, in `w` cells:
+/// `restoring 2/5 src/  ━━━━━━──────  35%  1.2M / 3.4M  esc stop`.
+/// Short of room, `esc stop` goes first, then the bar shrinks.
+fn restoring(rs: &Restoring, t: &Theme, w: usize) -> Vec<(String, Style)> {
+    let name = rs.name();
+    if rs.stopping {
+        return vec![(format!("stopping after {name}…"), t.warn)];
+    }
+    let mut head = vec![("restoring ".to_string(), t.text)];
+    if let Some(p) = rs.progress.as_ref().filter(|p| p.items > 1) {
+        head.push((format!("{}/{} ", p.item + 1, p.items), t.dim));
+    }
+    head.push((name, t.bold));
+    let (Some(pct), Some(RestoreStep::Bytes { done, total })) =
+        (rs.percent(), rs.progress.as_ref().map(|p| p.step))
+    else {
+        head.push((" … preparing".to_string(), t.dim));
+        head.push(("  esc stop".to_string(), t.dim2));
+        return head;
+    };
+    let tail = format!("  {pct}%  {} / {}", fmt::size(done), fmt::size(total));
+    let used: usize = head.iter().map(|(s, _)| fmt::width(s)).sum::<usize>() + fmt::width(&tail);
+    let stop = "  esc stop";
+    let (bar, with_stop) = match w.saturating_sub(used + 2) {
+        n if n >= 16 + stop.len() => (16, true),
+        n => (n.min(16), false),
+    };
+    if bar >= 4 {
+        let filled = (bar as u64 * pct / 100) as usize;
+        head.push(("  ".to_string(), t.text));
+        head.push(("━".repeat(filled), t.accent));
+        head.push(("─".repeat(bar - filled), t.dim2));
+    }
+    head.push((tail, t.text));
+    if with_stop {
+        head.push((stop.to_string(), t.dim2));
+    }
+    head
 }

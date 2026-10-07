@@ -145,6 +145,32 @@ impl Tree {
     }
 }
 
+/// How far a restore has got.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RestoreStep {
+    /// Finding out what to restore; the size isn't known yet.
+    Preparing,
+    /// Copying file contents.
+    Bytes { done: u64, total: u64 },
+}
+
+/// The error of a restore that was stopped on request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Stopped;
+
+impl fmt::Display for Stopped {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("stopped")
+    }
+}
+
+impl std::error::Error for Stopped {}
+
+/// Whether an error is a [`Stopped`].
+pub fn is_stopped(e: &anyhow::Error) -> bool {
+    e.downcast_ref::<Stopped>().is_some()
+}
+
 /// The start of a file, up to a limit.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileBytes {
@@ -170,7 +196,19 @@ pub trait Repo: Send + Sync {
     /// Restores what's at `path` in `snap` (a file, link or folder) to
     /// `dest`, which must not exist yet; its parent must. Keeps mode,
     /// modification time and symlinks; owner and group only as root.
-    fn restore(&self, snap: &SnapshotInfo, path: &Path, dest: &Path) -> Result<()>;
+    ///
+    /// Reports how far it got through `progress`. `cancelled` is asked once
+    /// the restore is planned, before file contents are copied; if it says
+    /// yes, whatever was created at `dest` is removed and the error is
+    /// [`Stopped`]. Once copying has started it runs to the end.
+    fn restore(
+        &self,
+        snap: &SnapshotInfo,
+        path: &Path,
+        dest: &Path,
+        progress: &mut dyn FnMut(RestoreStep),
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<()>;
 
     /// The first `limit` bytes of a file node.
     fn read_file(&self, node: &Node, limit: u64) -> Result<FileBytes> {

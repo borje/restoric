@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use super::{App, Effect, Row, View};
 use crate::index::versions::Run;
 use crate::repo::NodeKind;
-use crate::restore::{How, Target, planned};
+use crate::repo::RestoreStep;
+use crate::restore::{How, Progress, Target, planned};
 use crate::ui::fmt;
-use crate::worker::Request;
+use crate::worker::{Cancel, Request};
 
 /// The restore dialog (`r`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,11 +32,74 @@ impl Dialog {
     }
 }
 
-/// The confirmation popup before `P` overwrites.
+/// A y/n popup.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Confirm {
-    pub text: String,
-    pub targets: Vec<Target>,
+pub enum Confirm {
+    /// Before `P` overwrites.
+    Overwrite { text: String, targets: Vec<Target> },
+    /// `esc` while restoring.
+    StopRestore,
+    /// `q` while restoring.
+    QuitRestore,
+}
+
+/// The restore that's running; there's at most one.
+#[derive(Clone, Debug)]
+pub struct Restoring {
+    pub how: How,
+    pub items: usize,
+    /// `main.go`, `src/` or `2 items`, until the worker names the item.
+    pub label: String,
+    pub cancel: Cancel,
+    /// The latest progress; `None` until the worker starts.
+    pub progress: Option<Progress>,
+    /// Asked to stop; waits for the item being copied.
+    pub stopping: bool,
+    /// Quit once it has stopped.
+    pub quit_after: bool,
+}
+
+impl Restoring {
+    /// The item being restored: `main.go`, `src/`.
+    pub fn name(&self) -> String {
+        self.progress
+            .as_ref()
+            .map_or_else(|| self.label.clone(), |p| p.name.clone())
+    }
+
+    /// How far the current item has got, 0 to 100, once it's copying.
+    pub fn percent(&self) -> Option<u64> {
+        match self.progress.as_ref()?.step {
+            RestoreStep::Bytes { done, total } if total > 0 => {
+                Some((done.min(total) * 100) / total)
+            }
+            RestoreStep::Bytes { .. } => Some(100),
+            RestoreStep::Preparing => None,
+        }
+    }
+
+    /// The popup's text for `StopRestore` and `QuitRestore`, below its title.
+    pub fn stop_text(&self, quit: bool) -> String {
+        let name = self.name();
+        let state = match (self.percent(), self.items) {
+            (Some(p), 1) => format!("{name} is {p}% done."),
+            (Some(p), n) => format!(
+                "Item {} of {n}, {name}, is {p}% done.",
+                self.progress.as_ref().map_or(1, |p| p.item + 1)
+            ),
+            (None, _) => format!("{name} is being prepared."),
+        };
+        let what = match (self.how, self.items) {
+            (How::Overwrite, _) => "Nothing will be overwritten.",
+            (_, 1) => "The partly restored copy is removed.",
+            _ => "Finished items are kept; the partly restored copy is removed.",
+        };
+        if quit {
+            format!("A restore is running. {state} {what}")
+        } else {
+            format!("{state} {what}")
+        }
+    }
 }
 
 /// `main.go`, `src/`, or `2 items`.
@@ -191,13 +255,16 @@ impl App {
     }
 
     pub(super) fn paste(&mut self, over: bool) -> bool {
+        if self.restore_busy() {
+            return false;
+        }
         let Some(targets) = self.yanked.clone() else {
             self.message = Some("Nothing yanked. Press y on a file first.".into());
             return false;
         };
         if over {
             let when = fmt::time(targets[0].snapshot.time, &self.tz);
-            self.confirm = Some(Confirm {
+            self.confirm = Some(Confirm::Overwrite {
                 text: format!(
                     "Replace {} on disk with the version from {when}? The current version is kept for :undo.",
                     describe(&targets)
@@ -205,15 +272,71 @@ impl App {
                 targets,
             });
         } else {
-            self.outbox.push(Request::Restore {
-                targets,
-                how: How::NextTo,
-            });
+            self.start_restore(targets, How::NextTo);
         }
         true
     }
 
+    /// Sends a restore to the worker and shows its progress.
+    pub(super) fn start_restore(&mut self, targets: Vec<Target>, how: How) {
+        let cancel = Cancel::default();
+        self.restoring = Some(Restoring {
+            how,
+            items: targets.len(),
+            label: describe(&targets),
+            cancel: cancel.clone(),
+            progress: None,
+            stopping: false,
+            quit_after: false,
+        });
+        self.outbox.push(Request::Restore {
+            targets,
+            how,
+            cancel,
+        });
+    }
+
+    /// Whether a restore is running; if so, says so. Another restore or an
+    /// undo waits until it's done.
+    pub(super) fn restore_busy(&mut self) -> bool {
+        if self.restoring.is_some() {
+            self.message = Some("A restore is running · esc to stop".into());
+        }
+        self.restoring.is_some()
+    }
+
+    /// The restore is over: closes its popups, and quits if asked to.
+    pub(super) fn restore_ended(&mut self) -> Option<Restoring> {
+        if matches!(
+            self.confirm,
+            Some(Confirm::StopRestore | Confirm::QuitRestore)
+        ) {
+            self.confirm = None;
+        }
+        let r = self.restoring.take();
+        if r.as_ref().is_some_and(|r| r.quit_after) {
+            self.quit = true;
+        }
+        r
+    }
+
+    /// Stops the running restore (`:cancel`, or `y` in the popup).
+    pub(super) fn stop_restore(&mut self, quit: bool) {
+        match &mut self.restoring {
+            Some(r) => {
+                r.cancel.cancel();
+                r.stopping = true;
+                r.quit_after |= quit;
+            }
+            None if quit => self.quit = true,
+            None => self.message = Some("No restore is running.".into()),
+        }
+    }
+
     pub(super) fn open_dialog(&mut self) -> bool {
+        if self.restore_busy() {
+            return false;
+        }
         match self.targets() {
             Ok(t) => {
                 let target = t[0].clone();
@@ -325,22 +448,10 @@ impl App {
                 self.dialog = Some(Dialog { confirm: true, ..d });
                 return;
             }
-            0 => self.outbox.push(Request::Restore {
-                targets: vec![t],
-                how: How::Overwrite,
-            }),
-            1 => self.outbox.push(Request::Restore {
-                targets: vec![t],
-                how: How::NextTo,
-            }),
-            2 => self.outbox.push(Request::Restore {
-                targets: vec![t],
-                how: How::RestoreDir,
-            }),
-            _ => self.outbox.push(Request::Restore {
-                targets: vec![t],
-                how: How::Tar,
-            }),
+            0 => self.start_restore(vec![t], How::Overwrite),
+            1 => self.start_restore(vec![t], How::NextTo),
+            2 => self.start_restore(vec![t], How::RestoreDir),
+            _ => self.start_restore(vec![t], How::Tar),
         }
         self.dialog = None;
     }

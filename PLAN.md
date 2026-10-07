@@ -173,7 +173,7 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 - **Deleted item:** the last version, headed "deleted · last version Aug 22, gone Sep 06".
 - `..`: the parent folder's path.
 
-**Status bar:** mode badge (`NOR`; `SEL` when items are selected; `VIS` in visual mode; `DIFF`, `FIND`, `RST` in those screens), then date · snapshot id · folder counts (or "unchanged since Sep 02"), then extra notes ("2 in column · zi", `filter "go"`, "2 yanked"). On the right: the selected file's modification time, position (`5/7`), any pending count or prefix key, and `? help`.
+**Status bar:** mode badge (`NOR`; `SEL` when items are selected; `VIS` in visual mode; `DIFF`, `FIND`, `RST` in those screens), then date · snapshot id · folder counts (or "unchanged since Sep 02"), then extra notes ("2 in column · zi", `filter "go"`, "2 yanked"). On the right: the selected file's modification time, position (`5/7`), any pending count or prefix key, and `? help`. While a restore runs, the middle shows its progress instead, in every view: `restoring 2/5 src/  ━━━━━━──────  35%  1.2M / 3.4M  esc stop` (§3.11).
 
 **Messages** appear as a small rounded popup at the top right of the panes, like yazi's notifications, and disappear at the next key press.
 
@@ -776,6 +776,52 @@ Showing a file in `$PAGER` is not a restore, so it isn't in the dialog: `o` does
 
 How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restorer, which keeps mode, modification time and symlinks; owner and group are set only when running as root. Folder tar archives are written by restoric from the trees. An overwrite moves what's on disk into `undo/<time>/files/<absolute path>` with a `manifest.json`. If the restore fails, the old version is moved back. `:undo` undoes the newest overwrite, all of its items at once. Moves fall back to copy and delete across file systems. The dialog's "next to it" name comes without the `-2` a clash would add, because the UI doesn't look at the disk; the message after the restore gives the real name. The `:` line handles `:undo`, `:q`, `:help`, `:deleted`, `:latest`/`:now` and `:oldest`/`:first`; the rest of §3.15 comes in M6.
 
+**Progress and stopping.** A restore runs in the background, like a copy in yazi; the UI stays usable. The status bar shows how far it has got (§3.1): `restoring config.go … preparing` while rustic works out what to copy, then a bar with the percentage and bytes of the item being copied, with `2/5` before the name when there are several items. Short of room, `esc stop` goes first, then the bar shrinks. A tar archive walks the folder's trees first to know its size.
+- **One restore at a time.** `p`, `P`, `r` and `:undo` say "A restore is running · esc to stop" until it's done.
+- **Stopping:** `esc` in the folder view, when it has nothing else to do (no visual mode, selection, search or filter), asks first (below); `:cancel` stops without asking. A restore stops between items, or before an item's contents are copied. Once rustic copies a folder's contents it can't be interrupted, so the status bar says `stopping after src/…` until it's done. A tar archive stops anywhere.
+- **After stopping:** copies (next to it, `~/Restored`, tar) keep the finished items and remove the one that was partly written: "Stopped · restored 2 of 5" or "Stopped · nothing was restored". An overwrite is all or nothing: everything it replaced is put back and no undo step is left: "Stopped · nothing was overwritten".
+- **Quitting** during a restore asks "A restore is running. Stop it and quit?"; `y` stops it, waits for the cleanup, then quits.
+- A restore that fails cleans up the same way and shows the error. It doesn't resume; see `ISSUES.md`.
+
+<sub>`docs/screens/18-stop-restore.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
+                                                      ▲                                    − 1× +
+
+ on disk  ~1          │   ..                                   │ main.go · v7/7 · 108 B  ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                                 │ changed here · + new line · − remo…
+ Sep 27 08:52 ~1      │ ▸ models/                              │
+   ┄ 2 unchanged ┄    │ ◇ config.go                    89 B    │   1  package main
+ Sep 20 20:35 ~1      │ ◇ main.go                     108 B  ~ │   2
+   ┄ 2 unchanged ┄    │ ◇ server.go                    30 B    │   3  func main() {
+ Sep 13 20:51 ~2      ╭─ Stop restoring? ────────────────────────────────────╮
+   ┄ 1 unchanged ┄    │                                                      │
+▶Sep 09 19:23 ~1      │  config.go is 25% done. The partly restored copy is  │
+   ┄ 1 unchanged ┄    │  removed.                                            │eware
+ Sep 06 18:03 +1~3−1  │                                                      │re flag
+   ┄ 2 unchanged ┄    │  [y] Stop   [n] Keep going                           │ls
+ Sep 02 20:16 ~1      ╰──────────────────────────────────────────────────────╯
+   ┄ 2 unchanged ┄    │                                        │  11+ // shutdown
+ Aug 22 11:59 ~2−1    │                                        │
+   ┄ 1 unchanged ┄    │                                        │
+ Aug 17 16:04 +1~1    │                                        │
+   ┄ 1 unchanged ┄    │                                        │
+ Aug 10 15:44 ~1      │                                        │
+ Aug 07 08:15 +1      │                                        │
+ Aug 03 16:19 +1~1    │                                        │
+   ┄ 1 unchanged ┄    │                                        │
+ Jul 28 15:59 ~1      │                                        │
+ Jul 26 11:57 ~1      │                                        │
+ Jul 24 12:16 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │
+ Jul 14 09:00 +7      │                                        │
+                      │   2 deleted · . to show                │
+ NOR  restoring config.go  ━━━━────────────  25%  1 B / 4 B  esc stop     Sep 09 19:23  4/6  ? help
+```
+
 ### 3.12 Help (`?` or `~`)
 <sub>`docs/screens/16-help.txt`</sub>
 
@@ -913,6 +959,7 @@ Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `�
 | `:find NAME` / `:f NAME` (or `s`) | Search every snapshot (path contains NAME, case-insensitive) |
 | `:deleted` | Same as `.` |
 | `:undo` | Undo the last overwrite (`P` or option 1) |
+| `:cancel` | Stop the running restore, without asking (§3.11) |
 | `:host NAME`, `:tag T` | Change the snapshot filter *(not in the mockup)* |
 | `:set strict` / `:set nostrict` | Tree-id vs fingerprint change detection *(not in the mockup)* |
 | `:q` `:quit` | Quit |
@@ -929,6 +976,7 @@ Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one na
 - "Yanked 2 items from Sep 09 19:23. p restores next to the original, P overwrites."
 - "Nothing yanked. Press y on a file first."
 - "Restored as main.go.2026-09-09_1923" · "Restored 2 items next to the originals" · "Overwrote main.go. :undo puts the old version back."
+- "A restore is running · esc to stop" · "Stopped · restored 2 of 5" · "Stopped · nothing was restored" · "Stopped · nothing was overwritten" · "No restore is running."
 - "Copied 3e01f5b8:/home/bege/dev/project/src/util.go"
 - "No match for "x" in this folder. Press s to search every snapshot."
 - "The file did not exist in these snapshots, so there is nothing to restore."
@@ -1081,7 +1129,7 @@ restoric must work on repositories of **any size**: any number of snapshots, fil
 
 1. **Work grows with what's on screen, never with the repo.** Opening a folder costs about *depth × snapshots* tree reads (cached after the first time), not the number of files in the repo. Nothing walks a whole snapshot unless the user asks for it (`:find`, restoring a whole folder).
 2. **Nothing assumes a list fits on screen or in memory.** The listing, the Versions column, the versions view, find results and the diff are virtualised: only visible rows are built. Long lists load in pages.
-3. **Results stream in.** Change points, find results and folder counts appear as they're computed, newest first, with progress in the header (`indexing 1 200/48 000`). Every long operation can be cancelled with `esc` and resumes from the cache next time. (M7: leaving the Find view stops `:find`. A folder's indexing runs to the end in the background, and everything it computed is cached.)
+3. **Results stream in.** Change points, find results and folder counts appear as they're computed, newest first, with progress in the header (`indexing 1 200/48 000`). Every long operation can be cancelled with `esc` and resumes from the cache next time. (M7: leaving the Find view stops `:find`. A folder's indexing runs to the end in the background, and everything it computed is cached.) Restores show their progress in the status bar and stop on request, except that rustic's copying of one folder's contents runs to the end (§3.11).
 4. **Lazy everything.** Folder counts, "compared to disk" stats, item tracks, previews and deleted items are computed only for what's visible, and cached.
 5. **Bounded memory.** In-memory caches (trees, previews, diffs) are LRU with a size cap, configurable. The on-disk cache can grow, but has a size cap too. (M7: a cache file over the cap is started afresh at start-up, rather than evicting the least recently used entries; everything in it can be computed again.) Previews are capped at 64 KB and diffs at 2 MB (both configurable). Files are never loaded whole just to show them.
 6. **Incremental refresh.** At start-up, only snapshots that are new since the last run are read. Change points are extended, not recomputed.
@@ -1203,6 +1251,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- Restores show progress and can be stopped (2026-10-07), after comparing with lazyrestic. Progress goes in the **status bar**, not the header (the header belongs to indexing) and not a modal popup (a big remote restore would lock the user out; yazi runs copies in the background too). restoric keeps rustic's restorer, which can't be interrupted while it copies a folder's contents; writing its own restorer for that was judged not worth losing rustic's parallel reads. `esc` asks before stopping, `:cancel` doesn't; one restore at a time; quitting asks and waits. A stopped overwrite puts everything back; stopped copies keep finished items. No resume after a failure for now (`ISSUES.md`). Details in §3.11.
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
 - The state of the files on disk is called `on disk` everywhere (2026-10-06): the Versions column's top row (`on disk  ~1`), the timeline's right-hand label, the versions view's first row and the messages. It was `now  ~1 unsaved` in the column and `now` on the timeline; "unsaved" suggested work at risk, which is the opposite of what a backup browser should say.

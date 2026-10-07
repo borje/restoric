@@ -1,0 +1,38 @@
+---
+source: tests/ui_restore.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  Versions  ~/dev/project/src/server.go                         2 versions in 32 snapshots
+  Jul 2026        Aug                         Sep                              on disk
+                                                    ●·· · · ·  ··  · ·● ·  ·  ┊ · server.go
+                                                    ▲                                      − 1× +
+
+ VERSION         SIZE  SNAPSHOTS  VS DISK       │server.go · Sep 06 18:03                ⇥ content
+ on disk         42 B                           │kept in 10 snapshots · 7ff3fd58
+ Sep 27 08:52    42 B  3 snaps    identical     │
+▶Sep 06 18:03    30 B  10 snaps   +1 −0         │  1  package main
+                                                │  2
+                                                │  3  func serve() {}
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+ NOR  restoring api/  ━━━━━───────────  37%  3.0M / 8.0M  esc stop                      2/2  ? help

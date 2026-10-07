@@ -11,8 +11,9 @@ use std::path::Path;
 use jiff::tz::TimeZone;
 
 use common::fixture::fixture;
-use restoric::repo::{Repo, SnapshotInfo};
-use restoric::restore::{How, Places, Target, planned, run, stamp, undo};
+use restoric::repo::{Repo, RestoreStep, SnapshotInfo, is_stopped};
+use restoric::restore::{Done, How, Places, Target, planned, run, stamp, undo};
+use restoric::worker::Cancel;
 
 fn target(repo: &dyn Repo, snap: &SnapshotInfo, path: &Path) -> Target {
     let mut tree = repo.tree(&snap.tree).unwrap();
@@ -29,6 +30,13 @@ fn target(repo: &dyn Repo, snap: &SnapshotInfo, path: &Path) -> Target {
         path: path.to_path_buf(),
         node: node.unwrap(),
     }
+}
+
+/// Runs a restore to the end, without watching its progress.
+fn go(repo: &dyn Repo, targets: &[Target], how: How, places: &Places) -> anyhow::Result<Vec<Done>> {
+    let o = run(repo, targets, how, places, &mut |_| {}, &Cancel::default())?;
+    assert!(!o.stopped);
+    Ok(o.done)
 }
 
 #[test]
@@ -53,35 +61,35 @@ fn every_option() {
         planned(&t, How::NextTo, &places),
         src.join(format!("a.txt.{st0}"))
     );
-    let done = run(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
+    let done = go(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
     assert_eq!(done[0].dest, src.join(format!("a.txt.{st0}")));
     assert_eq!(fs::read(&done[0].dest).unwrap(), b"alpha\n");
-    let done = run(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
+    let done = go(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
     assert_eq!(done[0].dest, src.join(format!("a.txt.{st0}-2")));
 
     // Missing on disk: next to it means back in its place.
     let d = src.join("sub/d.txt");
     assert!(!d.exists());
-    let done = run(&repo, &[target(&repo, &snaps[0], &d)], How::NextTo, &places).unwrap();
+    let done = go(&repo, &[target(&repo, &snaps[0], &d)], How::NextTo, &places).unwrap();
     assert_eq!(done[0].dest, d);
     assert_eq!(fs::read(&d).unwrap(), b"delta\n");
 
     // Permissions are kept (a.txt is 600 from snapshot 4 on).
     let t4 = target(&repo, &snaps[4], &a);
-    let done = run(&repo, &[t4], How::NextTo, &places).unwrap();
+    let done = go(&repo, &[t4], How::NextTo, &places).unwrap();
     let mode = fs::metadata(&done[0].dest).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o600);
 
     // A folder into the restore folder.
     let sub = target(&repo, &snaps[0], &src.join("sub"));
-    let done = run(&repo, std::slice::from_ref(&sub), How::RestoreDir, &places).unwrap();
+    let done = go(&repo, std::slice::from_ref(&sub), How::RestoreDir, &places).unwrap();
     let dir = places.restore_dir.join(&st0).join("sub");
     assert_eq!(done[0].dest, dir);
     assert_eq!(fs::read(dir.join("c.txt")).unwrap(), b"charlie\n");
     assert_eq!(fs::read(dir.join("d.txt")).unwrap(), b"delta\n");
 
     // A folder as a tar archive next to it.
-    let done = run(&repo, &[sub], How::Tar, &places).unwrap();
+    let done = go(&repo, &[sub], How::Tar, &places).unwrap();
     assert_eq!(done[0].dest, src.join(format!("sub-{st0}.tar")));
     let mut ar = tar::Archive::new(fs::File::open(&done[0].dest).unwrap());
     let mut entries: Vec<(String, String)> = ar
@@ -106,7 +114,7 @@ fn every_option() {
     );
 
     // Overwrite a file, then undo: the original bytes come back.
-    run(&repo, std::slice::from_ref(&t), How::Overwrite, &places).unwrap();
+    go(&repo, std::slice::from_ref(&t), How::Overwrite, &places).unwrap();
     assert_eq!(fs::read(&a).unwrap(), b"alpha\n");
     assert_eq!(undo(&places).unwrap(), std::slice::from_ref(&a));
     assert_eq!(fs::read(&a).unwrap(), b"alpha 2\n");
@@ -119,7 +127,7 @@ fn every_option() {
         target(&repo, &snaps[0], &src.join("sub")),
         target(&repo, &snaps[0], &src.join("keep.txt")),
     ];
-    run(&repo, &items, How::Overwrite, &places).unwrap();
+    go(&repo, &items, How::Overwrite, &places).unwrap();
     assert!(!src.join("sub/new.txt").exists());
     assert_eq!(fs::read(src.join("keep.txt")).unwrap(), b"keep\n");
     undo(&places).unwrap();
@@ -132,4 +140,35 @@ fn every_option() {
         !src.join("keep.txt").exists(),
         "keep.txt wasn't on disk before"
     );
+
+    // Progress: preparing, then bytes up to the folder's size.
+    let sub = target(&repo, &snaps[0], &src.join("sub"));
+    let mut steps = Vec::new();
+    let o = run(
+        &repo,
+        std::slice::from_ref(&sub),
+        How::RestoreDir,
+        &places,
+        &mut |p| steps.push(p.step),
+        &Cancel::default(),
+    )
+    .unwrap();
+    assert!(!o.stopped);
+    assert_eq!(steps.first(), Some(&RestoreStep::Preparing));
+    let size = fs::read(src.join("sub/c.txt")).unwrap().len() + b"delta\n".len();
+    assert_eq!(
+        steps.last(),
+        Some(&RestoreStep::Bytes {
+            done: size as u64,
+            total: size as u64
+        })
+    );
+
+    // Stopped before the contents are copied: nothing is left at the destination.
+    let dest = f.root.join("stopped");
+    let e = repo
+        .restore(&snaps[0], &sub.path, &dest, &mut |_| {}, &|| true)
+        .unwrap_err();
+    assert!(is_stopped(&e));
+    assert!(!dest.exists());
 }

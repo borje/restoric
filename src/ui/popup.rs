@@ -1,6 +1,7 @@
 //! Popups (PLAN.md §3.4, §3.12, §3.16): which-key, messages, help.
 
 use super::{Grid, TOP, fmt};
+use crate::app::selection::Confirm;
 use crate::app::{Action, App, View};
 
 /// What can follow a prefix key.
@@ -182,20 +183,38 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
     g.put(x + w - 29, by, "j k choose  ⏎ restore  esc", t.dim);
 }
 
-/// The confirmation before overwriting.
+/// A y/n popup: before overwriting, and before stopping a restore.
 pub fn confirm(app: &App, g: &mut Grid) {
     let Some(c) = &app.confirm else { return };
     let t = g.theme.clone();
-    let lines = fmt::wrap(&c.text, 50);
+    let stop = |quit| app.restoring.as_ref().map(|r| r.stop_text(quit));
+    let (title, text, yes, no) = match c {
+        Confirm::Overwrite { text, .. } => {
+            ("Overwrite?", text.clone(), "[y] Overwrite", "[n] Cancel")
+        }
+        Confirm::StopRestore => (
+            "Stop restoring?",
+            stop(false).unwrap_or_default(),
+            "[y] Stop",
+            "[n] Keep going",
+        ),
+        Confirm::QuitRestore => (
+            "Quit?",
+            stop(true).unwrap_or_default(),
+            "[y] Stop and quit",
+            "[n] Keep going",
+        ),
+    };
+    let lines = fmt::wrap(&text, 50);
     let w = 56.min(g.cols());
     let h = lines.len() as u16 + 5;
     let x = (g.cols() - w) / 2;
     let y = ((g.rows().saturating_sub(h)) / 2).saturating_sub(2);
-    g.rbox(x, y, w, h, "Overwrite?", t.warn);
+    g.rbox(x, y, w, h, title, t.warn);
     for (k, l) in lines.iter().enumerate() {
         g.put(x + 3, y + 2 + k as u16, l, t.text);
     }
     let by = y + h - 2;
-    g.put_act(x + 3, by, "[y] Overwrite", t.warn, Action::ConfirmYes);
-    g.put_act(x + 19, by, "[n] Cancel", t.dim, Action::ConfirmNo);
+    let nx = g.put_act(x + 3, by, yes, t.warn, Action::ConfirmYes) + 3;
+    g.put_act(nx, by, no, t.dim, Action::ConfirmNo);
 }
