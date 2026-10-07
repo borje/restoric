@@ -19,8 +19,13 @@ pub struct Filter {
 
 impl Filter {
     pub fn matches(&self, s: &SnapshotInfo) -> bool {
-        (self.hosts.is_empty() || self.hosts.contains(&s.host))
-            && self.tag.as_ref().is_none_or(|t| s.tags.contains(t))
+        self.accepts(&s.host, &s.tags)
+    }
+
+    /// Whether a snapshot from `host` with `tags` is one of ours.
+    pub fn accepts(&self, host: &str, tags: &[String]) -> bool {
+        (self.hosts.is_empty() || self.hosts.iter().any(|h| h == host))
+            && self.tag.as_ref().is_none_or(|t| tags.contains(t))
     }
 }
 
@@ -28,7 +33,12 @@ impl Filter {
 /// below it. Below counts because the snapshot's tree has the folders above
 /// each backup path, so `restic backup dir/a.log dir/b.csv` holds `dir` (§2.3).
 pub fn covers(s: &SnapshotInfo, path: &Path) -> bool {
-    s.paths
+    holds(&s.paths, path)
+}
+
+/// Whether backup paths `paths` hold `path`, as in [`covers`].
+pub fn holds(paths: &[PathBuf], path: &Path) -> bool {
+    paths
         .iter()
         .any(|p| path.starts_with(p) || p.starts_with(path))
 }

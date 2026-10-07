@@ -8,13 +8,14 @@ use clap::{Args, Parser, Subcommand};
 
 use restoric::app::App;
 use restoric::cache::Cache;
-use restoric::config::Config;
+use restoric::config::{Access, Config, RepoEntry, resolve_access};
 use restoric::disk::RealDisk;
 use restoric::index::timeline::{Filter, explain_empty, timeline_set};
 use restoric::index::{Index, Mode};
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
-use restoric::repo::rustic::{BACKEND, OpenOptions, RusticRepo};
+use restoric::repo::rustic::{BACKEND, Connection, OpenOptions, RusticRepo};
+use restoric::repos::{self, Candidate, ProbeCache};
 use restoric::ui::theme::Theme;
 use restoric::worker::{Ctx, Worker};
 
@@ -52,19 +53,21 @@ enum Command {
     },
 }
 
+/// The environment is read in `env_access`, not by clap: a `[[repo]]` in the
+/// config comes between the flags and the environment.
 #[derive(Args)]
 struct RepoArgs {
-    /// Repository, as for restic
-    #[arg(short, long, global = true, env = "RESTIC_REPOSITORY")]
+    /// Repository, as for restic [env: RESTIC_REPOSITORY, after the config's [[repo]]]
+    #[arg(short, long, global = true)]
     repo: Option<String>,
-    /// File holding the repository location
-    #[arg(long, global = true, env = "RESTIC_REPOSITORY_FILE")]
+    /// File holding the repository location [env: RESTIC_REPOSITORY_FILE]
+    #[arg(long, global = true)]
     repository_file: Option<PathBuf>,
-    /// File holding the password
-    #[arg(long, global = true, env = "RESTIC_PASSWORD_FILE")]
+    /// File holding the password [env: RESTIC_PASSWORD_FILE]
+    #[arg(long, global = true)]
     password_file: Option<PathBuf>,
-    /// Command that prints the password
-    #[arg(long, global = true, env = "RESTIC_PASSWORD_COMMAND")]
+    /// Command that prints the password [env: RESTIC_PASSWORD_COMMAND]
+    #[arg(long, global = true)]
     password_command: Option<String>,
     /// Open a repository that has no password (restic's --insecure-no-password)
     #[arg(long, global = true)]
@@ -109,16 +112,159 @@ fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
     Some(guard)
 }
 
-fn open(args: &RepoArgs, view: &ViewArgs, config: &Config) -> Result<(Index, Filter)> {
-    let repo = RusticRepo::open(&OpenOptions {
-        repo: args.repo.clone(),
-        repo_file: args.repository_file.clone(),
+impl RepoArgs {
+    fn access(&self) -> Access {
+        Access {
+            repo: self.repo.clone(),
+            repo_file: self.repository_file.clone(),
+            password: None,
+            password_file: self.password_file.clone(),
+            password_command: self.password_command.clone(),
+            no_password: self.insecure_no_password,
+        }
+    }
+}
+
+/// restic's environment variables.
+fn env_access() -> Access {
+    let var = |name| std::env::var(name).ok().filter(|v: &String| !v.is_empty());
+    Access {
+        repo: var("RESTIC_REPOSITORY"),
+        repo_file: var("RESTIC_REPOSITORY_FILE").map(PathBuf::from),
         password: std::env::var("RESTIC_PASSWORD").ok(),
-        password_file: args.password_file.clone(),
-        password_command: args.password_command.clone(),
-        no_password: args.insecure_no_password,
+        password_file: var("RESTIC_PASSWORD_FILE").map(PathBuf::from),
+        password_command: var("RESTIC_PASSWORD_COMMAND"),
+        no_password: false,
+    }
+}
+
+fn open_options(a: Access) -> OpenOptions {
+    OpenOptions {
+        repo: a.repo,
+        repo_file: a.repo_file,
+        password: a.password,
+        password_file: a.password_file,
+        password_command: a.password_command,
+        no_password: a.no_password,
         cache_dir: None,
-    })?;
+    }
+}
+
+/// Which snapshots are ours in the repository `entry` names (or the one
+/// from the flags or environment, for `None`): `--host`, then the entry's
+/// `host`, then the config's, then this machine's name.
+fn filter(view: &ViewArgs, config: &Config, entry: Option<&RepoEntry>) -> Filter {
+    let entry_hosts = entry.map(RepoEntry::hosts).unwrap_or_default();
+    let hosts = if !view.host.is_empty() {
+        view.host.clone()
+    } else if !entry_hosts.is_empty() {
+        entry_hosts
+    } else if !config.hosts().is_empty() {
+        config.hosts()
+    } else {
+        vec![gethostname::gethostname().to_string_lossy().into_owned()]
+    };
+    let tag = view
+        .tag
+        .clone()
+        .or(entry.and_then(|e| e.tag.clone()))
+        .or(config.tag.clone())
+        .filter(|t| !t.is_empty());
+    Filter { hosts, tag }
+}
+
+/// The line of an error that says what went wrong. rustic_core's errors
+/// run to many lines, with the message under a `Message:` heading.
+fn short(err: &anyhow::Error) -> String {
+    let text = format!("{err:#}");
+    let lines = text.lines().map(str::trim).filter(|l| !l.is_empty());
+    let first = lines.clone().next().unwrap_or_default().to_string();
+    lines
+        .skip_while(|l| *l != "Message:")
+        .nth(1)
+        .map_or(first, str::to_string)
+}
+
+/// Opens the repository that holds `folder`: the one from `--repo`, else
+/// the config's `[[repo]]` whose snapshots hold it, else the one from the
+/// environment (PLAN.md §4.6).
+fn open(
+    args: &RepoArgs,
+    view: &ViewArgs,
+    config: &Config,
+    folder: &Path,
+) -> Result<(Index, Filter)> {
+    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    let home = home.as_deref();
+    let flags = args.access();
+    let env = env_access();
+    let (repo, entry) = if flags.has_repo() || config.repo.is_empty() {
+        let a = resolve_access(&flags, &env, None, home);
+        (RusticRepo::open(&open_options(a))?, None)
+    } else {
+        let cands: Vec<Candidate> = config
+            .repo
+            .iter()
+            .map(|e| Candidate {
+                repo: e.repository.clone(),
+                filter: filter(view, config, Some(e)),
+            })
+            .collect();
+        let cache_path = ProbeCache::default_path();
+        let mut cache = cache_path
+            .as_deref()
+            .map(ProbeCache::load)
+            .unwrap_or_default();
+        let tty = std::io::stderr().is_terminal();
+        let chosen = repos::choose(
+            &cands,
+            folder,
+            &mut cache,
+            jiff::Timestamp::now(),
+            |i, probing| {
+                let e = &config.repo[i];
+                if probing && tty {
+                    eprint!("\rchecking {}…\x1b[K", e.repository);
+                }
+                let a = resolve_access(&flags, &env, Some(e), home);
+                let c = Connection::open(&open_options(a))?;
+                let snaps = c.snapshots()?;
+                Ok((c, snaps))
+            },
+            |i, err| {
+                let repo = &config.repo[i].repository;
+                tracing::warn!("skipping {repo}: {err:#}");
+                if tty {
+                    eprint!("\r\x1b[K");
+                }
+                eprintln!("restoric: skipping {repo}: {}", short(err));
+            },
+        );
+        if tty {
+            eprint!("\r\x1b[K");
+        }
+        if let Some(p) = &cache_path
+            && let Err(e) = cache.save(p)
+        {
+            tracing::warn!("{e:#}");
+        }
+        match chosen {
+            Some((i, c)) => (RusticRepo::from_connection(c)?, Some(&config.repo[i])),
+            None if env.has_repo() => {
+                let a = resolve_access(&flags, &env, None, home);
+                (RusticRepo::open(&open_options(a))?, None)
+            }
+            None => {
+                let names: Vec<&str> = cands.iter().map(|c| c.repo.as_str()).collect();
+                anyhow::bail!(
+                    "none of the repositories in the config has snapshots of {} ({}); \
+                     use --repo, or set RESTIC_REPOSITORY",
+                    folder.display(),
+                    names.join(", ")
+                );
+            }
+        }
+    };
     let cache = match Cache::default_path(repo.id()) {
         Some(path) => Cache::open(&path, BACKEND, config.disk_cache()).unwrap_or_else(|e| {
             tracing::warn!("cache unavailable, using memory: {e:#}");
@@ -132,19 +278,7 @@ fn open(args: &RepoArgs, view: &ViewArgs, config: &Config) -> Result<(Index, Fil
         Mode::Content
     };
     let index = Index::new(Arc::new(repo), cache, mode, config.memory_cache());
-    // --host, then the config, then this machine's name.
-    let hosts = if !view.host.is_empty() {
-        view.host.clone()
-    } else if !config.hosts().is_empty() {
-        config.hosts()
-    } else {
-        vec![gethostname::gethostname().to_string_lossy().into_owned()]
-    };
-    let tag = view
-        .tag
-        .clone()
-        .or(config.tag.clone().filter(|t| !t.is_empty()));
-    Ok((index, Filter { hosts, tag }))
+    Ok((index, filter(view, config, entry)))
 }
 
 /// Starts the TUI.
@@ -220,7 +354,7 @@ fn run(cli: Cli) -> Result<()> {
         Some(Command::Demo) => demo(&cli.view, &config),
         Some(Command::Log { path, json }) => {
             let path = std::path::absolute(&path).context("resolving the path")?;
-            let (index, filter) = open(&cli.repo, &cli.view, &config)?;
+            let (index, filter) = open(&cli.repo, &cli.view, &config, &path)?;
             let tty = std::io::stderr().is_terminal();
             let mut progress = |done: usize, total: usize| {
                 if tty && (done.is_multiple_of(16) || done == total) {
@@ -243,7 +377,7 @@ fn run(cli: Cli) -> Result<()> {
         }
         Some(Command::Versions { file, json }) => {
             let path = std::path::absolute(&file).context("resolving the path")?;
-            let (index, filter) = open(&cli.repo, &cli.view, &config)?;
+            let (index, filter) = open(&cli.repo, &cli.view, &config, &path)?;
             let versions = restoric::log::versions(&index, &filter, &path)?;
             let mut out = std::io::stdout().lock();
             if json {
@@ -271,7 +405,7 @@ fn run(cli: Cli) -> Result<()> {
             } else {
                 path
             };
-            let (index, filter) = open(&cli.repo, &view, &config)?;
+            let (index, filter) = open(&cli.repo, &view, &config, &folder)?;
             let snaps = index.repo().snapshots()?;
             if timeline_set(&snaps, &filter, &folder).is_empty() {
                 anyhow::bail!("{}", explain_empty(&snaps, &filter, &folder));

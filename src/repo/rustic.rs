@@ -10,7 +10,7 @@ use rustic_backend::BackendOptions;
 use rustic_core::repofile::{Node as RNode, NodeType, SnapshotFile};
 use rustic_core::{
     CommandInput, CredentialOptions, Credentials, IndexedFullStatus, IndexedIdsStatus,
-    LocalDestination, LsOptions, Progress, ProgressBars, ProgressType, Repository,
+    LocalDestination, LsOptions, OpenStatus, Progress, ProgressBars, ProgressType, Repository,
     RepositoryBackends, RepositoryOptions, RestoreOptions, RusticProgress,
 };
 use sha2::{Digest, Sha256};
@@ -106,7 +106,14 @@ struct Reopen {
     credentials: Credentials,
 }
 
-impl RusticRepo {
+/// An opened repository whose index isn't loaded yet: enough to list
+/// snapshots, which is how restoric finds the repo that holds a folder.
+pub struct Connection {
+    open: Repository<OpenStatus>,
+    reopen: Reopen,
+}
+
+impl Connection {
     pub fn open(o: &OpenOptions) -> Result<Self> {
         let repo = match (&o.repo, &o.repo_file) {
             (Some(r), _) => r.clone(),
@@ -155,17 +162,37 @@ impl RusticRepo {
         let open = Repository::new(&opts, &backends)
             .and_then(|r| r.open(&credentials))
             .map_err(|e| anyhow!("{e}"))?;
-        let id = id_from(&open.config().id);
-        let trees = open.to_indexed_ids().map_err(|e| anyhow!("{e}"))?;
         Ok(Self {
-            id,
-            trees,
-            full: Mutex::new(None),
+            open,
             reopen: Reopen {
                 opts,
                 backends,
                 credentials,
             },
+        })
+    }
+
+    /// Every snapshot in the repository, without loading the index.
+    pub fn snapshots(&self) -> Result<Vec<SnapshotInfo>> {
+        let snaps = self.open.get_all_snapshots().map_err(|e| anyhow!("{e}"))?;
+        Ok(snaps.into_iter().map(snapshot_from).collect())
+    }
+}
+
+impl RusticRepo {
+    pub fn open(o: &OpenOptions) -> Result<Self> {
+        Self::from_connection(Connection::open(o)?)
+    }
+
+    /// Loads the index of an opened repository.
+    pub fn from_connection(c: Connection) -> Result<Self> {
+        let id = id_from(&c.open.config().id);
+        let trees = c.open.to_indexed_ids().map_err(|e| anyhow!("{e}"))?;
+        Ok(Self {
+            id,
+            trees,
+            full: Mutex::new(None),
+            reopen: c.reopen,
             meter: Arc::default(),
             restoring: Mutex::new(()),
         })

@@ -9,6 +9,7 @@ pub mod disk;
 pub mod index;
 pub mod log;
 pub mod repo;
+pub mod repos;
 pub mod restore;
 pub mod tui;
 pub mod ui;

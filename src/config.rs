@@ -34,6 +34,124 @@ pub struct Config {
     pub keys: BTreeMap<String, String>,
     /// Style name → colour, e.g. `accent = "magenta"` or `"#e4a84c"`.
     pub colors: BTreeMap<String, String>,
+    /// Repositories to look in, as `[[repo]]` blocks (§4.6).
+    pub repo: Vec<RepoEntry>,
+}
+
+/// One `[[repo]]` block: where a repository is and how to unlock it.
+/// restoric uses the one whose snapshots hold the folder it opens.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RepoEntry {
+    pub repository: String,
+    pub password_file: Option<String>,
+    pub password_command: Option<String>,
+    #[serde(default)]
+    pub insecure_no_password: bool,
+    /// Replaces the top-level `host` for this repository.
+    pub host: Option<Hosts>,
+    /// Replaces the top-level `tag` for this repository.
+    pub tag: Option<String>,
+}
+
+impl RepoEntry {
+    pub fn hosts(&self) -> Vec<String> {
+        hosts_of(&self.host)
+    }
+
+    fn has_password(&self) -> bool {
+        self.password_file.is_some() || self.password_command.is_some() || self.insecure_no_password
+    }
+}
+
+/// Where a repository is and how to unlock it, from one source: the flags,
+/// the environment or a `[[repo]]` block.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Access {
+    pub repo: Option<String>,
+    pub repo_file: Option<PathBuf>,
+    /// Only from the environment (`RESTIC_PASSWORD`): there's no flag.
+    pub password: Option<String>,
+    pub password_file: Option<PathBuf>,
+    pub password_command: Option<String>,
+    pub no_password: bool,
+}
+
+impl Access {
+    pub fn has_repo(&self) -> bool {
+        self.repo.is_some() || self.repo_file.is_some()
+    }
+
+    fn has_password(&self) -> bool {
+        self.password.is_some()
+            || self.password_file.is_some()
+            || self.password_command.is_some()
+            || self.no_password
+    }
+
+    fn password_from(mut self, other: &Access) -> Self {
+        self.password = other.password.clone();
+        self.password_file = other.password_file.clone();
+        self.password_command = other.password_command.clone();
+        self.no_password = other.no_password;
+        self
+    }
+}
+
+/// Combines the sources. The repository comes from a flag, then `entry`
+/// (the `[[repo]]` that holds the folder), then the environment. The
+/// password comes from a flag, then `entry` if it gave the repository and
+/// says how to unlock it, then the environment.
+pub fn resolve_access(
+    flags: &Access,
+    env: &Access,
+    entry: Option<&RepoEntry>,
+    home: Option<&Path>,
+) -> Access {
+    let entry = entry.filter(|_| !flags.has_repo());
+    let mut a = match entry {
+        Some(e) => Access {
+            repo: Some(e.repository.clone()),
+            ..Access::default()
+        },
+        None if flags.has_repo() => Access {
+            repo: flags.repo.clone(),
+            repo_file: flags.repo_file.clone(),
+            ..Access::default()
+        },
+        None => Access {
+            repo: env.repo.clone(),
+            repo_file: env.repo_file.clone(),
+            ..Access::default()
+        },
+    };
+    if flags.has_password() {
+        a = a.password_from(flags);
+    } else if let Some(e) = entry.filter(|e| e.has_password()) {
+        a.password_file = e.password_file.as_deref().map(|f| expand_home(f, home));
+        a.password_command = e.password_command.clone();
+        a.no_password = e.insecure_no_password;
+    } else {
+        a = a.password_from(env);
+    }
+    a
+}
+
+fn hosts_of(h: &Option<Hosts>) -> Vec<String> {
+    match h {
+        Some(Hosts::One(h)) => vec![h.clone()],
+        Some(Hosts::Many(h)) => h.clone(),
+        None => Vec::new(),
+    }
+}
+
+/// `p` with a leading `~` replaced by `home`.
+fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
+    match (p.strip_prefix("~/"), home) {
+        (Some(rest), Some(h)) => h.join(rest),
+        (_, Some(h)) if p == "~" => h.to_path_buf(),
+        _ => PathBuf::from(p),
+    }
 }
 
 impl Config {
@@ -61,11 +179,7 @@ impl Config {
     }
 
     pub fn hosts(&self) -> Vec<String> {
-        match &self.host {
-            Some(Hosts::One(h)) => vec![h.clone()],
-            Some(Hosts::Many(h)) => h.clone(),
-            None => Vec::new(),
-        }
+        hosts_of(&self.host)
     }
 
     pub fn preview_limit(&self) -> u64 {
@@ -86,14 +200,7 @@ impl Config {
 
     /// `restore_dir` with `~` expanded, if set.
     pub fn restore_dir(&self, home: Option<&Path>) -> Option<PathBuf> {
-        let d = self.restore_dir.as_ref()?;
-        Some(match (d.strip_prefix("~/"), home) {
-            (Some(rest), Some(h)) => h.join(rest),
-            _ if d == "~" => home
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| PathBuf::from(d)),
-            _ => PathBuf::from(d),
-        })
+        Some(expand_home(self.restore_dir.as_ref()?, home))
     }
 
     /// The `[keys]` overrides.
@@ -281,9 +388,97 @@ selected = "#202830"
             }
         };
         assert!(bad("hots = 1").contains("unknown field"));
+        assert!(bad("[[repo]]\nrepository = \"x\"\npaths = []").contains("unknown field"));
+        assert!(bad("[[repo]]\ntag = \"x\"").contains("missing field `repository`"));
         assert!(bad("[keys]\nfly = \"x\"").contains("unknown action \"fly\""));
         assert!(bad("[keys]\nopen = \"Hyper\"").contains("isn't a key"));
         assert!(bad("[colors]\naccent = \"chartreuse!\"").contains("isn't a colour"));
         assert_eq!(Config::default().hosts(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn parses_repos() {
+        let c: Config = toml::from_str(
+            r#"
+host = "top"
+
+[[repo]]
+repository = "rest:http://iridium:8000/dev-vm"
+insecure_no_password = true
+
+[[repo]]
+repository = "/mnt/photos"
+password_file = "~/.photos-pw"
+password_command = "pass photos"
+host = ["a", "b"]
+tag = "photos"
+"#,
+        )
+        .unwrap();
+        assert_eq!(c.repo.len(), 2);
+        assert!(c.repo[0].insecure_no_password);
+        assert_eq!(c.repo[0].hosts(), Vec::<String>::new());
+        assert_eq!(c.repo[1].hosts(), ["a", "b"]);
+        assert_eq!(c.repo[1].tag.as_deref(), Some("photos"));
+        assert_eq!(c.hosts(), ["top"]);
+    }
+
+    #[test]
+    fn flags_then_the_repo_entry_then_the_environment() {
+        let home = Some(Path::new("/home/me"));
+        let env = Access {
+            repo: Some("env-repo".into()),
+            password: Some("env-pw".into()),
+            ..Access::default()
+        };
+        let entry = RepoEntry {
+            repository: "entry-repo".into(),
+            password_file: Some("~/pw".into()),
+            ..RepoEntry::default()
+        };
+        let none = Access::default();
+
+        // The entry's repository and password beat the environment's.
+        let a = resolve_access(&none, &env, Some(&entry), home);
+        assert_eq!(a.repo.as_deref(), Some("entry-repo"));
+        assert_eq!(a.password, None);
+        assert_eq!(a.password_file, Some(PathBuf::from("/home/me/pw")));
+
+        // An entry that doesn't say how to unlock it takes the environment's.
+        let bare = RepoEntry {
+            repository: "entry-repo".into(),
+            ..RepoEntry::default()
+        };
+        let a = resolve_access(&none, &env, Some(&bare), home);
+        assert_eq!(a.repo.as_deref(), Some("entry-repo"));
+        assert_eq!(a.password.as_deref(), Some("env-pw"));
+
+        // A password flag beats the entry.
+        let flags = Access {
+            password_command: Some("pass x".into()),
+            ..Access::default()
+        };
+        let a = resolve_access(&flags, &env, Some(&entry), home);
+        assert_eq!(a.repo.as_deref(), Some("entry-repo"));
+        assert_eq!(a.password_command.as_deref(), Some("pass x"));
+        assert_eq!(a.password_file, None);
+
+        // --repo leaves the entry out, password and all.
+        let flags = Access {
+            repo: Some("flag-repo".into()),
+            ..Access::default()
+        };
+        let no_pw = RepoEntry {
+            insecure_no_password: true,
+            ..entry.clone()
+        };
+        let a = resolve_access(&flags, &env, Some(&no_pw), home);
+        assert_eq!(a.repo.as_deref(), Some("flag-repo"));
+        assert!(!a.no_password);
+        assert_eq!(a.password.as_deref(), Some("env-pw"));
+
+        // No entry: the environment.
+        let a = resolve_access(&none, &env, None, home);
+        assert_eq!(a, env);
     }
 }

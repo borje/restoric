@@ -32,7 +32,7 @@ This document holds everything decided so far: the research, the UX (with screen
 2. **Only stop where something changed.** Snapshots where nothing changed are folded away and counted.
 3. **Never destroy anything by default.** Restore puts the file next to the original unless you choose to overwrite, and overwriting asks for confirmation and can be undone.
 4. **The UI never waits on the network.** All repo access runs in the background, and the screen draws from caches.
-5. **Works with your existing restic setup.** It uses `RESTIC_REPOSITORY`, `RESTIC_PASSWORD_COMMAND` and so on, with no new config needed.
+5. **Works with your existing restic setup.** It uses `RESTIC_REPOSITORY`, `RESTIC_PASSWORD_COMMAND` and so on, with no new config needed. When different folders go to different repositories, the config can list them all, and restoric finds the one that holds the folder (§4.6).
 6. **Vim and yazi keys, arrows always.** Every action has a vim key and a plain key, and keys mean the same as in yazi where they can. Prefix keys pop up what can follow, and `?` lists everything.
 7. **No FUSE, no mount.** It reads the repository directly through rustic_core.
 8. **Looks at home next to yazi.** Three columns with a preview, a status bar with a mode badge, few lines, rounded popups, Nerd Font icons.
@@ -1025,6 +1025,7 @@ restoric/
 │   ├── lib.rs         the modules below, so tests/ can use them
 │   ├── log.rs         `restoric log`
 │   ├── config.rs      ~/.config/restoric/config.toml
+│   ├── repos.rs       which [[repo]] holds the folder; repos.json cache of snapshot roots
 │   ├── repo/
 │   │   ├── mod.rs     trait Repo + our own types (SnapshotInfo, TreeId, Node, NodeKind)
 │   │   ├── rustic.rs  RusticRepo: rustic_core implementation
@@ -1103,7 +1104,12 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 - **Progress:** the title bar shows `indexing 120/430` while change points are computed. Partial results draw as they arrive, newest first.
 
 ### 4.6 Start-up
-1. Read the repository and password from `--repo` / `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE` and `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic, or `--insecure-no-password` for a repository without one. Then the config file.
+1. Read the config file. Then find the repository, in this order:
+   1. `--repo` / `--repository-file`.
+   2. The config's `[[repo]]` whose snapshots of this machine (§2.4, with that entry's `host` and `tag`) hold the folder. restoric doesn't build an index to check this: it lists each repository's snapshots. `~/.cache/restoric/repos.json` remembers each repository's snapshot roots (host, tags, backup paths) and when it was read, so a usual start opens only the repository the cache picks, and checks it against its current snapshot list. On a miss, or when the pick turns out stale, every repository not read in the last 5 minutes is read again, one at a time, with a `checking <repo>…` line on stderr. A repository that can't be opened is skipped with a one-line warning. When several hold the folder, the one with the closest backup path wins (at or above the folder beats below it, deeper beats shallower), then the one listed first.
+   3. `RESTIC_REPOSITORY` / `RESTIC_REPOSITORY_FILE`. If there's none and the config has `[[repo]]` entries, the error names the folder and the repositories checked.
+
+   The password comes from `--password-file` / `--password-command` / `--insecure-no-password`, then the chosen `[[repo]]` if it says how to unlock it, then `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic. The repository is chosen once, from the folder restoric starts in.
 2. Open the repo (read only). Load the snapshot list from the cache, then fetch new ones in the background.
 3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) with a backup path at, above, or below that path (§2.3).
 4. If this machine has no snapshots at all: show the hostnames that do have snapshots, explain how to set `host` (§2.4), and stop.
@@ -1113,7 +1119,8 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
 ```
 restoric [PATH]                       open the TUI at PATH (default: current folder)
   -r, --repo REPO       --repository-file FILE
-  --password-file FILE  --password-command CMD     (plus RESTIC_REPOSITORY, _FILE, RESTIC_PASSWORD, _FILE, _COMMAND)
+  --password-file FILE  --password-command CMD     (plus RESTIC_REPOSITORY, _FILE, RESTIC_PASSWORD, _FILE, _COMMAND;
+                                                    a matching [[repo]] in the config comes before the environment, §4.6)
   --insecure-no-password  a repository made with `restic init --insecure-no-password` (empty password; can't be combined with a password)
   --host HOST           --tag TAG                  --strict
   --select NAME         start with NAME selected (used by the yazi plugin)
@@ -1251,6 +1258,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.
 - Restores show progress and can be stopped (2026-10-07), after comparing with lazyrestic. Progress goes in the **status bar**, not the header (the header belongs to indexing) and not a modal popup (a big remote restore would lock the user out; yazi runs copies in the background too). restoric keeps rustic's restorer, which can't be interrupted while it copies a folder's contents; writing its own restorer for that was judged not worth losing rustic's parallel reads. `esc` asks before stopping, `:cancel` doesn't; one restore at a time; quitting asks and waits. A stopped overwrite puts everything back; stopped copies keep finished items. No resume after a failure for now (`ISSUES.md`). Details in §3.11.
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
 - Labels at the right edge of the timeline row replace the legend.
@@ -1318,6 +1326,12 @@ restore_dir = "~/Restored"
 
 [colors]                      # accent added changed deleted live dim dir code selected
 # accent = "magenta"          # ANSI names, "#rrggbb" or 0–255
+
+[[repo]]                      # repositories to look in; the one holding the folder is used (§4.6)
+repository = "rest:http://iridium:8000/dev-vm"
+insecure_no_password = true   # or password_file = "~/…", password_command = "…"
+# host = "dev-vm"             # replace the top-level host and tag for this repository
+# tag = "work"
 ```
 
 How it works (M7): `--host` and `--tag` win over the config, and the config over the hostname. A mistake in the file (an unknown key, action, key name or colour) stops start-up with a message naming it. Key overrides apply in every view, before the built-in keys. Actions: `down up top bottom half_down half_up parent open versions root older_change newer_change older_snapshot newer_snapshot oldest_change newest_change older_item_change newer_item_change preview_mode scroll_down scroll_up deleted diff select visual yank paste overwrite restore show search filter find next_match prev_match command zoom_in zoom_out help quit`. Keys: a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, arrows, `Home`, `End`, `PageUp`, `PageDown`, `F1`–`F12`.
