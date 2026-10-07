@@ -145,6 +145,15 @@ fn hosts_of(h: &Option<Hosts>) -> Vec<String> {
     }
 }
 
+/// `$XDG_CONFIG_HOME` or `~/.config`, on every platform (not macOS's
+/// `Library/Application Support`).
+fn config_path(xdg: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
+    let base = xdg
+        .filter(|p| p.is_absolute())
+        .or_else(|| home.map(|h| h.join(".config")))?;
+    Some(base.join("restoric").join("config.toml"))
+}
+
 /// `p` with a leading `~` replaced by `home`.
 fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
     match (p.strip_prefix("~/"), home) {
@@ -156,8 +165,9 @@ fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
 
 impl Config {
     pub fn path() -> Option<PathBuf> {
-        directories::ProjectDirs::from("", "", "restoric")
-            .map(|d| d.config_dir().join("config.toml"))
+        let xdg = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
+        let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+        config_path(xdg, home)
     }
 
     /// The config file, or the defaults if there isn't one.
@@ -330,6 +340,17 @@ pub fn parse_key(s: &str) -> Result<(KeyCode, KeyModifiers)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn config_path_prefers_xdg_then_dot_config() {
+        let p = |x: Option<&str>| super::config_path(x.map(Into::into), Some("/h".into()));
+        assert_eq!(p(None), Some("/h/.config/restoric/config.toml".into()));
+        assert_eq!(p(Some("/x")), Some("/x/restoric/config.toml".into()));
+        assert_eq!(
+            p(Some("rel")),
+            Some("/h/.config/restoric/config.toml".into())
+        );
+    }
+
     use super::*;
 
     #[test]
