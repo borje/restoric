@@ -1479,4 +1479,4 @@ Tick milestones here as they're done, with the commit.
 - [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
 - [x] M8: yazi plugin — abb5806 (not yet published for `ya pkg`)
-- [x] M9: repository picker — COMMIT
+- [x] M9: repository picker — c725494
