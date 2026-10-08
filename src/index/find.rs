@@ -37,7 +37,7 @@ impl Index {
         query: &str,
         progress: &mut dyn FnMut(usize, usize, Vec<Found>) -> bool,
     ) -> Result<Vec<Found>> {
-        let q = query.to_lowercase();
+        let q = super::fold(query);
         let mut memo: HashMap<(PathBuf, TreeId), Matches> = HashMap::new();
         let mut found: BTreeMap<PathBuf, Found> = BTreeMap::new();
         for (i, s) in set.iter().enumerate() {
@@ -78,7 +78,7 @@ impl Index {
         let mut out = Vec::new();
         for n in &self.tree(tree)?.nodes {
             let p = rel.join(&n.name);
-            if p.to_string_lossy().to_lowercase().contains(q) {
+            if super::fold(&p.to_string_lossy()).contains(q) {
                 out.push((p, n.is_dir()));
             } else if let (true, Some(sub)) = (n.is_dir(), n.subtree) {
                 out.extend(self.find_in(memo, &p, sub, q)?.iter().cloned());

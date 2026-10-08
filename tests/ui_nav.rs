@@ -192,3 +192,23 @@ fn reload() {
     command(&mut h, "reload");
     assert_eq!(h.app.message.as_deref(), Some("No new snapshots."));
 }
+
+/// macOS stores ä as a + U+0308. It must be drawn with its accent, and an ä
+/// typed as one char must find it in search, filter and find.
+#[test]
+fn decomposed_names() {
+    let dsl = "host bege-laptop\nroot /home/bege/data\nsnapshot 2026-07-01 10:00\n  write ha\u{308}lsa.pdf x\n  write other.txt y\n";
+    let mut h = Harness::with(dsl, "/home/bege/data");
+    assert!(h.screen(100, 12).contains("ha\u{308}lsa.pdf"));
+
+    h.keys("/h\u{e4}lsa").key(KeyCode::Enter);
+    assert!(h.app.matches(h.app.rows()[h.app.sel]));
+
+    h.keys("fH\u{e4}lsa").key(KeyCode::Enter);
+    let screen = h.screen(100, 12);
+    assert!(screen.contains("ha\u{308}lsa.pdf") && !screen.contains("other.txt"));
+    h.key(KeyCode::Esc);
+
+    h.keys("sh\u{e4}lsa").key(KeyCode::Enter);
+    assert!(h.screen(100, 12).contains("ha\u{308}lsa.pdf"));
+}

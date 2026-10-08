@@ -15,6 +15,7 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+use crate::index::fold;
 use crate::repo::SnapshotInfo;
 use crate::repos::{Candidate, ProbeCache, fit};
 
@@ -230,14 +231,14 @@ impl Picker {
         let Some(g) = &self.groups else {
             return Vec::new();
         };
-        let f = g.filter.to_lowercase();
+        let f = fold(&g.filter);
         g.rows
             .iter()
             .enumerate()
             .filter(|(_, r)| {
                 f.is_empty()
-                    || r.host.to_lowercase().contains(&f)
-                    || r.path.to_string_lossy().to_lowercase().contains(&f)
+                    || fold(&r.host).contains(&f)
+                    || fold(&r.path.to_string_lossy()).contains(&f)
             })
             .map(|(i, _)| i)
             .collect()

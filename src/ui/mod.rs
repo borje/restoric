@@ -18,7 +18,6 @@ pub mod versions;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use unicode_width::UnicodeWidthChar;
 
 use crate::app::keys::Hits;
 use crate::app::{Action, App, View};
@@ -45,26 +44,19 @@ impl Grid<'_> {
     /// column after the text.
     pub fn put_to(&mut self, x: u16, y: u16, text: &str, style: Style, end: u16) -> u16 {
         let end = end.min(self.cols());
-        let mut x = x;
-        if y >= self.rows() {
+        if y >= self.rows() || x >= end {
             return x;
         }
-        for c in text.chars() {
-            let w = c.width().unwrap_or(0) as u16;
-            if w == 0 {
-                continue;
-            }
-            if x + w > end {
-                break;
-            }
-            let pos = (self.area.x + x, self.area.y + y);
-            if let Some(cell) = self.buf.cell_mut(pos) {
-                cell.set_char(c);
-                cell.set_style(style);
-            }
-            x += w;
-        }
-        x
+        // Whole graphemes, so a decomposed name (macOS stores ä as a +
+        // U+0308) keeps its accent.
+        let (ax, _) = self.buf.set_stringn(
+            self.area.x + x,
+            self.area.y + y,
+            text,
+            usize::from(end - x),
+            style,
+        );
+        ax - self.area.x
     }
 
     pub fn put(&mut self, x: u16, y: u16, text: &str, style: Style) -> u16 {

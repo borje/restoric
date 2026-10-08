@@ -24,7 +24,7 @@ use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
 use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
-use crate::index::{Mode, ModeSwitch};
+use crate::index::{Mode, ModeSwitch, fold};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
 use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
@@ -562,14 +562,8 @@ impl App {
         let Some(Some(entries)) = self.listing() else {
             return rows;
         };
-        let shown = |e: &Entry| {
-            self.name_filter.is_empty()
-                || e.node
-                    .name
-                    .to_string_lossy()
-                    .to_lowercase()
-                    .contains(&self.name_filter.to_lowercase())
-        };
+        let f = fold(&self.name_filter);
+        let shown = |e: &Entry| f.is_empty() || fold(&e.node.name.to_string_lossy()).contains(&f);
         let ghosts: &[Entry] = match (self.ghosts, self.ghost_entries()) {
             (true, Some(g)) => g,
             _ => &[],
@@ -1822,13 +1816,9 @@ impl App {
     /// Whether a row matches the search.
     pub fn matches(&self, row: Row) -> bool {
         !self.search.is_empty()
-            && self.entry(row).is_some_and(|e| {
-                e.node
-                    .name
-                    .to_string_lossy()
-                    .to_lowercase()
-                    .contains(&self.search.to_lowercase())
-            })
+            && self
+                .entry(row)
+                .is_some_and(|e| fold(&e.node.name.to_string_lossy()).contains(&fold(&self.search)))
     }
 
     fn select_row(&mut self, k: usize) {

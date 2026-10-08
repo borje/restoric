@@ -473,7 +473,7 @@ Restoring works like yazi's copy and paste, out of the past.
 
 `:find NAME` searches every snapshot by path. It answers "where did this file go?"
 
-How it works (M6): the search starts at the backup root and matches paths relative to it, ignoring case. When a folder matches, its contents aren't listed again. Matches are memoised by (folder path, tree id), so an unchanged folder is read once, and the cost follows the number of distinct trees. It runs in the background; the header shows `searching 120/430` and partial results arrive as it goes.
+How it works (M6): the search starts at the backup root and matches paths relative to it, ignoring case and Unicode form (NFC/NFD). When a folder matches, its contents aren't listed again. Matches are memoised by (folder path, tree id), so an unchanged folder is read once, and the cost follows the number of distinct trees. It runs in the background; the header shows `searching 120/430` and partial results arrive as it goes.
 
 <sub>`docs/screens/09-find.txt`</sub>
 
@@ -1380,6 +1380,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- Accented names (2026-10-08): macOS stores `ä` as `a` + U+0308. Names are drawn grapheme by grapheme (ratatui's `set_stringn`), so the accent stays in its cell. Search (`/`), filter (`f`), `:find` and the picker filter compare lowercased NFC text (`index::fold`), so a typed `ä` finds a decomposed one. Names are never normalized for paths or restores.
 - Picker details (2026-10-08, M9 built): a repo row shows the full location and the hosts, no name column and no `name` key. On a foreign host `r` is the same directory prompt as `p` (no reduced dialog); the item lands at `<dir>/<name>`. The config `tag` is dropped for a foreign host and kept for one of this machine's. The picker is keyboard-only.
 - Repository picker (2026-10-08), §3.18, M9. It lists (host, path) groups, not a snapshot file tree, so the folder-anchored design stays. It opens with `--browse` and in place of the §4.6 dead ends (no terminal: the old message, exit non-zero). With several `[[repo]]` there is a repo level first (A2), drawn from `repos.json` without opening any repo. A row is (host, path) only, with no tags. No in-session switch of repo, host or path: restart. Restoring from a foreign host always asks for a target directory and disables `P`. The `on disk` comparison is left as it is: it is read-only, and for a renamed machine it is correct.
 - Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.

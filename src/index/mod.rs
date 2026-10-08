@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use anyhow::Result;
 use quick_cache::Weighter;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::cache::{Cache, Table};
 use crate::repo::{Id, Node, Repo, SnapshotInfo, Tree, TreeId};
@@ -112,6 +113,12 @@ pub struct Index {
     cache: Cache,
     /// The current [`Mode`], switchable while running (`:set strict`).
     mode: Arc<AtomicU8>,
+}
+
+/// `s` lowercased and NFC-normalized, for matching typed text against
+/// names: macOS stores ä as a + U+0308, a keyboard types it as one char.
+pub fn fold(s: &str) -> String {
+    s.to_lowercase().nfc().collect()
 }
 
 pub fn components(path: &Path) -> Vec<OsString> {
