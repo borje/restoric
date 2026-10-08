@@ -1129,7 +1129,7 @@ How it works (M9): the picker is its own state machine (`picker.rs`), not a `Vie
 restoric/
 ├── Cargo.toml
 ├── PLAN.md
-├── docs/            mockup.html, screens/*.txt
+├── docs/            mockup.html, screens/*.txt, demo.tape → demo.gif (the README's demo; `vhs docs/demo.tape` regenerates it)
 ├── src/
 │   ├── main.rs        clap args, env (RESTIC_*), start-up, terminal setup/teardown, panic hook
 │   ├── lib.rs         the modules below, so tests/ can use them
@@ -1331,7 +1331,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 - Nerd Font icons per file type with fallback.
 - `restoric demo`.
 - Performance pass on the large and huge repos (§4.8): meet the targets, check memory caps and cancellation.
-- README with screenshots. `cargo install`, GitHub release binaries (Linux x86_64/aarch64, macOS), AUR/deb later.
+- README with a demo recording: `docs/demo.tape` drives `restoric demo` under [vhs](https://github.com/charmbracelet/vhs) and writes `docs/demo.gif`; `vhs docs/demo.tape` regenerates it. `cargo install`, GitHub release binaries (Linux x86_64/aarch64, macOS), AUR/deb later.
 - Optional: syntax highlighting in the preview and diff (`syntect`), restore to the system trash.
 
 ### M8: yazi plugin

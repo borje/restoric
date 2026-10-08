@@ -4,28 +4,7 @@ A terminal UI for browsing and restoring files from a [restic](https://restic.ne
 
 You open a folder and scrub through time. restoric only stops at the snapshots where that folder actually changed, and folds the rest away:
 
-```text
- restoric  ~/dev/project/src                                                   ◀ version 11 of 15 ▶
-  Jul 2026        Aug                         Sep                              now
-  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
-                                                    ▲                                      − 1× +
-
- now  ~1 unsaved      │   ..                              │ main.go · v6/7 · 96 B        ⇥ content
-   ┄ 2 unchanged ┄    │ ▸ api/                      ~1    │ changed here · + new line · − removed
- Sep 27 08:52 ~1      │ ▸ models/                         │
-   ┄ 2 unchanged ┄    │ ◇ config.go           89 B  ~     │   1  package main
- Sep 20 20:35 ~1      │ ◇ legacy.go           62 B  −     │   2
-   ┄ 2 unchanged ┄    │ ◇ main.go             96 B  ~     │   3  func main() {
- Sep 13 20:51 ~2      │ ◇ server.go           30 B  +     │   4    run()
-   ┄ 1 unchanged ┄    │ ◇ util.go             94 B        │   5  }
- Sep 09 19:23 ~1      │                                   │   6  // flags
-   ┄ 1 unchanged ┄    │                                   │   7  // middleware
-▶Sep 06 18:03 +1~3−1  │                                   │   8  // feature flag
-   ┄ 2 unchanged ┄    │                                   │   9  // signals
- Sep 02 20:16 ~1      │                                   │  10+ // serve
-   ┄ 2 unchanged ┄    │                                   │
- NOR  Sep 06 18:03  7ff3fd58  src/ +1 ~3 −1                               Sep 06 18:03  5/7  ? help
-```
+![restoric browsing a folder's history, diffing a version and restoring it](docs/demo.gif)
 
 - The row of dots marks the snapshots where the selected file changed (`●`) and where only its folder did (`○`).
 - A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored).
