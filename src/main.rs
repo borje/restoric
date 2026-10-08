@@ -362,18 +362,19 @@ fn open(
     }
 }
 
-/// Runs the folder view in `term`.
+/// Runs the folder view in `term`. True when `q` asks to go back to the
+/// picker.
 fn tui(
     term: &mut Term,
-    index: Index,
+    index: Arc<Index>,
     disk: Arc<dyn restoric::disk::Disk>,
     app: App,
     view: &ViewArgs,
     config: &Config,
-) -> Result<()> {
+) -> Result<bool> {
     let mut app = app;
     app.mode_switch = Some(index.mode_switch());
-    app.strict = view.strict;
+    app.strict = index.mode() == Mode::Strict;
     app.icons = !view.no_icons && config.icons.unwrap_or(true);
     app.diff_limit = config.diff_limit();
     app.keymap = config.keymap()?;
@@ -410,12 +411,12 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
     let repo = FakeRepo::parse(&dsl)?;
     repo.disk().write_files()?;
     let snaps = repo.snapshots()?;
-    let index = Index::new(
+    let index = Arc::new(Index::new(
         Arc::new(repo),
         Cache::in_memory(),
         Mode::Content,
         config.memory_cache(),
-    );
+    ));
     let mut app = App::new(
         snaps,
         Filter::default(),
@@ -428,7 +429,7 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
     let result = Term::new()
         .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, config));
     let _ = std::fs::remove_dir_all(&dir);
-    result
+    result.map(|_| ())
 }
 
 fn run(cli: Cli) -> Result<()> {
@@ -488,21 +489,23 @@ fn run(cli: Cli) -> Result<()> {
             } else {
                 path
             };
-            browse(&cli.repo, &view, &config, folder)
+            browse(&cli.repo, &mut view, &config, folder)
         }
     }
 }
 
 /// The folder view on `folder`, through the picker (§3.18) when the folder
 /// isn't in this machine's snapshots or `--browse` says so.
-fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) -> Result<()> {
+fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf) -> Result<()> {
     let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
     let tz = jiff::tz::TimeZone::system();
     let now = jiff::Timestamp::now();
     let tty = std::io::stdout().is_terminal();
     let theme = config.apply_colors(Theme::from_env())?;
     let mut picker = Picker::new(folder.clone(), home.clone(), tz.clone(), now);
-    let (mut repo, mut entry) = match start(args, view, config, &folder, view.browse)? {
+    // The repository in use: the one opened before the picker, or the one
+    // picked at the repo level. Its index lasts from one pick to the next.
+    let mut current = match start(args, view, config, &folder, view.browse)? {
         Start::Repo {
             repo,
             entry,
@@ -515,8 +518,8 @@ fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) ->
                 let mut app = App::new(snaps, f.clone(), folder, tz, home);
                 app.mine = f.hosts;
                 let mut term = Term::new()?;
-                let index = index_for(*repo, view, config);
-                return tui(&mut term, index, Arc::new(RealDisk), app, view, config);
+                let index = Arc::new(index_for(*repo, view, config));
+                return tui(&mut term, index, Arc::new(RealDisk), app, view, config).map(|_| ());
             }
             let message = (!held).then(|| explain_empty(&snaps, &f, &folder));
             if !tty {
@@ -526,7 +529,7 @@ fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) ->
                 );
             }
             picker = picker.with_groups(&location, &snaps, &f.hosts, message);
-            (Some(*repo), entry)
+            Some((entry, Arc::new(index_for(*repo, view, config))))
         }
         Start::Repos => {
             if !tty {
@@ -541,7 +544,7 @@ fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) ->
                 .map(ProbeCache::load)
                 .unwrap_or_default();
             picker = picker.with_repos(&cands, &cache);
-            (None, None)
+            None
         }
     };
 
@@ -553,59 +556,77 @@ fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) ->
         .as_deref()
         .map(ProbeCache::load)
         .unwrap_or_default();
-    // The repository opened from the repo level, kept for after the pick.
-    let mut opened: Option<(usize, RusticRepo)> = None;
-    let pick = {
-        let mut io = |io: Io| -> Result<Vec<restoric::repo::SnapshotInfo>> {
-            let i = match io {
-                Io::Open(i) | Io::Refresh(i) => i,
+    loop {
+        // The repository opened from the repo level, kept for after the pick.
+        let mut opened: Option<(usize, RusticRepo)> = None;
+        let pick = {
+            let mut io = |io: Io| -> Result<Vec<restoric::repo::SnapshotInfo>> {
+                let i = match io {
+                    Io::Open(i) | Io::Refresh(i) => i,
+                };
+                let e = &config.repo[i];
+                // The repository in use opens again from what it has loaded.
+                if let (Io::Open(_), Some((Some(c), index))) = (io, &current)
+                    && *c == i
+                {
+                    let snaps = index.repo().snapshots()?;
+                    cache.record(&e.repository, &snaps, now);
+                    save_cache(cache_path.as_deref(), &cache);
+                    return Ok(snaps);
+                }
+                let a = resolve_access(&flags, &env, Some(e), home.as_deref());
+                let c = Connection::open(&open_options(a)).map_err(|e| anyhow!("{}", short(&e)))?;
+                let snaps = c.snapshots().map_err(|e| anyhow!("{}", short(&e)))?;
+                cache.record(&e.repository, &snaps, now);
+                save_cache(cache_path.as_deref(), &cache);
+                if matches!(io, Io::Open(_)) {
+                    let r = RusticRepo::from_connection(c).map_err(|e| anyhow!("{}", short(&e)))?;
+                    opened = Some((i, r));
+                }
+                Ok(snaps)
             };
-            let e = &config.repo[i];
-            let a = resolve_access(&flags, &env, Some(e), home.as_deref());
-            let c = Connection::open(&open_options(a)).map_err(|e| anyhow!("{}", short(&e)))?;
-            let snaps = c.snapshots().map_err(|e| anyhow!("{}", short(&e)))?;
-            cache.record(&e.repository, &snaps, now);
-            save_cache(cache_path.as_deref(), &cache);
-            if matches!(io, Io::Open(_)) {
-                let r = RusticRepo::from_connection(c).map_err(|e| anyhow!("{}", short(&e)))?;
-                opened = Some((i, r));
-            }
-            Ok(snaps)
+            term.pick(&mut picker, &theme, &mut io)?
         };
-        term.pick(&mut picker, &theme, &mut io)?
-    };
-    let Some(pick) = pick else {
-        return Ok(());
-    };
-    if let Some(i) = pick.repo
-        && let Some((j, r)) = opened.take()
-        && i == j
-    {
-        repo = Some(r);
-        entry = Some(i);
-    }
-    let repo = repo.context("no repository was opened")?;
+        let Some(pick) = pick else {
+            return Ok(());
+        };
+        if let Some(i) = pick.repo
+            && let Some((j, r)) = opened.take()
+            && i == j
+        {
+            // Close the old index's cache first: it may be the same file.
+            drop(current.take());
+            current = Some((Some(i), Arc::new(index_for(r, view, config))));
+        }
+        let (entry, index) = current.clone().context("no repository was opened")?;
 
-    // The picked host replaces this machine's; the tag stays only for one
-    // of this machine's hosts.
-    let base = filter(view, config, entry.map(|i| &config.repo[i]));
-    let foreign = !base.hosts.contains(&pick.host);
-    let f = Filter {
-        hosts: vec![pick.host.clone()],
-        tag: if foreign { None } else { base.tag },
-    };
-    let open_at = if folder.starts_with(&pick.path) {
-        folder.clone()
-    } else {
-        pick.path.clone()
-    };
-    let snaps = repo.snapshots()?;
-    let mut app = App::new(snaps, f, open_at, tz, home);
-    app.mine = base.hosts;
-    app.shown_host = Some(pick.host);
-    app.start_dir = folder;
-    let index = index_for(repo, view, config);
-    tui(&mut term, index, Arc::new(RealDisk), app, view, config)
+        // The picked host replaces this machine's; the tag stays only for one
+        // of this machine's hosts.
+        let base = filter(view, config, entry.map(|i| &config.repo[i]));
+        let foreign = !base.hosts.contains(&pick.host);
+        let f = Filter {
+            hosts: vec![pick.host.clone()],
+            tag: if foreign { None } else { base.tag },
+        };
+        let open_at = if folder.starts_with(&pick.path) {
+            folder.clone()
+        } else {
+            pick.path.clone()
+        };
+        let snaps = index.repo().snapshots()?;
+        let mut app = App::new(snaps, f, open_at, tz.clone(), home.clone());
+        app.mine = base.hosts;
+        app.shown_host = Some(pick.host);
+        app.start_dir = folder.clone();
+        app.from_picker = true;
+        if !tui(&mut term, index, Arc::new(RealDisk), app, view, config)? {
+            return Ok(());
+        }
+        // Why the picker first opened, and where to start, no longer apply.
+        picker.message = None;
+        view.select = None;
+        view.at = None;
+    }
 }
 
 fn main() -> ExitCode {

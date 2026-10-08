@@ -310,6 +310,17 @@ fn a_restore_that_ends_closes_the_stop_popup() {
 }
 
 #[test]
+fn going_back_to_the_picker_during_a_restore_asks() {
+    let mut h = Harness::new(SRC);
+    h.app.from_picker = true;
+    h.at("2026-09-09 19:23").select("config.go").keys("yP");
+    start_held(&mut h, "y");
+    h.keys("q");
+    assert!(!h.app.quit && h.app.to_picker);
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
+#[test]
 fn quitting_during_a_restore_asks_and_waits() {
     let mut h = Harness::new(SRC);
     h.at("2026-09-09 19:23").select("config.go").keys("yP");

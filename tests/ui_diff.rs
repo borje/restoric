@@ -2,7 +2,7 @@
 
 mod common;
 
-use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use common::{Harness, SRC};
 use restoric::app::{DiffMode, View};
@@ -124,4 +124,38 @@ fn identical() {
     let mut h = Harness::with(FILES, "/home/bege/data");
     h.select("same.txt").keys("d");
     insta::assert_snapshot!(h.screen(100, 10));
+}
+
+/// `q` goes back one level: diff, versions, folder, then out (§3.14).
+#[test]
+fn q_goes_back_one_level() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("main.go").keys("ld");
+    assert!(matches!(h.app.view, View::Diff(_)));
+    h.keys("q");
+    assert!(matches!(h.app.view, View::Versions(_)));
+    h.keys("q");
+    assert_eq!(h.app.view, View::Folder);
+    assert!(!h.app.quit);
+    h.keys("q");
+    assert!(h.app.quit && !h.app.to_picker);
+}
+
+/// After the picker, `q` in the folder view goes back to it; `Ctrl-c`
+/// and `:q` still quit (§3.18).
+#[test]
+fn q_after_the_picker_goes_back_to_it() {
+    let mut h = Harness::new(SRC);
+    h.app.from_picker = true;
+    h.keys("q");
+    assert!(h.app.quit && h.app.to_picker);
+    let mut h = Harness::new(SRC);
+    h.app.from_picker = true;
+    h.app
+        .key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+    assert!(h.app.quit && !h.app.to_picker);
+    let mut h = Harness::new(SRC);
+    h.app.from_picker = true;
+    h.keys(":q").key(KeyCode::Enter);
+    assert!(h.app.quit && !h.app.to_picker);
 }

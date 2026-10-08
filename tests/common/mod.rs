@@ -63,7 +63,7 @@ impl Harness {
         let mut h = Harness {
             app,
             ctx: Ctx {
-                index,
+                index: std::sync::Arc::new(index),
                 disk,
                 places: restoric::restore::Places {
                     restore_dir: PathBuf::from("/home/bege/Restored"),

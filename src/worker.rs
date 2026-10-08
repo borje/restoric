@@ -28,7 +28,7 @@ pub const PREVIEW_LIMIT: u64 = 64 * 1024;
 
 /// What the worker works with.
 pub struct Ctx {
-    pub index: Index,
+    pub index: Arc<Index>,
     pub disk: Arc<dyn Disk>,
     pub places: Places,
     /// Most of a file the preview reads (`preview_max_kb`).
@@ -491,5 +491,13 @@ impl Worker {
     pub fn send(&self, req: Request) {
         let g = self.generation.load(Ordering::Relaxed);
         let _ = self.tx.send((g, req));
+    }
+}
+
+/// Once the folder view is gone (back to the picker), its queued
+/// on-screen work is skipped; what fills the shared cache still runs.
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.bump();
     }
 }

@@ -198,6 +198,12 @@ pub fn confirm(app: &App, g: &mut Grid) {
             "[y] Stop",
             "[n] Keep going",
         ),
+        Confirm::QuitRestore if app.to_picker => (
+            "Back to the picker?",
+            stop(true).unwrap_or_default(),
+            "[y] Stop and go back",
+            "[n] Keep going",
+        ),
         Confirm::QuitRestore => (
             "Quit?",
             stop(true).unwrap_or_default(),

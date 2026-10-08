@@ -95,7 +95,7 @@ fn search_and_next() {
 }
 
 #[test]
-fn arrows_are_hjkl_and_q_quits_everywhere() {
+fn arrows_are_hjkl_and_q_goes_back() {
     let mut h = Harness::new(SRC);
     let start = when(&h);
     // Plain arrows move in the tree, not in time.
@@ -105,15 +105,14 @@ fn arrows_are_hjkl_and_q_quits_everywhere() {
     h.key(KeyCode::Left);
     assert!(h.app.folder.ends_with("src"));
     assert_eq!(when(&h), start);
-    // Sub-views go back with h, esc and backspace; q quits from any of them.
+    // Sub-views go back with h, esc, backspace and q.
     h.select("main.go").keys("l");
     assert!(matches!(h.app.view, View::Versions(_)));
     h.key(KeyCode::Left);
     assert_eq!(h.app.view, View::Folder);
-    h.keys("l");
+    h.keys("lq");
+    assert_eq!(h.app.view, View::Folder);
     assert!(!h.app.quit);
-    h.keys("q");
-    assert!(h.app.quit);
 }
 
 #[test]

@@ -188,16 +188,11 @@ fn status(p: &Picker, g: &mut Grid) {
         Level::Groups => {
             let n = p.visible().len();
             let sel = p.groups.as_ref().map_or(0, |g| g.sel);
-            let back = if p.repos.is_empty() {
-                ""
-            } else {
-                " · esc back"
-            };
             (
-                if back.is_empty() {
+                if p.repos.is_empty() {
                     "⏎ open · / filter · q quit"
                 } else {
-                    "⏎ open · / filter · esc back · q quit"
+                    "⏎ open · / filter · q back"
                 },
                 format!("{}/{n}", if n > 0 { sel + 1 } else { 0 }),
             )

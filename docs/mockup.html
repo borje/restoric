@@ -650,8 +650,7 @@ function stepHist(k){const runs=fileRuns(S.hist.f),H=S.hist;
     case 'p':openDiff(H.f,H.sel,'previous','hist');break;
     case 'r':openRestore();break;case 'o':showFile();break;case 'y':yank();break;
     case 'zi':zoom(1);break;case 'zo':zoom(-1);break;
-    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;
-    case 'q':flash('q quits restoric in the real tool. h goes back.');break;}}
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':case 'q':S.view='main';S.dir=H.f.dir;S.selKey='f:'+H.f.name;break;}}
 function stepDiff(k){const D=S.diff,runs=fileRuns(D.f),{lines}=diffLines();const hdrs=lines.map((o,i)=>o.hdr?i:-1).filter(i=>i>=0);
   switch(k){case 'j':case 'ArrowDown':D.scroll++;break;case 'k':case 'ArrowUp':D.scroll=Math.max(0,D.scroll-1);break;
     case 'C-d':case 'PageDown':case ' ':D.scroll+=15;break;case 'C-u':case 'PageUp':D.scroll=Math.max(0,D.scroll-15);break;
@@ -662,14 +661,12 @@ function stepDiff(k){const D=S.diff,runs=fileRuns(D.f),{lines}=diffLines();const
     case 'L':case '}':{let n=D.run-1;while(n>=0&&runs[n].s<0)n--;if(n>=0){D.run=n;D.scroll=0}else flash('This is the newest saved version.');break}
     case 'c':D.mode='current';D.scroll=0;break;case 'p':D.mode='previous';D.scroll=0;break;
     case 'r':openRestore();break;case 'o':showFile();break;case 'y':yank();break;
-    case 'q':flash('q quits restoric in the real tool. h goes back.');break;
-    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':if(D.from==='hist'){S.view='hist';S.hist={f:D.f,sel:D.run}}else{S.view='main';S.selKey='f:'+D.f.name}break;}}
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':case 'q':if(D.from==='hist'){S.view='hist';S.hist={f:D.f,sel:D.run}}else{S.view='main';S.selKey='f:'+D.f.name}break;}}
 function stepFind(k){const F=S.find;
   switch(k){case 'j':case 'ArrowDown':F.sel++;break;case 'k':case 'ArrowUp':F.sel=Math.max(0,F.sel-1);break;
     case 'gg':F.sel=0;break;case 'G':F.sel=F.res.length-1;break;case 'C-d':F.sel+=10;break;case 'C-u':F.sel=Math.max(0,F.sel-10);break;
     case 'Enter':case 'l':goFind(F.res[F.sel]);break;
-    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':S.view=F.from==='find'?'main':F.from;break;
-    case 'q':flash('q quits restoric in the real tool. h goes back.');break;}}
+    case 'Escape':case 'h':case 'ArrowLeft':case 'Backspace':case 'q':S.view=F.from==='find'?'main':F.from;break;}}
 
 // ---------- "under the hood" ----------
 function renderCmds(){const L=[];

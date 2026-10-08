@@ -142,7 +142,7 @@ impl Term {
         })
     }
 
-    /// Runs the picker until a pick or `q`. `io` opens repositories on
+    /// Runs the picker until a pick or a quit. `io` opens repositories on
     /// request; its error is shown above the rows.
     pub fn pick(
         &mut self,
@@ -186,14 +186,15 @@ impl Term {
         }
     }
 
-    /// The folder view's event loop (PLAN.md §4.5).
+    /// The folder view's event loop (PLAN.md §4.5). True when `q` asks to
+    /// go back to the picker.
     pub fn run(
         &mut self,
         mut app: App,
         worker: Worker,
         responses: Receiver<Response>,
         theme: Theme,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut hits = Hits::default();
         // New snapshots (a backup finished) are looked for every 5 minutes.
         let mut last_reload = std::time::Instant::now();
@@ -228,7 +229,7 @@ impl Term {
                 hits = ui::draw(&mut app, f.buffer_mut(), area, &theme);
             })?;
             if app.quit {
-                return Ok(());
+                return Ok(app.to_picker);
             }
             select! {
                 recv(self.events) -> ev => match ev? {

@@ -358,6 +358,10 @@ impl Picker {
             (_, KeyCode::Home) => set(self, 0),
             (_, KeyCode::PageDown) => set(self, sel + 10),
             (_, KeyCode::PageUp) => set(self, sel.saturating_sub(10)),
+            (_, KeyCode::Char('q')) if self.level == Level::Groups && !self.repos.is_empty() => {
+                self.level = Level::Repos;
+                self.message = None;
+            }
             (_, KeyCode::Char('q')) => return Step::Quit,
             (_, KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right) => match self.level {
                 Level::Repos => {
@@ -544,5 +548,9 @@ mod tests {
         assert_eq!(p.groups.as_ref().unwrap().repo, Some(1));
         p.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
         assert_eq!(p.level, Level::Repos);
+        p.opened(1, &snaps());
+        assert_eq!(p.key(key('q')), Step::Stay);
+        assert_eq!(p.level, Level::Repos);
+        assert_eq!(p.key(key('q')), Step::Quit);
     }
 }

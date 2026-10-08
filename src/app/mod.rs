@@ -247,6 +247,8 @@ pub enum Action {
     ConfirmNo,
     Help,
     Prefix(char),
+    /// `q`: back one level; from the folder view, to the picker or out.
+    Leave,
     Quit,
 }
 
@@ -318,6 +320,10 @@ pub struct App {
     pub mine: Vec<String>,
     /// The host picked in the picker, for the title bar.
     pub shown_host: Option<String>,
+    /// The session started in the picker: `q` in the folder view goes back to it.
+    pub from_picker: bool,
+    /// Set with `quit`: go back to the picker instead of quitting.
+    pub to_picker: bool,
     /// The folder restoric started in: the default restore directory on a
     /// foreign host.
     pub start_dir: PathBuf,
@@ -440,6 +446,8 @@ impl App {
             filter,
             mine: Vec::new(),
             shown_host: None,
+            from_picker: false,
+            to_picker: false,
             start_dir: folder.clone(),
             last_dir: None,
             pending_targets: None,
@@ -1301,7 +1309,9 @@ impl App {
     /// Does an action. Returns false if it stopped at a boundary (with a message).
     pub fn act(&mut self, a: Action) -> bool {
         match a {
-            Action::Quit => {
+            Action::Leave if self.view != View::Folder => return self.act(Action::Back),
+            Action::Quit | Action::Leave => {
+                self.to_picker = a == Action::Leave && self.from_picker;
                 if self.restoring.is_some() {
                     self.confirm = Some(Confirm::QuitRestore);
                 } else {
@@ -1616,7 +1626,8 @@ impl App {
             | Action::ConfirmNo
             | Action::Find
             | Action::ZoomIn
-            | Action::ZoomOut => unreachable!("handled above"),
+            | Action::ZoomOut
+            | Action::Leave => unreachable!("handled above"),
             Action::TogglePreview => self.toggle_preview(),
             Action::Scroll(n) => self.scroll_by(n),
             Action::Help => self.help = true,

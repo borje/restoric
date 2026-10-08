@@ -121,7 +121,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('c') => Prefix('c'),
         KeyCode::Char(':') => CommandLine,
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
-        KeyCode::Char('q') => Quit,
+        KeyCode::Char('q') => Leave,
         _ => return None,
     })
 }

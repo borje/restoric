@@ -76,7 +76,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `:sep 1` `:yesterday` `:3d` | Jump to a date |
 | `zi` `zo` | Zoom the timeline |
 | `:undo` | Undo the last overwrite |
-| `q` | Quit |
+| `q` | Back one level: from the folder view, to the picker if restoric started there, else quit (`Ctrl-c` and `:q` always quit) |
 
 The mouse works too: click dots, rows, the breadcrumb and the arrows.
 
