@@ -1,9 +1,9 @@
 //! Text formats shared by the UI and messages.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use jiff::Timestamp;
 use jiff::tz::TimeZone;
+use jiff::{SignedDuration, Timestamp};
 use unicode_width::UnicodeWidthStr;
 
 /// `Sep 06 18:03`, in local time.
@@ -43,6 +43,29 @@ pub fn path(p: &Path, home: Option<&Path>) -> String {
         };
     }
     p.display().to_string()
+}
+
+/// `just now`, `5 min ago`, `3 h ago`, `2 d ago`
+pub fn ago(d: SignedDuration) -> String {
+    let s = d.as_secs().max(0);
+    if s < 60 {
+        "just now".to_string()
+    } else if s < 3600 {
+        format!("{} min ago", s / 60)
+    } else if s < 86_400 {
+        format!("{} h ago", s / 3600)
+    } else {
+        format!("{} d ago", s / 86_400)
+    }
+}
+
+/// `p` with a leading `~` replaced by `home`.
+pub fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
+    match (p.strip_prefix("~/"), home) {
+        (Some(rest), Some(h)) => h.join(rest),
+        (_, Some(h)) if p == "~" => h.to_path_buf(),
+        _ => PathBuf::from(p),
+    }
 }
 
 pub fn width(s: &str) -> usize {
@@ -113,5 +136,18 @@ mod tests {
         let home = Path::new("/home/bege");
         assert_eq!(path(Path::new("/home/bege/dev"), Some(home)), "~/dev");
         assert_eq!(path(Path::new("/etc"), Some(home)), "/etc");
+        assert_eq!(
+            expand_home("~/x", Some(home)),
+            PathBuf::from("/home/bege/x")
+        );
+        assert_eq!(expand_home("/x", Some(home)), PathBuf::from("/x"));
+    }
+
+    #[test]
+    fn ages() {
+        assert_eq!(ago(SignedDuration::from_secs(5)), "just now");
+        assert_eq!(ago(SignedDuration::from_mins(7)), "7 min ago");
+        assert_eq!(ago(SignedDuration::from_hours(3)), "3 h ago");
+        assert_eq!(ago(SignedDuration::from_hours(50)), "2 d ago");
     }
 }

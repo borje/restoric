@@ -29,7 +29,7 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 
 - The row of dots marks the snapshots where the selected file changed (`●`) and where only its folder did (`○`).
 - A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored).
-- Only this machine's snapshots are shown, picked by hostname as `restic snapshots --host` does.
+- Only this machine's snapshots are shown, picked by hostname as `restic snapshots --host` does. `--browse` (or a folder that isn't in your backups) opens a picker of the other hosts and backup paths in the repository, for a renamed machine or a server's backups.
 - Restoring works like copy and paste: `y` yanks, `p` puts the old version next to the original, `P` overwrites it after asking. `:undo` puts back what was overwritten.
 - restoric never writes to the repository, and needs no FUSE or mount.
 
@@ -70,6 +70,7 @@ Every backend rustic supports works: local, sftp, REST, rclone, S3, B2, Azure an
 | `--host NAME`, `--tag TAG` | Whose snapshots to show (default: this machine's hostname) |
 | `--strict` | Count any metadata change |
 | `--select NAME`, `--at DATE` | Start with NAME selected, or at a date (`sep 1`, `2026-09-01`, `3d`) |
+| `--browse` | Start in the repository picker: other hosts and backup paths (restores from another host ask for a directory) |
 | `restoric log PATH [--json]` | Print when PATH changed, with counts |
 | `restoric versions FILE [--json]` | Print the distinct versions of FILE |
 

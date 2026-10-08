@@ -1,0 +1,5 @@
+---
+source: tests/ui_picker.rs
+expression: "h.screen(100, 34).lines().last().unwrap()"
+---
+ restore to: ~/dev/project/src█                                         ⏎ restore here · esc cancel

@@ -1,0 +1,38 @@
+---
+source: tests/ui_picker.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  dev-vm:/srv/data
+  Aug 2026                                                                     on disk
+  ●                                                                        ●  ┊ ● etc/  ○ data/
+                                                                           ▲               − 1× +
+
+ on disk  −3          │ ▸ etc/                              ~1 │ etc/
+▶Sep 01 10:00 ~1      │ ▸ src/                                 │
+ Aug 01 10:00 +3      │ ¶ README.md                    6 B     │ ○ app.conf                       ~
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+ NOR  Sep 01 10:00  314436b3  data/ ~1                                                  1/3  ? help

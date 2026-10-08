@@ -313,6 +313,18 @@ pub struct App {
     everything: Vec<SnapshotInfo>,
     /// Which of them are this machine's (§2.4); `:host`, `:tag`.
     pub filter: Filter,
+    /// This machine's hosts. A filter host outside them is a foreign host
+    /// (§3.18): restores ask for a directory and `P` is off.
+    pub mine: Vec<String>,
+    /// The host picked in the picker, for the title bar.
+    pub shown_host: Option<String>,
+    /// The folder restoric started in: the default restore directory on a
+    /// foreign host.
+    pub start_dir: PathBuf,
+    /// The last directory a foreign-host restore went to this session.
+    pub last_dir: Option<PathBuf>,
+    /// What the `restore to:` prompt will restore.
+    pub(crate) pending_targets: Option<Vec<Target>>,
     /// The snapshots that pass the filter.
     all: Vec<SnapshotInfo>,
     /// Switches the worker's change detection (`:set strict`).
@@ -426,6 +438,11 @@ impl App {
             home,
             everything,
             filter,
+            mine: Vec::new(),
+            shown_host: None,
+            start_dir: folder.clone(),
+            last_dir: None,
+            pending_targets: None,
             all,
             mode_switch: None,
             strict: false,
@@ -1083,7 +1100,7 @@ impl App {
                 stopped: true,
             } => {
                 let items = self.restore_ended().map_or(done.len(), |r| r.items);
-                self.message = Some(match (how, done.len()) {
+                self.message = Some(match (&how, done.len()) {
                     (How::Overwrite, _) => "Stopped · nothing was overwritten".into(),
                     (_, 0) => "Stopped · nothing was restored".into(),
                     (_, n) => format!("Stopped · restored {n} of {items}"),
@@ -1099,7 +1116,7 @@ impl App {
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default()
                 };
-                self.message = Some(match (how, done.as_slice()) {
+                self.message = Some(match (&how, done.as_slice()) {
                     (How::Overwrite, [d]) => {
                         format!(
                             "Overwrote {}. :undo puts the old version back.",
@@ -1119,8 +1136,10 @@ impl App {
                     (How::NextTo, ds) => {
                         format!("Restored {} items next to the originals", ds.len())
                     }
-                    (How::RestoreDir, [d]) => format!("Restored to {}", show(&d.dest)),
-                    (How::RestoreDir, ds) => format!(
+                    (How::RestoreDir | How::Into(_), [d]) => {
+                        format!("Restored to {}", show(&d.dest))
+                    }
+                    (How::RestoreDir | How::Into(_), ds) => format!(
                         "Restored {} items to {}",
                         ds.len(),
                         show(ds[0].dest.parent().unwrap_or(&ds[0].dest))
@@ -1266,6 +1285,11 @@ impl App {
 
     fn time(&self, i: usize) -> String {
         fmt::time(self.set()[i].time, &self.tz)
+    }
+
+    /// Whether the snapshots shown are another machine's (§3.18).
+    pub fn foreign(&self) -> bool {
+        !self.filter.hosts.is_empty() && self.filter.hosts.iter().any(|h| !self.mine.contains(h))
     }
 
     /// Whether files changed on disk since the newest snapshot of the folder.

@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use super::cmdline::InputKind;
 use super::{App, Effect, Row, View};
 use crate::index::versions::Run;
 use crate::repo::NodeKind;
@@ -89,7 +90,7 @@ impl Restoring {
             ),
             (None, _) => format!("{name} is being prepared."),
         };
-        let what = match (self.how, self.items) {
+        let what = match (&self.how, self.items) {
             (How::Overwrite, _) => "Nothing will be overwritten.",
             (_, 1) => "The partly restored copy is removed.",
             _ => "Finished items are kept; the partly restored copy is removed.",
@@ -262,6 +263,17 @@ impl App {
             self.message = Some("Nothing yanked. Press y on a file first.".into());
             return false;
         };
+        if self.foreign() {
+            if over {
+                self.message = Some(
+                    "Overwriting is off for another host's snapshots. p restores into a directory you choose."
+                        .into(),
+                );
+                return false;
+            }
+            self.ask_dir(targets);
+            return true;
+        }
         if over {
             let when = fmt::time(targets[0].snapshot.time, &self.tz);
             self.confirm = Some(Confirm::Overwrite {
@@ -281,7 +293,7 @@ impl App {
     pub(super) fn start_restore(&mut self, targets: Vec<Target>, how: How) {
         let cancel = Cancel::default();
         self.restoring = Some(Restoring {
-            how,
+            how: how.clone(),
             items: targets.len(),
             label: describe(&targets),
             cancel: cancel.clone(),
@@ -333,11 +345,46 @@ impl App {
         }
     }
 
+    /// On a foreign host (§3.18): asks where the restore goes, with the
+    /// last directory used, else the folder restoric started in.
+    pub(super) fn ask_dir(&mut self, targets: Vec<Target>) {
+        let dir = self
+            .last_dir
+            .clone()
+            .unwrap_or_else(|| self.start_dir.clone());
+        let text = fmt::path(&dir, self.home.as_deref());
+        self.pending_targets = Some(targets);
+        self.start_input(InputKind::Dir, &text);
+    }
+
+    /// `⏎` on the `restore to:` prompt.
+    pub(super) fn restore_into(&mut self, text: &str) {
+        let Some(targets) = self.pending_targets.take() else {
+            return;
+        };
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        let dir = fmt::expand_home(text, self.home.as_deref());
+        let dir = if dir.is_absolute() {
+            dir
+        } else {
+            self.start_dir.join(dir)
+        };
+        self.last_dir = Some(dir.clone());
+        self.start_restore(targets, How::Into(dir));
+    }
+
     pub(super) fn open_dialog(&mut self) -> bool {
         if self.restore_busy() {
             return false;
         }
         match self.targets() {
+            Ok(t) if self.foreign() => {
+                self.ask_dir(t);
+                true
+            }
             Ok(t) => {
                 let target = t[0].clone();
                 let on_disk = self.exists.get(&target.path).copied();
@@ -392,12 +439,12 @@ impl App {
         let next = if self.on_disk(t) {
             format!(
                 "→ {}{slash}",
-                file_name(planned(t, How::NextTo, &self.places))
+                file_name(planned(t, &How::NextTo, &self.places))
             )
         } else {
             format!("→ {}{slash}", show(&t.path))
         };
-        let dir = planned(t, How::RestoreDir, &self.places);
+        let dir = planned(t, &How::RestoreDir, &self.places);
         let mut options = vec![
             first,
             ("Restore next to it".to_string(), next),
@@ -409,7 +456,7 @@ impl App {
         if is_dir {
             options.push((
                 "Write a tar archive".to_string(),
-                format!("→ {}", file_name(planned(t, How::Tar, &self.places))),
+                format!("→ {}", file_name(planned(t, &How::Tar, &self.places))),
             ));
         }
         options

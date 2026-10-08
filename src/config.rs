@@ -9,6 +9,7 @@ use ratatui::style::Color;
 use serde::Deserialize;
 
 use crate::app::Action;
+use crate::ui::fmt::expand_home;
 use crate::ui::theme::Theme;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -152,15 +153,6 @@ fn config_path(xdg: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
         .filter(|p| p.is_absolute())
         .or_else(|| home.map(|h| h.join(".config")))?;
     Some(base.join("restoric").join("config.toml"))
-}
-
-/// `p` with a leading `~` replaced by `home`.
-fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
-    match (p.strip_prefix("~/"), home) {
-        (Some(rest), Some(h)) => h.join(rest),
-        (_, Some(h)) if p == "~" => h.to_path_buf(),
-        _ => PathBuf::from(p),
-    }
 }
 
 impl Config {

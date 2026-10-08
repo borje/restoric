@@ -33,7 +33,7 @@ impl Target {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum How {
     /// Replace what's on disk (or put it back where it was).
     Overwrite,
@@ -44,6 +44,9 @@ pub enum How {
     RestoreDir,
     /// A folder as `name-2026-09-09_1923.tar` next to the original.
     Tar,
+    /// `<dir>/name`: a directory the user named (restores from another
+    /// host, §3.18).
+    Into(PathBuf),
 }
 
 /// Where restores go and where undo data is kept.
@@ -93,7 +96,7 @@ fn free(dir: &Path, base: &str, ext: &str) -> PathBuf {
 
 /// Where a restore of `t` would go if something is on disk at its path,
 /// without the `-2` a clash adds. Doesn't look at the disk.
-pub fn planned(t: &Target, how: How, places: &Places) -> PathBuf {
+pub fn planned(t: &Target, how: &How, places: &Places) -> PathBuf {
     let st = stamp(t.snapshot.time, &places.tz);
     let parent = t.path.parent().unwrap_or(Path::new("/"));
     let name = t.name();
@@ -102,6 +105,7 @@ pub fn planned(t: &Target, how: How, places: &Places) -> PathBuf {
         How::NextTo => parent.join(format!("{name}.{st}")),
         How::RestoreDir => places.restore_dir.join(&st).join(&name),
         How::Tar => parent.join(format!("{name}-{st}.tar")),
+        How::Into(dir) => dir.join(&name),
     }
 }
 
@@ -171,7 +175,7 @@ impl Reporter<'_> {
 pub fn run(
     repo: &dyn Repo,
     targets: &[Target],
-    how: How,
+    how: &How,
     places: &Places,
     progress: &mut dyn FnMut(Progress),
     cancel: &Cancel,
@@ -181,7 +185,7 @@ pub fn run(
         items: targets.len(),
         last: None,
     };
-    if how == How::Overwrite {
+    if *how == How::Overwrite {
         return overwrite(repo, targets, places, &mut rep, cancel);
     }
     let mut done = Vec::new();
@@ -208,9 +212,13 @@ pub fn run(
                 free(&dir, &name, "")
             }
             How::Tar => free(parent, &format!("{name}-{st}"), ".tar"),
+            How::Into(dir) => {
+                fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+                free(dir, &name, "")
+            }
             How::Overwrite => unreachable!(),
         };
-        let res = if how == How::Tar {
+        let res = if *how == How::Tar {
             write_tar(repo, t, &dest, &mut report, cancel)
         } else {
             repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {

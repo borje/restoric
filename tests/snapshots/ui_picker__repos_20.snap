@@ -1,0 +1,38 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 100, 34)"
+---
+ restoric  Pick a repository
+
+   location                         hosts
+ ▶ rest:http://iridium:8000/dev-vm  bege-laptop, dev-vm, old-laptop · read 3 h ago
+   /mnt/photos                      nas · read 30 d ago
+   sftp:nas:/backup                 not read yet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ PICK  ⏎ open · r refresh · q quit                                                              1/3

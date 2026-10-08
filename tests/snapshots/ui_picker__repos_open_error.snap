@@ -1,0 +1,16 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 100, 12)"
+---
+ restoric  Pick a repository
+ Can't open /mnt/photos: connection refused
+
+   location                         hosts
+ ▶ /mnt/photos                      can't open
+   rest:http://iridium:8000/dev-vm  not read yet
+   sftp:nas:/backup                 not read yet
+
+
+
+
+ PICK  ⏎ open · r refresh · q quit                                                              1/3

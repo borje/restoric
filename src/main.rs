@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::{Args, Parser, Subcommand};
 
 use restoric::app::App;
@@ -12,10 +12,12 @@ use restoric::config::{Access, Config, RepoEntry, resolve_access};
 use restoric::disk::RealDisk;
 use restoric::index::timeline::{Filter, explain_empty, timeline_set};
 use restoric::index::{Index, Mode};
+use restoric::picker::Picker;
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::repo::rustic::{BACKEND, Connection, OpenOptions, RusticRepo};
 use restoric::repos::{self, Candidate, ProbeCache};
+use restoric::tui::{Io, Term};
 use restoric::ui::theme::Theme;
 use restoric::worker::{Ctx, Worker};
 
@@ -94,6 +96,9 @@ struct ViewArgs {
     /// Start at a date (as :sep 1, :2026-09-01, :3d)
     #[arg(long, value_name = "DATE")]
     at: Option<String>,
+    /// Start in the repository picker: other hosts and backup paths
+    #[arg(long)]
+    browse: bool,
 }
 
 fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
@@ -185,86 +190,146 @@ fn short(err: &anyhow::Error) -> String {
         .map_or(first, str::to_string)
 }
 
+/// The config's `[[repo]]` entries as candidates, each with its own idea
+/// of which snapshots are ours.
+fn candidates(view: &ViewArgs, config: &Config) -> Vec<Candidate> {
+    config
+        .repo
+        .iter()
+        .map(|e| Candidate {
+            repo: e.repository.clone(),
+            filter: filter(view, config, Some(e)),
+        })
+        .collect()
+}
+
+/// Where `start` got to.
+enum Start {
+    /// An opened repository: the one holding the folder, or the only one.
+    Repo {
+        repo: Box<RusticRepo>,
+        /// Which `[[repo]]` it is, if any.
+        entry: Option<usize>,
+        location: String,
+    },
+    /// Several `[[repo]]` and none holds the folder, or `--browse`: nothing
+    /// is opened, the picker lists them (§3.18).
+    Repos,
+}
+
+fn save_cache(path: Option<&Path>, cache: &ProbeCache) {
+    if let Some(p) = path
+        && let Err(e) = cache.save(p)
+    {
+        tracing::warn!("{e:#}");
+    }
+}
+
 /// Opens the repository that holds `folder`: the one from `--repo`, else
 /// the config's `[[repo]]` whose snapshots hold it, else the one from the
 /// environment (PLAN.md §4.6).
-fn open(
+fn start(
     args: &RepoArgs,
     view: &ViewArgs,
     config: &Config,
     folder: &Path,
-) -> Result<(Index, Filter)> {
+    browse: bool,
+) -> Result<Start> {
     let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
     let home = home.as_deref();
     let flags = args.access();
     let env = env_access();
-    let (repo, entry) = if flags.has_repo() || config.repo.is_empty() {
-        let a = resolve_access(&flags, &env, None, home);
-        (RusticRepo::open(&open_options(a))?, None)
-    } else {
-        let cands: Vec<Candidate> = config
-            .repo
-            .iter()
-            .map(|e| Candidate {
-                repo: e.repository.clone(),
-                filter: filter(view, config, Some(e)),
-            })
-            .collect();
-        let cache_path = ProbeCache::default_path();
-        let mut cache = cache_path
-            .as_deref()
-            .map(ProbeCache::load)
-            .unwrap_or_default();
-        let tty = std::io::stderr().is_terminal();
-        let chosen = repos::choose(
-            &cands,
-            folder,
-            &mut cache,
-            jiff::Timestamp::now(),
-            |i, probing| {
-                let e = &config.repo[i];
-                if probing && tty {
-                    eprint!("\rchecking {}…\x1b[K", e.repository);
-                }
-                let a = resolve_access(&flags, &env, Some(e), home);
-                let c = Connection::open(&open_options(a))?;
-                let snaps = c.snapshots()?;
-                Ok((c, snaps))
-            },
-            |i, err| {
-                let repo = &config.repo[i].repository;
-                tracing::warn!("skipping {repo}: {err:#}");
-                if tty {
-                    eprint!("\r\x1b[K");
-                }
-                eprintln!("restoric: skipping {repo}: {}", short(err));
-            },
-        );
-        if tty {
-            eprint!("\r\x1b[K");
-        }
-        if let Some(p) = &cache_path
-            && let Err(e) = cache.save(p)
-        {
-            tracing::warn!("{e:#}");
-        }
-        match chosen {
-            Some((i, c)) => (RusticRepo::from_connection(c)?, Some(&config.repo[i])),
-            None if env.has_repo() => {
-                let a = resolve_access(&flags, &env, None, home);
-                (RusticRepo::open(&open_options(a))?, None)
-            }
-            None => {
-                let names: Vec<&str> = cands.iter().map(|c| c.repo.as_str()).collect();
-                anyhow::bail!(
-                    "none of the repositories in the config has snapshots of {} ({}); \
-                     use --repo, or set RESTIC_REPOSITORY",
-                    folder.display(),
-                    names.join(", ")
-                );
-            }
-        }
+    let direct = |a: Access| -> Result<Start> {
+        let location = a.repo.clone().unwrap_or_else(|| {
+            a.repo_file
+                .as_ref()
+                .map(|f| f.display().to_string())
+                .unwrap_or_default()
+        });
+        Ok(Start::Repo {
+            repo: Box::new(RusticRepo::open(&open_options(a))?),
+            entry: None,
+            location,
+        })
     };
+    if flags.has_repo() || config.repo.is_empty() {
+        return direct(resolve_access(&flags, &env, None, home));
+    }
+    let cands = candidates(view, config);
+    let cache_path = ProbeCache::default_path();
+    let mut cache = cache_path
+        .as_deref()
+        .map(ProbeCache::load)
+        .unwrap_or_default();
+    let now = jiff::Timestamp::now();
+    if let [e] = config.repo.as_slice() {
+        // Nothing to choose from: open it and remember what it holds.
+        let a = resolve_access(&flags, &env, Some(e), home);
+        let c = Connection::open(&open_options(a))?;
+        cache.record(&e.repository, &c.snapshots()?, now);
+        save_cache(cache_path.as_deref(), &cache);
+        return Ok(Start::Repo {
+            repo: Box::new(RusticRepo::from_connection(c)?),
+            entry: Some(0),
+            location: e.repository.clone(),
+        });
+    }
+    if browse {
+        return Ok(Start::Repos);
+    }
+    let tty = std::io::stderr().is_terminal();
+    let chosen = repos::choose(
+        &cands,
+        folder,
+        &mut cache,
+        now,
+        |i, probing| {
+            let e = &config.repo[i];
+            if probing && tty {
+                eprint!("\rchecking {}…\x1b[K", e.repository);
+            }
+            let a = resolve_access(&flags, &env, Some(e), home);
+            let c = Connection::open(&open_options(a))?;
+            let snaps = c.snapshots()?;
+            Ok((c, snaps))
+        },
+        |i, err| {
+            let repo = &config.repo[i].repository;
+            tracing::warn!("skipping {repo}: {err:#}");
+            if tty {
+                eprint!("\r\x1b[K");
+            }
+            eprintln!("restoric: skipping {repo}: {}", short(err));
+        },
+    );
+    if tty {
+        eprint!("\r\x1b[K");
+    }
+    save_cache(cache_path.as_deref(), &cache);
+    match chosen {
+        Some((i, c)) => Ok(Start::Repo {
+            repo: Box::new(RusticRepo::from_connection(c)?),
+            entry: Some(i),
+            location: config.repo[i].repository.clone(),
+        }),
+        None if env.has_repo() => direct(resolve_access(&flags, &env, None, home)),
+        None => Ok(Start::Repos),
+    }
+}
+
+/// The error for a folder no configured repository holds, without a TUI.
+fn none_holds(config: &Config, folder: &Path) -> anyhow::Error {
+    let names: Vec<&str> = config.repo.iter().map(|e| e.repository.as_str()).collect();
+    anyhow!(
+        "none of the repositories in the config has snapshots of {} ({}); \
+         use --repo, set RESTIC_REPOSITORY, or pick one with --browse",
+        folder.display(),
+        names.join(", ")
+    )
+}
+
+/// The index over an opened repository, with its on-disk cache.
+fn index_for(repo: RusticRepo, view: &ViewArgs, config: &Config) -> Index {
     let cache = match Cache::default_path(repo.id()) {
         Some(path) => Cache::open(&path, BACKEND, config.disk_cache()).unwrap_or_else(|e| {
             tracing::warn!("cache unavailable, using memory: {e:#}");
@@ -277,12 +342,29 @@ fn open(
     } else {
         Mode::Content
     };
-    let index = Index::new(Arc::new(repo), cache, mode, config.memory_cache());
-    Ok((index, filter(view, config, entry)))
+    Index::new(Arc::new(repo), cache, mode, config.memory_cache())
 }
 
-/// Starts the TUI.
+/// For `restoric log` and `versions`: the repository holding `folder`, or
+/// an error.
+fn open(
+    args: &RepoArgs,
+    view: &ViewArgs,
+    config: &Config,
+    folder: &Path,
+) -> Result<(Index, Filter)> {
+    match start(args, view, config, folder, false)? {
+        Start::Repo { repo, entry, .. } => Ok((
+            index_for(*repo, view, config),
+            filter(view, config, entry.map(|i| &config.repo[i])),
+        )),
+        Start::Repos => Err(none_holds(config, folder)),
+    }
+}
+
+/// Runs the folder view in `term`.
 fn tui(
+    term: &mut Term,
     index: Index,
     disk: Arc<dyn restoric::disk::Disk>,
     app: App,
@@ -312,7 +394,7 @@ fn tui(
         preview_limit: config.preview_limit(),
     };
     let worker = Worker::start(Arc::new(ctx), threads, tx);
-    restoric::tui::run(app, worker, rx, theme)
+    term.run(app, worker, rx, theme)
 }
 
 /// `restoric demo`: the sample project, written to a temporary folder so
@@ -343,7 +425,8 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
     );
     app.places.restore_dir = dir.join("Restored");
     app.places.undo_dir = dir.join("undo");
-    let result = tui(index, Arc::new(RealDisk), app, view, config);
+    let result = Term::new()
+        .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, config));
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
@@ -405,16 +488,124 @@ fn run(cli: Cli) -> Result<()> {
             } else {
                 path
             };
-            let (index, filter) = open(&cli.repo, &view, &config, &folder)?;
-            let snaps = index.repo().snapshots()?;
-            if timeline_set(&snaps, &filter, &folder).is_empty() {
-                anyhow::bail!("{}", explain_empty(&snaps, &filter, &folder));
-            }
-            let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
-            let app = App::new(snaps, filter, folder, jiff::tz::TimeZone::system(), home);
-            tui(index, Arc::new(RealDisk), app, &view, &config)
+            browse(&cli.repo, &view, &config, folder)
         }
     }
+}
+
+/// The folder view on `folder`, through the picker (§3.18) when the folder
+/// isn't in this machine's snapshots or `--browse` says so.
+fn browse(args: &RepoArgs, view: &ViewArgs, config: &Config, folder: PathBuf) -> Result<()> {
+    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    let tz = jiff::tz::TimeZone::system();
+    let now = jiff::Timestamp::now();
+    let tty = std::io::stdout().is_terminal();
+    let theme = config.apply_colors(Theme::from_env())?;
+    let mut picker = Picker::new(folder.clone(), home.clone(), tz.clone(), now);
+    let (mut repo, mut entry) = match start(args, view, config, &folder, view.browse)? {
+        Start::Repo {
+            repo,
+            entry,
+            location,
+        } => {
+            let f = filter(view, config, entry.map(|i| &config.repo[i]));
+            let snaps = repo.snapshots()?;
+            let held = !timeline_set(&snaps, &f, &folder).is_empty();
+            if held && !view.browse {
+                let mut app = App::new(snaps, f.clone(), folder, tz, home);
+                app.mine = f.hosts;
+                let mut term = Term::new()?;
+                let index = index_for(*repo, view, config);
+                return tui(&mut term, index, Arc::new(RealDisk), app, view, config);
+            }
+            let message = (!held).then(|| explain_empty(&snaps, &f, &folder));
+            if !tty {
+                anyhow::bail!(
+                    "{}",
+                    message.unwrap_or_else(|| "--browse needs a terminal".to_string())
+                );
+            }
+            picker = picker.with_groups(&location, &snaps, &f.hosts, message);
+            (Some(*repo), entry)
+        }
+        Start::Repos => {
+            if !tty {
+                if view.browse {
+                    anyhow::bail!("--browse needs a terminal");
+                }
+                return Err(none_holds(config, &folder));
+            }
+            let cands = candidates(view, config);
+            let cache = ProbeCache::default_path()
+                .as_deref()
+                .map(ProbeCache::load)
+                .unwrap_or_default();
+            picker = picker.with_repos(&cands, &cache);
+            (None, None)
+        }
+    };
+
+    let mut term = Term::new()?;
+    let flags = args.access();
+    let env = env_access();
+    let cache_path = ProbeCache::default_path();
+    let mut cache = cache_path
+        .as_deref()
+        .map(ProbeCache::load)
+        .unwrap_or_default();
+    // The repository opened from the repo level, kept for after the pick.
+    let mut opened: Option<(usize, RusticRepo)> = None;
+    let pick = {
+        let mut io = |io: Io| -> Result<Vec<restoric::repo::SnapshotInfo>> {
+            let i = match io {
+                Io::Open(i) | Io::Refresh(i) => i,
+            };
+            let e = &config.repo[i];
+            let a = resolve_access(&flags, &env, Some(e), home.as_deref());
+            let c = Connection::open(&open_options(a)).map_err(|e| anyhow!("{}", short(&e)))?;
+            let snaps = c.snapshots().map_err(|e| anyhow!("{}", short(&e)))?;
+            cache.record(&e.repository, &snaps, now);
+            save_cache(cache_path.as_deref(), &cache);
+            if matches!(io, Io::Open(_)) {
+                let r = RusticRepo::from_connection(c).map_err(|e| anyhow!("{}", short(&e)))?;
+                opened = Some((i, r));
+            }
+            Ok(snaps)
+        };
+        term.pick(&mut picker, &theme, &mut io)?
+    };
+    let Some(pick) = pick else {
+        return Ok(());
+    };
+    if let Some(i) = pick.repo
+        && let Some((j, r)) = opened.take()
+        && i == j
+    {
+        repo = Some(r);
+        entry = Some(i);
+    }
+    let repo = repo.context("no repository was opened")?;
+
+    // The picked host replaces this machine's; the tag stays only for one
+    // of this machine's hosts.
+    let base = filter(view, config, entry.map(|i| &config.repo[i]));
+    let foreign = !base.hosts.contains(&pick.host);
+    let f = Filter {
+        hosts: vec![pick.host.clone()],
+        tag: if foreign { None } else { base.tag },
+    };
+    let open_at = if folder.starts_with(&pick.path) {
+        folder.clone()
+    } else {
+        pick.path.clone()
+    };
+    let snaps = repo.snapshots()?;
+    let mut app = App::new(snaps, f, open_at, tz, home);
+    app.mine = base.hosts;
+    app.shown_host = Some(pick.host);
+    app.start_dir = folder;
+    let index = index_for(repo, view, config);
+    tui(&mut term, index, Arc::new(RealDisk), app, view, config)
 }
 
 fn main() -> ExitCode {

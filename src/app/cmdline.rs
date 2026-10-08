@@ -15,6 +15,8 @@ pub enum InputKind {
     Command,
     Search,
     Filter,
+    /// `restore to:` on a foreign host (§3.18).
+    Dir,
 }
 
 /// What's being typed in the status bar.
@@ -199,7 +201,7 @@ impl App {
         let prev = match kind {
             InputKind::Search => self.search.clone(),
             InputKind::Filter => self.name_filter.clone(),
-            InputKind::Command => String::new(),
+            InputKind::Command | InputKind::Dir => String::new(),
         };
         self.input = Some(Input {
             kind,
@@ -234,7 +236,7 @@ impl App {
                     self.select_row(k);
                 }
             }
-            InputKind::Command => {}
+            InputKind::Command | InputKind::Dir => {}
         }
     }
 
@@ -253,6 +255,7 @@ impl App {
                 self.select_first();
             }
             InputKind::Command => {}
+            InputKind::Dir => self.pending_targets = None,
         }
     }
 
@@ -273,6 +276,7 @@ impl App {
                 }
             }
             InputKind::Filter => {}
+            InputKind::Dir => self.restore_into(&input.text),
         }
     }
 

@@ -81,7 +81,7 @@ fn progress_names_each_item_and_counts_bytes() {
     let o = run(
         &s.repo,
         &items,
-        How::RestoreDir,
+        &How::RestoreDir,
         &s.places,
         &mut |p| seen.push(p),
         &Cancel::default(),
@@ -118,7 +118,7 @@ fn stopped_copies_keep_finished_items() {
     let o = run(
         &s.repo,
         &items,
-        How::RestoreDir,
+        &How::RestoreDir,
         &s.places,
         &mut |p| {
             if p.item == 1 {
@@ -146,7 +146,7 @@ fn a_stopped_overwrite_puts_everything_back() {
     let o = run(
         &s.repo,
         &items,
-        How::Overwrite,
+        &How::Overwrite,
         &s.places,
         &mut |p| {
             if p.item == 1 {
@@ -173,7 +173,7 @@ fn an_overwrite_stopped_during_the_last_item_is_undone_too() {
     let o = run(
         &s.repo,
         &[s.target("a.txt")],
-        How::Overwrite,
+        &How::Overwrite,
         &s.places,
         &mut |p| {
             if matches!(p.step, RestoreStep::Bytes { .. }) {
@@ -195,7 +195,7 @@ fn tar_counts_bytes_and_stops_anywhere() {
     let o = run(
         &s.repo,
         &[s.target("sub")],
-        How::Tar,
+        &How::Tar,
         &s.places,
         &mut |p| last = Some(p.step),
         &Cancel::default(),
@@ -210,7 +210,7 @@ fn tar_counts_bytes_and_stops_anywhere() {
     let o = run(
         &s.repo,
         &[s.target("sub")],
-        How::Tar,
+        &How::Tar,
         &s.places,
         &mut |p| {
             if matches!(p.step, RestoreStep::Bytes { .. }) {

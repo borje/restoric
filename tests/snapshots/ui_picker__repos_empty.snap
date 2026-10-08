@@ -1,0 +1,16 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 80, 12)"
+---
+ restoric  Pick a repository
+
+   No repositories in the config.
+
+
+
+
+
+
+
+
+ PICK  ⏎ open · r refresh · q quit                                          0/0

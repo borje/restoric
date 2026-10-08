@@ -329,7 +329,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 let res = restore::run(
                     index.repo().as_ref(),
                     &targets,
-                    how,
+                    &how,
                     &ctx.places,
                     &mut |p| send(Response::RestoreProgress(p)),
                     &cancel,

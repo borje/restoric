@@ -80,6 +80,18 @@ impl ProbeCache {
         );
     }
 
+    /// What the cache remembers of `repo`, for the picker's repo level.
+    pub fn seen(&self, repo: &str) -> Option<SeenRepo> {
+        let s = self.repos.get(repo)?;
+        let mut hosts: Vec<String> = s.roots.iter().map(|r| r.host.clone()).collect();
+        hosts.dedup();
+        Some(SeenRepo {
+            checked: Timestamp::from_second(s.checked).unwrap_or(Timestamp::UNIX_EPOCH),
+            hosts,
+            roots: s.roots.iter().cloned().collect(),
+        })
+    }
+
     fn fresh(&self, repo: &str, now: Timestamp) -> bool {
         self.repos
             .get(repo)
@@ -115,12 +127,33 @@ impl ProbeCache {
     }
 }
 
+/// What a repository held when its snapshot list was last read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SeenRepo {
+    pub checked: Timestamp,
+    /// Distinct hostnames, sorted.
+    pub hosts: Vec<String>,
+    pub roots: Vec<Root>,
+}
+
+impl SeenRepo {
+    /// Whether any snapshot of `filter`'s hosts was seen.
+    pub fn mine(&self, filter: &Filter) -> bool {
+        self.roots.iter().any(|r| filter.accepts(&r.host, &r.tags))
+    }
+
+    /// Whether any snapshot, from any host, holds `folder`.
+    pub fn holds(&self, folder: &Path) -> bool {
+        self.roots.iter().any(|r| holds(&r.paths, folder))
+    }
+}
+
 /// How closely backup paths hold a folder: a path at or above the folder
 /// holds all of it and beats one below it, and a deeper path beats a
 /// shallower one.
-type Fit = (bool, usize);
+pub type Fit = (bool, usize);
 
-fn fit(paths: &[PathBuf], folder: &Path) -> Option<Fit> {
+pub fn fit(paths: &[PathBuf], folder: &Path) -> Option<Fit> {
     if !holds(paths, folder) {
         return None;
     }
@@ -393,6 +426,17 @@ mod tests {
         let back = ProbeCache::load(&p);
         assert_eq!(back.repos["a"].checked, 5);
         assert_eq!(back.repos["a"].roots.len(), 1);
+        let seen = back.seen("a").unwrap();
+        assert_eq!(seen.checked, at(5));
+        assert_eq!(seen.hosts, ["me"]);
+        assert!(seen.holds(Path::new("/x/y")));
+        assert!(!seen.holds(Path::new("/z")));
+        assert!(seen.mine(&cand("a").filter));
+        assert!(!seen.mine(&Filter {
+            hosts: vec!["other".into()],
+            tag: None
+        }));
+        assert_eq!(back.seen("b"), None);
         std::fs::write(&p, "not json").unwrap();
         assert!(ProbeCache::load(&p).repos.is_empty());
         let _ = std::fs::remove_dir_all(dir);

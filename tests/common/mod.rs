@@ -39,6 +39,11 @@ impl Harness {
 
     /// A history in the FakeRepo DSL, opened at `folder`.
     pub fn with(dsl: &str, folder: &str) -> Self {
+        Self::with_filter(dsl, folder, restoric::index::timeline::Filter::default())
+    }
+
+    /// As `with`, showing only the snapshots `filter` accepts.
+    pub fn with_filter(dsl: &str, folder: &str, filter: restoric::index::timeline::Filter) -> Self {
         let repo = Arc::new(FakeRepo::parse(dsl).unwrap());
         let snaps = repo.snapshots().unwrap();
         let disk = Arc::new(repo.disk());
@@ -46,7 +51,7 @@ impl Harness {
         let mode_switch = index.mode_switch();
         let app = App::new(
             snaps,
-            restoric::index::timeline::Filter::default(),
+            filter,
             PathBuf::from(folder),
             TimeZone::UTC,
             Some(PathBuf::from("/home/bege")),

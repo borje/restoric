@@ -7,6 +7,7 @@ pub mod findview;
 pub mod fmt;
 pub mod folder;
 pub mod icons;
+pub mod picker;
 pub mod popup;
 pub mod preview;
 pub mod statusbar;

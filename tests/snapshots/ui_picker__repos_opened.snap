@@ -1,0 +1,16 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 100, 12)"
+---
+ restoric  Pick a host and path                                                    sftp:nas:/backup
+
+   host         path                                                        snapshots  latest
+ ▶ bege-laptop  ~/dev/project                                                       2  Sep 06 18:03
+
+
+
+
+
+
+
+ PICK  ⏎ open · / filter · esc back · q quit                                                    1/1

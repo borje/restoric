@@ -21,6 +21,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             ),
             InputKind::Search => ("/", "type to search this folder · ⏎ keep · esc cancel"),
             InputKind::Filter => ("filter: ", "type to filter · ⏎ keep · esc clear"),
+            InputKind::Dir => ("restore to: ", "⏎ restore here · esc cancel"),
         };
         let c = g.put(1, r, label, t.accent.patch(t.bold));
         let c = g.put(c, r, &input.text, t.text);

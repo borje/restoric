@@ -12,6 +12,8 @@ use ratatui::crossterm::execute;
 
 use crate::app::keys::Hits;
 use crate::app::{App, Effect};
+use crate::picker::{Pick, Picker, Step};
+use crate::repo::SnapshotInfo;
 use crate::ui;
 use crate::ui::theme::Theme;
 use crate::worker::{Response, Worker};
@@ -83,48 +85,118 @@ fn page(terminal: &mut ratatui::DefaultTerminal, bytes: &[u8]) -> Result<()> {
     result.map_err(|e| anyhow::anyhow!("running {pager}: {e}"))
 }
 
-pub fn run(
-    mut app: App,
-    worker: Worker,
-    responses: Receiver<Response>,
-    theme: Theme,
-) -> Result<()> {
-    // ratatui::init restores the terminal on panic; mouse capture too.
-    let mut terminal = ratatui::init();
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = execute!(stdout(), DisableMouseCapture);
-        hook(info);
-    }));
-    execute!(stdout(), EnableMouseCapture)?;
+/// What the picker's driver is asked to do between keys.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Io {
+    /// Open config repository `i` and list its snapshots.
+    Open(usize),
+    /// List config repository `i`'s snapshots again.
+    Refresh(usize),
+}
 
-    // The reader pauses while a pager owns the terminal, so it doesn't take
-    // the pager's keys.
-    let paused = Arc::new(AtomicBool::new(false));
-    let (ev_tx, events) = crossbeam_channel::unbounded();
-    let reader_paused = paused.clone();
-    std::thread::spawn(move || {
+/// The terminal, set up for the TUI and restored when dropped. The picker
+/// and the folder view run in the same one.
+pub struct Term {
+    terminal: ratatui::DefaultTerminal,
+    events: Receiver<Event>,
+    /// The reader pauses while a pager owns the terminal, so it doesn't
+    /// take the pager's keys.
+    paused: Arc<AtomicBool>,
+}
+
+impl Term {
+    pub fn new() -> Result<Self> {
+        // ratatui::init restores the terminal on panic; mouse capture too.
+        let terminal = ratatui::init();
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = execute!(stdout(), DisableMouseCapture);
+            hook(info);
+        }));
+        execute!(stdout(), EnableMouseCapture)?;
+
+        let paused = Arc::new(AtomicBool::new(false));
+        let (ev_tx, events) = crossbeam_channel::unbounded();
+        let reader_paused = paused.clone();
+        std::thread::spawn(move || {
+            loop {
+                if reader_paused.load(Ordering::Acquire) {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                match event::poll(Duration::from_millis(50)) {
+                    Ok(true) => {}
+                    Ok(false) => continue,
+                    Err(_) => break,
+                }
+                let Ok(ev) = event::read() else { break };
+                if ev_tx.send(ev).is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(Term {
+            terminal,
+            events,
+            paused,
+        })
+    }
+
+    /// Runs the picker until a pick or `q`. `io` opens repositories on
+    /// request; its error is shown above the rows.
+    pub fn pick(
+        &mut self,
+        picker: &mut Picker,
+        theme: &Theme,
+        io: &mut dyn FnMut(Io) -> Result<Vec<SnapshotInfo>>,
+    ) -> Result<Option<Pick>> {
         loop {
-            if reader_paused.load(Ordering::Acquire) {
-                std::thread::sleep(Duration::from_millis(50));
+            self.terminal.draw(|f| {
+                let area = f.area();
+                ui::picker::draw(picker, f.buffer_mut(), area, theme);
+            })?;
+            let Event::Key(k) = self.events.recv()? else {
                 continue;
-            }
-            match event::poll(Duration::from_millis(50)) {
-                Ok(true) => {}
-                Ok(false) => continue,
-                Err(_) => break,
-            }
-            let Ok(ev) = event::read() else { break };
-            if ev_tx.send(ev).is_err() {
-                break;
+            };
+            let (i, what) = match picker.key(k) {
+                Step::Stay => continue,
+                Step::Quit => return Ok(None),
+                Step::Picked(p) => return Ok(Some(p)),
+                Step::Open(i) => (i, Io::Open(i)),
+                Step::Refresh(i) => (i, Io::Refresh(i)),
+            };
+            let location = picker
+                .repos
+                .iter()
+                .find(|r| r.index == i)
+                .map(|r| r.location.clone())
+                .unwrap_or_default();
+            picker.busy = Some(format!("opening {location}…"));
+            self.terminal.draw(|f| {
+                let area = f.area();
+                ui::picker::draw(picker, f.buffer_mut(), area, theme);
+            })?;
+            let result = io(what);
+            picker.busy = None;
+            match (result, what) {
+                (Ok(snaps), Io::Open(_)) => picker.opened(i, &snaps),
+                (Ok(snaps), Io::Refresh(_)) => picker.refreshed(i, &snaps),
+                (Err(e), _) => picker.failed(i, &format!("{e:#}")),
             }
         }
-    });
+    }
 
-    let mut hits = Hits::default();
-    // New snapshots (a backup finished) are looked for every 5 minutes.
-    let mut last_reload = std::time::Instant::now();
-    let result = (|| -> Result<()> {
+    /// The folder view's event loop (PLAN.md §4.5).
+    pub fn run(
+        &mut self,
+        mut app: App,
+        worker: Worker,
+        responses: Receiver<Response>,
+        theme: Theme,
+    ) -> Result<()> {
+        let mut hits = Hits::default();
+        // New snapshots (a backup finished) are looked for every 5 minutes.
+        let mut last_reload = std::time::Instant::now();
         loop {
             if app.bumped {
                 worker.bump();
@@ -137,13 +209,13 @@ pub fn run(
                 match effect {
                     Effect::Clipboard(text) => copy(&text),
                     Effect::Pager { bytes, .. } => {
-                        paused.store(true, Ordering::Release);
+                        self.paused.store(true, Ordering::Release);
                         // Let a poll in progress finish before the pager starts.
                         std::thread::sleep(Duration::from_millis(60));
-                        if let Err(e) = page(&mut terminal, &bytes) {
+                        if let Err(e) = page(&mut self.terminal, &bytes) {
                             app.message = Some(format!("{e:#}"));
                         }
-                        paused.store(false, Ordering::Release);
+                        self.paused.store(false, Ordering::Release);
                     }
                 }
             }
@@ -151,7 +223,7 @@ pub fn run(
                 last_reload = std::time::Instant::now();
                 worker.send(crate::worker::Request::Reload { quiet: true });
             }
-            terminal.draw(|f| {
+            self.terminal.draw(|f| {
                 let area = f.area();
                 hits = ui::draw(&mut app, f.buffer_mut(), area, &theme);
             })?;
@@ -159,7 +231,7 @@ pub fn run(
                 return Ok(());
             }
             select! {
-                recv(events) -> ev => match ev? {
+                recv(self.events) -> ev => match ev? {
                     Event::Key(k) => app.key(k),
                     Event::Mouse(m) => app.mouse(m, &hits),
                     _ => {}
@@ -174,7 +246,11 @@ pub fn run(
                 default(Duration::from_millis(500)) => {}
             }
         }
-    })();
-    restore();
-    result
+    }
+}
+
+impl Drop for Term {
+    fn drop(&mut self) {
+        restore();
+    }
 }

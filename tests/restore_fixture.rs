@@ -34,7 +34,7 @@ fn target(repo: &dyn Repo, snap: &SnapshotInfo, path: &Path) -> Target {
 
 /// Runs a restore to the end, without watching its progress.
 fn go(repo: &dyn Repo, targets: &[Target], how: How, places: &Places) -> anyhow::Result<Vec<Done>> {
-    let o = run(repo, targets, how, places, &mut |_| {}, &Cancel::default())?;
+    let o = run(repo, targets, &how, places, &mut |_| {}, &Cancel::default())?;
     assert!(!o.stopped);
     Ok(o.done)
 }
@@ -58,7 +58,7 @@ fn every_option() {
     // Next to the original, twice: name.stamp, then name.stamp-2.
     let t = target(&repo, &snaps[0], &a);
     assert_eq!(
-        planned(&t, How::NextTo, &places),
+        planned(&t, &How::NextTo, &places),
         src.join(format!("a.txt.{st0}"))
     );
     let done = go(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
@@ -147,7 +147,7 @@ fn every_option() {
     let o = run(
         &repo,
         std::slice::from_ref(&sub),
-        How::RestoreDir,
+        &How::RestoreDir,
         &places,
         &mut |p| steps.push(p.step),
         &Cancel::default(),

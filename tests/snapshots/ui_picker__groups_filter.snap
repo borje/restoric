@@ -1,0 +1,24 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 80, 20)"
+---
+ restoric  Pick a host and path                 rest:http://iridium:8000/dev-vm
+
+   host    path                                         snapshots  latest
+ ▶ dev-vm  /srv/data                                            2  Sep 01 10:00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ filter: vm█                                type to filter · ⏎ keep · esc clear

@@ -1,0 +1,16 @@
+---
+source: tests/ui_picker.rs
+expression: "screen(&p, 80, 12)"
+---
+ restoric  Pick a host and path                 rest:http://iridium:8000/dev-vm
+
+   No rows match "vmx".
+
+
+
+
+
+
+
+
+ filter: vmx█                               type to filter · ⏎ keep · esc clear

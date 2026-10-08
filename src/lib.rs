@@ -8,6 +8,7 @@ pub mod diff;
 pub mod disk;
 pub mod index;
 pub mod log;
+pub mod picker;
 pub mod repo;
 pub mod repos;
 pub mod restore;

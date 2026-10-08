@@ -142,6 +142,9 @@ pub fn header(app: &App, g: &mut Grid) {
     } else {
         // The backup root is one part; folders below it are one part each.
         let at_root = app.folder == app.root;
+        if let Some(h) = &app.shown_host {
+            c = g.put(c, 0, &format!("{h}:"), t.bold);
+        }
         let root = fmt::path(&app.root, app.home.as_deref());
         let style = if at_root { t.bold } else { t.accent };
         c = g.put_act(c, 0, &root, style, Action::GoFolder(app.root.clone()));

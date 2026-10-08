@@ -776,6 +776,8 @@ For targets other than "next to it" and "overwrite". Works on files and folders,
 
 Showing a file in `$PAGER` is not a restore, so it isn't in the dialog: `o` does it from the folder, versions and diff views.
 
+**Foreign host** (the host shown isn't one of this machine's, §3.18): there is no original on disk to overwrite or sit next to, so `p` and `r` both open one prompt in the status bar, `restore to: ~/dev/project/src█`, with the last directory used this session, else the folder restoric started in. `⏎` restores the item (or the yanked items) to `<dir>/<name>`, with `-2`, `-3`, … on a clash, and says "Restored to …"; `esc` cancels. `~` is expanded; a relative path is taken from the start folder. `P` says "Overwriting is off for another host's snapshots. p restores into a directory you choose." `:undo` is unchanged.
+
 How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restorer, which keeps mode, modification time and symlinks; owner and group are set only when running as root. Folder tar archives are written by restoric from the trees. An overwrite moves what's on disk into `undo/<time>/files/<absolute path>` with a `manifest.json`. If the restore fails, the old version is moved back. `:undo` undoes the newest overwrite, all of its items at once. Moves fall back to copy and delete across file systems. The dialog's "next to it" name comes without the `-2` a clash would add, because the UI doesn't look at the disk; the message after the restore gives the real name. The `:` line handles `:undo`, `:q`, `:help`, `:deleted`, `:latest`/`:now` and `:oldest`/`:first`; the rest of §3.15 comes in M6.
 
 **Progress and stopping.** A restore runs in the background, like a copy in yazi; the UI stays usable. The status bar shows how far it has got (§3.1): `restoring config.go … preparing` while rustic works out what to copy, then a bar with the percentage and bytes of the item being copied, with `2/5` before the name when there are several items. Short of room, `esc stop` goes first, then the bar shrinks. A tar archive walks the folder's trees first to know its size.
@@ -945,7 +947,9 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 
 **Find view:** `j` `k` · `gg` `G` · `⏎` `l` go to the last snapshot with it · `h` `←` `esc` `⌫` back.
 
-**Restore dialog:** `j` `k` / `1`–`3` (`4` tar, for a folder) · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no.
+**Restore dialog:** `j` `k` / `1`–`3` (`4` tar, for a folder) · `⏎` (twice for overwrite) · `esc` `q`. **Confirmation:** `y` / `⏎` yes, `n` / `esc` no. **`restore to:` prompt** (foreign host, §3.11): type a directory · `⏎` restore · `esc` cancel.
+
+**Repository picker (§3.18):** `j` `k` `↓` `↑` · `gg` `G` `Home` `End` `PgDn` `PgUp` · `⏎` `l` `→` open the repository / pick the row · `/` filter the groups as you type (`⏎` keeps it, `esc` clears it) · `esc` `h` `←` `⌫` clear the filter, else back from the groups to the repositories · `r` read the selected repository's snapshot list again (repo level) · `q` `Ctrl-c` quit. Keyboard only.
 
 Mouse (crossterm mouse events): click timeline dots, rows, breadcrumb parts, `− +`, the preview mode, which-key entries, dialog options and `? help`. Clicking a selected row opens it. Wheel scrolls the column under the pointer.
 
@@ -984,6 +988,8 @@ Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one na
 - "The file did not exist in these snapshots, so there is nothing to restore."
 - "No snapshots that early. The oldest is from Jul 14 09:00."
 - "Already at the top of the backup."
+- "Restored to ~/tmp/x/main.go" · "Overwriting is off for another host's snapshots. p restores into a directory you choose." (§3.11, foreign host)
+- Picker (§3.18): "Can't open /mnt/photos: connection refused" above the rows · "No snapshots in this repository." · "No repositories in the config." · "No rows match "x"."
 
 ### 3.17 Look and colours
 - **Colours:** by default, the **16 ANSI colours**, so the terminal's theme applies. Respect `NO_COLOR`. Colours can be changed in restoric's own config file. restoric doesn't read yazi's theme: it's a separate app.
@@ -996,11 +1002,104 @@ Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one na
 ### 3.18 Repository picker (`--browse`)
 A start-up screen for reaching snapshots the folder-anchored flow can't: a renamed or dead machine, another host, a path that has moved. It runs only at start-up (§4.6). To browse another repository, host or path, quit and start again; there is no in-session switch.
 
-- **Repo level**, only when the config has several `[[repo]]` and `--repo` wasn't given. One row per repo: name, location, the hosts seen (from `repos.json`; `not read yet` or the age when missing or stale). Order: repos whose cached hosts include this machine, then repos holding or near PATH, then config order. No repo is opened to draw it. `r` refreshes the selected row; `⏎` opens the repo.
-- **Group level**, one row per **(host, backup path)**: host, path, snapshots, latest. Tags are not part of the row. A snapshot with several backup paths counts once in each path's row. This machine's hosts (the config `host` list) come first, the rest by newest snapshot. `/` filters by text. PATH pre-selects the closest row. Built from the snapshot list alone.
-- **Keys:** `⏎` select · `esc` back from groups to repos · `q` quit · `/` filter · `r` refresh (repo level).
-- **After picking:** open the folder view on PATH if it lies at or under the group's path, else on the group's path. The picked host replaces the config `host` for the session and shows in the title bar.
-- **Foreign host** (not in the config `host` list): `p` and `P` ask for a target directory (default: the last one used in the session, else the current folder), and `P` is disabled with a message. The `on disk` comparison (§2.5) is unchanged; a path missing here shows as missing.
+- **Repo level**, only when the config has several `[[repo]]` and `--repo` wasn't given. One row per repo: location, the hosts seen (from `repos.json`; `not read yet` when missing, with `· read 3 h ago` when older than the 5-minute recheck). Order: repos whose cached hosts include this machine, then repos holding PATH, then config order. No repo is opened to draw it. `r` refreshes the selected row; `⏎` opens the repo. An open that fails says why above the rows and marks the row `can't open`.
+- **Group level**, one row per **(host, backup path)**: host, path, snapshots, latest. Tags are not part of the row. A snapshot with several backup paths counts once in each path's row. This machine's hosts (the config `host` list) come first, in bold, the rest by newest snapshot. `/` filters by text (host or path, case-insensitive). PATH pre-selects the closest row. Built from the snapshot list alone.
+- **Keys:** `⏎` select · `esc` back from groups to repos · `q` quit · `/` filter · `r` refresh (repo level). The full list is in §3.14.
+- **After picking:** open the folder view on PATH if it lies at or under the group's path, else on the group's path. The picked host replaces the config `host` for the session and shows in the title bar as `dev-vm:` before the breadcrumb. The config `tag` stays only when the picked host is one of this machine's: for another host it means nothing and is dropped.
+- **Foreign host** (not in the config `host` list): `p` and `P` ask for a target directory (default: the last one used in the session, else the current folder), and `P` is disabled with a message (§3.11). The `on disk` comparison (§2.5) is unchanged; a path missing here shows as missing.
+
+<sub>`docs/screens/19-picker-groups.txt`</sub>
+
+```text
+source: tests/ui_picker.rs
+expression: "screen(&p, 100, 34)"
+---
+ restoric  Pick a host and path                                     rest:http://iridium:8000/dev-vm
+
+   host         path                                                        snapshots  latest
+ ▶ bege-laptop  ~/dev/project                                                       2  Sep 06 18:03
+   dev-vm       /srv/data                                                           2  Sep 01 10:00
+   old-laptop   ~                                                                   1  Mar 01 10:00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ PICK  ⏎ open · / filter · q quit                                                               1/3
+```
+
+<sub>`docs/screens/20-picker-repos.txt`</sub>
+
+```text
+source: tests/ui_picker.rs
+expression: "screen(&p, 100, 34)"
+---
+ restoric  Pick a repository
+
+   location                         hosts
+ ▶ rest:http://iridium:8000/dev-vm  bege-laptop, dev-vm, old-laptop · read 3 h ago
+   /mnt/photos                      nas · read 30 d ago
+   sftp:nas:/backup                 not read yet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ PICK  ⏎ open · r refresh · q quit                                                              1/3
+```
+
+| Rows | Content |
+|---|---|
+| 0 | `restoric` and `Pick a repository` / `Pick a host and path`; at the group level the repository's location at the right |
+| 1– | The message, when there is one: the §4.6 dead-end text, or why an open failed. Then a blank row. |
+| then | A dim column header and the rows, `▶` and the selected background on the current one. The host column is as wide as the widest host; the path takes the rest. |
+| last | Status bar: ` PICK ` badge, the keys, `opening …` while a repository opens, and `2/3`. Typing `/` shows `filter: vm█` like the folder view's filter. |
+
+How it works (M9): the picker is its own state machine (`picker.rs`), not a `View` of `App`: at the repo level there is no repository, no index and no folder. `tui::Term::pick` draws it and blocks on keys; when it asks to open or refresh a repository, `main.rs` does so synchronously (the status bar says `opening …`), records the list in `repos.json` and reports back. After a pick the folder view starts as usual, with the filter's host replaced and `App::mine` holding this machine's hosts, so `App::foreign` also applies after `:host` in a session. Restores on a foreign host go through `How::Into(dir)`.
 
 ---
 
@@ -1037,6 +1136,7 @@ restoric/
 │   ├── log.rs         `restoric log`
 │   ├── config.rs      ~/.config/restoric/config.toml
 │   ├── repos.rs       which [[repo]] holds the folder; repos.json cache of snapshot roots
+│   ├── picker.rs      the repository picker's state and keys (§3.18); drawn by ui/picker.rs
 │   ├── repo/
 │   │   ├── mod.rs     trait Repo + our own types (SnapshotInfo, TreeId, Node, NodeKind)
 │   │   ├── rustic.rs  RusticRepo: rustic_core implementation
@@ -1052,7 +1152,7 @@ restoric/
 │   ├── cache.rs       redb tables (§4.4)
 │   ├── disk.rs        Disk trait: the real file system (never follows symlinks), faked in tests
 │   ├── worker.rs      background pool, Request/Response enums, generation ids
-│   ├── tui.rs         terminal setup/teardown, panic hook, event loop
+│   ├── tui.rs         Term: terminal setup/teardown, panic hook, the picker loop and the event loop
 │   ├── restore.rs     next to / overwrite / restore folder / tar, undo log (writes nothing else)
 │   ├── diff.rs        imara-diff line diffs, binary detection, margin marks, hunks
 │   ├── app/
@@ -1066,6 +1166,7 @@ restoric/
 │       ├── folder.rs    versions column + listing
 │       ├── preview.rs   file content with change marks, inline diff, folder contents
 │       ├── versions.rs  diffview.rs  find.rs  statusbar.rs
+│       ├── picker.rs    the repository picker screen
 │       ├── popup.rs     restore dialog, confirmation, help, which-key, messages (rounded)
 │       ├── fmt.rs       dates, sizes, paths, fitting and wrapping text
 │       ├── icons.rs     Nerd Font glyphs per file type + plain fallback
@@ -1279,6 +1380,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- Picker details (2026-10-08, M9 built): a repo row shows the full location and the hosts, no name column and no `name` key. On a foreign host `r` is the same directory prompt as `p` (no reduced dialog); the item lands at `<dir>/<name>`. The config `tag` is dropped for a foreign host and kept for one of this machine's. The picker is keyboard-only.
 - Repository picker (2026-10-08), §3.18, M9. It lists (host, path) groups, not a snapshot file tree, so the folder-anchored design stays. It opens with `--browse` and in place of the §4.6 dead ends (no terminal: the old message, exit non-zero). With several `[[repo]]` there is a repo level first (A2), drawn from `repos.json` without opening any repo. A row is (host, path) only, with no tags. No in-session switch of repo, host or path: restart. Restoring from a foreign host always asks for a target directory and disables `P`. The `on disk` comparison is left as it is: it is read-only, and for a renamed machine it is correct.
 - Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.
 - Restores show progress and can be stopped (2026-10-07), after comparing with lazyrestic. Progress goes in the **status bar**, not the header (the header belongs to indexing) and not a modal popup (a big remote restore would lock the user out; yazi runs copies in the background too). restoric keeps rustic's restorer, which can't be interrupted while it copies a folder's contents; writing its own restorer for that was judged not worth losing rustic's parallel reads. `esc` asks before stopping, `:cancel` doesn't; one restore at a time; quitting asks and waits. A stopped overwrite puts everything back; stopped copies keep finished items. No resume after a failure for now (`ISSUES.md`). Details in §3.11.
@@ -1377,4 +1479,4 @@ Tick milestones here as they're done, with the commit.
 - [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
 - [x] M8: yazi plugin — abb5806 (not yet published for `ya pkg`)
-- [ ] M9: repository picker
+- [x] M9: repository picker — COMMIT
