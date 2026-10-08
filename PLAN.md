@@ -92,6 +92,8 @@ It works for normal setups. Things that can break it, and what restoric does:
 | **Two machines with the same hostname** back up to one repo | restic can't tell them apart either | Can't be separated by hostname. Separate them with tags (`restic backup --tag laptop`) and set `tag = "laptop"` in restoric's config. |
 | Containers or VMs with random hostnames | Each run looks like a new machine | Use `--host` when backing up, as above |
 
+To look at another machine's snapshots on purpose, use the repository picker (§3.18).
+
 So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
 ### 2.5 Changes on disk since the newest snapshot
@@ -991,6 +993,15 @@ Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one na
 - **Icons:** Nerd Font glyphs per file type (folder, language, markdown, shell, config…), coloured by type. `--no-icons` / `icons = false` switch to the plain set used in the mockup. A terminal can't report whether its font has the glyphs, so there's no automatic fallback: Nerd Font is the default, as in yazi.
 - **Lines:** only thin vertical `│` between columns. Popups (restore, confirmation, help, which-key, messages) have rounded corners `╭╮╰╯`.
 
+### 3.18 Repository picker (`--browse`)
+A start-up screen for reaching snapshots the folder-anchored flow can't: a renamed or dead machine, another host, a path that has moved. It runs only at start-up (§4.6). To browse another repository, host or path, quit and start again; there is no in-session switch.
+
+- **Repo level**, only when the config has several `[[repo]]` and `--repo` wasn't given. One row per repo: name, location, the hosts seen (from `repos.json`; `not read yet` or the age when missing or stale). Order: repos whose cached hosts include this machine, then repos holding or near PATH, then config order. No repo is opened to draw it. `r` refreshes the selected row; `⏎` opens the repo.
+- **Group level**, one row per **(host, backup path)**: host, path, snapshots, latest. Tags are not part of the row. A snapshot with several backup paths counts once in each path's row. This machine's hosts (the config `host` list) come first, the rest by newest snapshot. `/` filters by text. PATH pre-selects the closest row. Built from the snapshot list alone.
+- **Keys:** `⏎` select · `esc` back from groups to repos · `q` quit · `/` filter · `r` refresh (repo level).
+- **After picking:** open the folder view on PATH if it lies at or under the group's path, else on the group's path. The picked host replaces the config `host` for the session and shows in the title bar.
+- **Foreign host** (not in the config `host` list): `p` and `P` ask for a target directory (default: the last one used in the session, else the current folder), and `P` is disabled with a message. The `on disk` comparison (§2.5) is unchanged; a path missing here shows as missing.
+
 ---
 
 ## 4. Architecture
@@ -1112,8 +1123,10 @@ rustic_core has its own cache for index and tree packs. Check in M0 that tree pa
    The password comes from `--password-file` / `--password-command` / `--insecure-no-password`, then the chosen `[[repo]]` if it says how to unlock it, then `RESTIC_PASSWORD` / `_FILE` / `_COMMAND`, the same as restic. The repository is chosen once, from the folder restoric starts in.
 2. Open the repo (read only). Load the snapshot list from the cache, then fetch new ones in the background.
 3. Pick the path: the argument or the current folder, made absolute. The timeline set is snapshots of this machine (§2.4) with a backup path at, above, or below that path (§2.3).
-4. If this machine has no snapshots at all: show the hostnames that do have snapshots, explain how to set `host` (§2.4), and stop.
-5. If the path isn't in any of this machine's snapshots: show a clear message listing the paths this machine backs up.
+4. If this machine has no snapshots at all: open the picker (§3.18), which lists the hostnames that do have snapshots. Without a terminal, print them, explain how to set `host` (§2.4), and exit non-zero.
+5. If the path isn't in any of this machine's snapshots, or no `[[repo]]` holds the folder: open the picker, with the message above it. Without a terminal, print a clear message listing the paths this machine backs up, and exit non-zero.
+
+`--browse` opens the picker even when the folder matches. With one repository, or with `--repo`, the picker starts at the group level; with several `[[repo]]` and no `--repo`, at the repo level. With no repository at all (no `--repo`, no `[[repo]]`, no environment), the error stays and points at `--repo` and the config.
 
 ### 4.7 CLI
 ```
@@ -1126,6 +1139,7 @@ restoric [PATH]                       open the TUI at PATH (default: current fol
   --select NAME         start with NAME selected (used by the yazi plugin)
   --no-icons
   --at DATE             start at a date (:sep 1 syntax)
+  --browse              start in the repository picker (§3.18); also opens by itself on the §4.6 dead ends
 restoric log PATH [--json]            print the change points of PATH (no TUI)   (M1)
 restoric versions FILE [--json]       print the distinct versions of FILE        (M3)
 restoric demo                         TUI against FakeRepo with tests/fixtures/project.dsl, its files written to a temporary folder (removed on exit)
@@ -1227,6 +1241,13 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 
 How it works (M8): a `@sync` entry reads the hovered file (or the folder, if nothing is hovered) and emits yazi's `shell --block` with `restoric <path>`. A file path makes restoric open its folder with the file selected, so `--select` isn't needed. Arguments after `--` in the keymap pass through; yazi turns `--no-icons` into `no_icons`, so the plugin turns it back. Tested with yazi 26.9.1. Publishing for `ya pkg` needs the plugin at the root of a published repository, so it waits until restoric has a public home; until then the README says to copy the folder.
 
+### M9: repository picker
+- **Read first:** §3.18 (the screen), §4.6 and §4.7 (start-up and `--browse`), §2.4 (host), §3.11 (restore) and the 2026-10-08 entry in §8 "Settled".
+- `--browse` and the §4.6 dead ends open the picker (§3.18): repo level (several `[[repo]]`) and group level, `/` filter, PATH pre-selection, this machine's rows first.
+- The picked host replaces the config `host`; the title bar shows it. On a foreign host `p`/`P` ask for a target directory (remembered per session) and `P` is disabled.
+- Insta snapshots for both levels and their empty and error states, from `FakeRepo`. A test that a snapshot path missing on disk shows as missing without an error.
+- **Done when:** with a `FakeRepo` holding two hosts, `--browse` shows both, picking the other host opens its timeline, and a restore from it asks for a directory.
+
 ---
 
 ## 6. Testing
@@ -1258,6 +1279,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 1. **AGPL-3.0-only or AGPL-3.0-or-later?** `LICENSE` holds the AGPLv3 text. The plan assumes `-or-later`, which is the usual choice and lets a future AGPL version apply.
 
 Settled during review:
+- Repository picker (2026-10-08), §3.18, M9. It lists (host, path) groups, not a snapshot file tree, so the folder-anchored design stays. It opens with `--browse` and in place of the §4.6 dead ends (no terminal: the old message, exit non-zero). With several `[[repo]]` there is a repo level first (A2), drawn from `repos.json` without opening any repo. A row is (host, path) only, with no tags. No in-session switch of repo, host or path: restart. Restoring from a foreign host always asks for a target directory and disables `P`. The `on disk` comparison is left as it is: it is read-only, and for a renamed machine it is correct.
 - Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.
 - Restores show progress and can be stopped (2026-10-07), after comparing with lazyrestic. Progress goes in the **status bar**, not the header (the header belongs to indexing) and not a modal popup (a big remote restore would lock the user out; yazi runs copies in the background too). restoric keeps rustic's restorer, which can't be interrupted while it copies a folder's contents; writing its own restorer for that was judged not worth losing rustic's parallel reads. `esc` asks before stopping, `:cancel` doesn't; one restore at a time; quitting asks and waits. A stopped overwrite puts everything back; stopped copies keep finished items. No resume after a failure for now (`ISSUES.md`). Details in §3.11.
 - The listing widens with the terminal: 40% of the width after the Versions column, at least 40 (38 under 100 columns) and at most 50 (60 felt too wide at 171 columns). The Δ column is as wide as its widest visible entry, so a lone `~` doesn't leave five blank cells before the divider. A fixed 35 left names 18 cells and gave every extra column to the preview. At 100 columns the preview gives up 5 cells so names get 23.
@@ -1355,3 +1377,4 @@ Tick milestones here as they're done, with the commit.
 - [x] M6: navigation extras — 878a221
 - [ ] M7: polish and release
 - [x] M8: yazi plugin — abb5806 (not yet published for `ya pkg`)
+- [ ] M9: repository picker
