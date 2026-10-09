@@ -244,3 +244,23 @@ fn j_k_scroll_the_preview() {
     h.keys("K");
     assert_eq!(h.screen(100, 34), before);
 }
+
+/// A file replaced by a folder of the same name in a snapshot shows both
+/// rows, as the on disk version does.
+#[test]
+fn snapshot_listing_kind_change() {
+    let dsl = PROJECT.replace(
+        "\ndisk\n",
+        "snapshot 2026-10-05 12:00\n  rm src/util.go\n  write src/util.go/a.go package util\\n\n\ndisk\n",
+    );
+    let mut h = Harness::with(&dsl, SRC);
+    h.at("2026-10-05 12:00");
+    let rows = h.app.rows();
+    let utils: Vec<_> = rows
+        .iter()
+        .filter_map(|r| h.app.entry(*r))
+        .filter(|e| e.node.name.to_string_lossy() == "util.go")
+        .map(|e| (e.is_dir(), e.is_deleted()))
+        .collect();
+    assert_eq!(utils, vec![(true, false), (false, true)]);
+}

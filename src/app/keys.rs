@@ -79,6 +79,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
             ('g', KeyCode::Char('g')) => Some(Top),
             ('g', KeyCode::Char('h')) => Some(Root),
             ('z', KeyCode::Char('d')) => Some(ToggleDeleted),
+            ('z', KeyCode::Char('n')) => Some(HideNew),
             ('c', KeyCode::Char(c @ ('c' | 'd' | 'f'))) => Some(Copy(c)),
             _ => None,
         };

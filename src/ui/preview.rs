@@ -287,7 +287,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
                 Delta::Changed => {
                     g.put(x1 - 1, y, "~", t.changed);
                 }
-                Delta::Counts(cn) if !cn.is_empty() => {
+                Delta::Counts(cn) | Delta::New(cn) if !cn.is_empty() => {
                     let cw = counts_width(cn, "");
                     put_counts(g, x1 + 1 - cw, y, cn, "", x1 + 1);
                 }

@@ -23,6 +23,8 @@ pub enum Delta {
     Deleted,
     /// A folder: what changed under it (empty when nothing did).
     Counts(Counts),
+    /// A folder that wasn't there in the snapshot before: what's under it.
+    New(Counts),
     /// Deleted before the snapshot before; the last snapshot that had it.
     Gone(usize),
 }
@@ -88,8 +90,13 @@ impl Index {
         for n in &cur.nodes {
             let before = prev.get(&n.name);
             let delta = if n.is_dir() {
-                let was = before.filter(|b| b.is_dir()).and_then(|b| b.subtree);
-                Delta::Counts(self.tree_counts(was, n.subtree)?)
+                let was_dir = before.filter(|b| b.is_dir());
+                let c = self.tree_counts(was_dir.and_then(|b| b.subtree), n.subtree)?;
+                if was_dir.is_some() {
+                    Delta::Counts(c)
+                } else {
+                    Delta::New(c)
+                }
             } else {
                 match before {
                     None => Delta::Added,
@@ -105,8 +112,10 @@ impl Index {
                 delta,
             });
         }
+        // Gone, or replaced by the other kind of entry: a `−` row next to
+        // the `+` one, as on disk.
         for b in &prev.nodes {
-            if cur.get(&b.name).is_none() {
+            if cur.get(&b.name).is_none_or(|n| n.is_dir() != b.is_dir()) {
                 out.push(Entry {
                     node: b.clone(),
                     delta: Delta::Deleted,

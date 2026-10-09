@@ -21,17 +21,17 @@ expression: "h.screen(100, 34)"
    ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
  Sep 02 20:16│  / n N   f              search / next, previous / filter               │
    ┄ 2 unchan│  .  zd   zi zo          show deleted items / zoom timeline             │
- Aug 22 11:59│  gh   3H 5j             backup root / counts with motions              │
+ Aug 22 11:59│  zn                     on disk: hide / show files not backed up       │
+   ┄ 1 unchan│  gh   3H 5j             backup root / counts with motions              │
+ Aug 17 16:04│                                                                        │
+   ┄ 1 unchan│  Commands                                                              │
+ Aug 10 15:44│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
+ Aug 07 08:15│  :find NAME   s         search every snapshot for a name               │
+ Aug 03 16:19│  :latest :oldest :undo                                                 │
    ┄ 1 unchan│                                                                        │
- Aug 17 16:04│  Commands                                                              │
-   ┄ 1 unchan│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
- Aug 10 15:44│  :find NAME   s         search every snapshot for a name               │
- Aug 07 08:15│  :latest :oldest :undo                                                 │
- Aug 03 16:19│                                                                        │
-   ┄ 1 unchan│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │
- Jul 28 15:59│  Press any key to close                                                │
- Jul 26 11:57╰────────────────────────────────────────────────────────────────────────╯
- Jul 24 12:16 ~1      │                                        │
+ Jul 28 15:59│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │
+ Jul 26 11:57│  Press any key to close                                                │
+ Jul 24 12:16╰────────────────────────────────────────────────────────────────────────╯
    ┄ 2 unchanged ┄    │                                        │
  Jul 14 09:00 +7      │                                        │
                       │   2 deleted · . to show                │

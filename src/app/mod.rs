@@ -218,6 +218,8 @@ pub enum Action {
     /// Scroll the preview by this many lines.
     Scroll(isize),
     ToggleDeleted,
+    /// Hide / show files and folders not in the newest snapshot, on disk (`zn`).
+    HideNew,
     /// Full-screen diff against disk (`d`; `⏎` in the versions view).
     Diff,
     /// Full-screen diff against the previous version (`p` in versions and diff).
@@ -384,6 +386,9 @@ pub struct App {
     pending: HashSet<Pending>,
     /// Show items deleted earlier (`.`).
     pub ghosts: bool,
+    /// Hide files and folders not in the newest snapshot on the on disk
+    /// version (`zn`).
+    pub hide_new: bool,
     pub preview: PreviewMode,
     /// Preview scroll; `None` until the preview picks its first line.
     pub scroll: Option<usize>,
@@ -485,6 +490,7 @@ impl App {
             diffs: HashMap::new(),
             pending: HashSet::new(),
             ghosts: false,
+            hide_new: false,
             preview: PreviewMode::Content,
             scroll: None,
             scroll_base: Cell::new(0),
@@ -576,12 +582,44 @@ impl App {
         self.deleted.get(&(self.snap, self.folder.clone()))
     }
 
-    /// How many items deleted earlier are hidden.
+    /// The name filter, as `name_passes` wants it.
+    fn filter_key(&self) -> String {
+        fold(&self.name_filter)
+    }
+
+    /// Whether the entry passes the name filter (`f`), given as `filter_key`.
+    fn name_passes(e: &Entry, filter: &str) -> bool {
+        filter.is_empty() || fold(&e.node.name.to_string_lossy()).contains(filter)
+    }
+
+    /// How many items deleted earlier are hidden, among those the name
+    /// filter would show.
     pub fn hidden(&self) -> usize {
         if self.ghosts {
-            0
-        } else {
-            self.ghost_entries().map_or(0, |g| g.len())
+            return 0;
+        }
+        let filter = self.filter_key();
+        self.ghost_entries().map_or(0, |g| {
+            g.iter().filter(|e| Self::name_passes(e, &filter)).count()
+        })
+    }
+
+    /// Hidden by `zn`: a file or folder not in the newest snapshot, on the
+    /// on disk version.
+    fn hidden_new(&self, e: &Entry) -> bool {
+        self.hide_new && self.on_disk() && matches!(e.delta, Delta::Added | Delta::New(_))
+    }
+
+    /// How many rows not in the backup `zn` hides, among those the name
+    /// filter would show.
+    pub fn new_hidden(&self) -> usize {
+        let filter = self.filter_key();
+        match self.listing() {
+            Some(Some(entries)) => entries
+                .iter()
+                .filter(|e| self.hidden_new(e) && Self::name_passes(e, &filter))
+                .count(),
+            _ => 0,
         }
     }
 
@@ -595,8 +633,8 @@ impl App {
         let Some(Some(entries)) = self.listing() else {
             return rows;
         };
-        let f = fold(&self.name_filter);
-        let shown = |e: &Entry| f.is_empty() || fold(&e.node.name.to_string_lossy()).contains(&f);
+        let filter = self.filter_key();
+        let shown = |e: &Entry| !self.hidden_new(e) && Self::name_passes(e, &filter);
         let ghosts: &[Entry] = match (self.ghosts, self.ghost_entries()) {
             (true, Some(g)) => g,
             _ => &[],
@@ -743,10 +781,10 @@ impl App {
         if self.listings.contains_key(&key) {
             return;
         }
-        let set = self.set_for(folder);
         let Version::Snapshot(snap) = at else {
             return self.want_disk_listing(folder);
         };
+        let set = self.set_for(folder);
         if let Some(i) = set.iter().position(|s| s.id == snap) {
             self.request(
                 Pending::Listing(at, folder.to_path_buf()),
@@ -1314,6 +1352,29 @@ impl App {
     }
 
     /// Keeps the same name selected when the listing changes.
+    /// The name the visual anchor is on, to find it again when the rows
+    /// change.
+    fn visual_anchor(&self) -> Option<OsString> {
+        let k = self.visual?;
+        let row = *self.rows().get(k)?;
+        self.entry(row).map(|e| e.node.name.clone())
+    }
+
+    /// After a toggle that hides or shows rows: keep the selection and the
+    /// visual anchor on their entries. Visual mode ends if its anchor is
+    /// hidden.
+    fn rows_changed(&mut self, anchor: Option<OsString>) {
+        self.restore_selection();
+        if self.visual.is_some() {
+            let rows = self.rows();
+            self.visual = anchor.and_then(|name| {
+                rows.iter()
+                    .position(|r| self.entry(*r).is_some_and(|e| e.node.name == name))
+            });
+        }
+        self.moved_on();
+    }
+
     fn restore_selection(&mut self) {
         // Keep the place until the listing is there.
         if !matches!(self.listing(), Some(Some(_))) {
@@ -1429,15 +1490,26 @@ impl App {
     /// Forgets the current folder's own disk listing and counts, so they're
     /// read again on entering it on the disk version; what's known about
     /// its subfolders and files is kept.
+    /// Entering a folder on disk reads it again: its listing and live
+    /// counts, and what was read of the files in it, so the preview and
+    /// diffs agree with the rows.
     fn forget_disk_folder(&mut self) {
         let f = self.folder.clone();
         self.listings.remove(&(Version::Disk, f.clone()));
         self.deleted.remove(&(Version::Disk, f.clone()));
         self.live.remove(&f);
+        let inside = |p: &Path| p.parent() == Some(f.as_path());
+        self.disk_files.retain(|p, _| !inside(p));
+        self.disk_stats.borrow_mut().retain(|(_, p), _| !inside(p));
+        self.exists.retain(|p, _| !inside(p));
+        let disk_side = |k: &SideKey| matches!(k, SideKey::Disk(p) if inside(p));
+        self.diffs
+            .retain(|k, _| !disk_side(&k.old) && !disk_side(&k.new));
         self.pending.retain(|p| match p {
             Pending::Live(q)
             | Pending::Listing(Version::Disk, q)
             | Pending::Deleted(Version::Disk, q) => *q != f,
+            Pending::Disk(q) => !inside(q),
             _ => true,
         });
     }
@@ -1751,16 +1823,23 @@ impl App {
                 }
             }
             Action::ToggleDeleted => {
+                let anchor = self.visual_anchor();
                 self.ghosts = !self.ghosts;
-                self.restore_selection();
-                self.moved_on();
+                self.rows_changed(anchor);
+            }
+            Action::HideNew => {
+                if !self.on_disk() {
+                    return fail(self, "Only for the files on disk.".into());
+                }
+                let anchor = self.visual_anchor();
+                self.hide_new = !self.hide_new;
+                self.rows_changed(anchor);
             }
             Action::Diff => {
                 let Some(e) = self.selected().cloned().filter(|e| !e.is_dir()) else {
                     return fail(self, "Select a file to diff.".into());
                 };
                 let path = self.folder.join(&e.node.name);
-                let id = self.set()[self.entry_snapshot(&e)].id;
                 self.want_track(&path, false);
                 let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
                     return true;
@@ -1768,6 +1847,9 @@ impl App {
                 if self.on_disk() && !e.is_gone() {
                     return self.open_diff(path, 0, DiffMode::Previous, false, true);
                 }
+                let Some(id) = self.set().get(self.entry_snapshot(&e)).map(|s| s.id) else {
+                    return true;
+                };
                 let run = t
                     .index_of(id)
                     .and_then(|s| run_at(&t.runs, s))
@@ -1856,9 +1938,13 @@ impl App {
                 }
             }
         };
+        // Down from `on disk` is the newest version, if there is one.
+        let only_disk = "Not in any backup.";
         match a {
             Action::Down(n) => {
-                if disk {
+                if disk && runs == 0 {
+                    return fail(self, only_disk);
+                } else if disk {
                     disk = false;
                 } else if sel + 1 >= runs {
                     return fail(self, "This is the oldest version.");
@@ -1867,7 +1953,9 @@ impl App {
                 }
             }
             Action::OlderChange | Action::OlderItemChange => {
-                if disk {
+                if disk && runs == 0 {
+                    return fail(self, only_disk);
+                } else if disk {
                     disk = false;
                 } else if sel + 1 >= runs {
                     return fail(self, "This is the oldest version.");
@@ -1907,21 +1995,23 @@ impl App {
                     return false;
                 }
             }
+            Action::Bottom | Action::HalfDown if runs == 0 => return fail(self, only_disk),
             Action::Bottom => {
                 disk = false;
-                sel = runs.saturating_sub(1);
+                sel = runs - 1;
             }
             Action::HalfDown => {
                 disk = false;
-                sel = (sel + 10).min(runs.saturating_sub(1));
+                sel = (sel + 10).min(runs - 1);
             }
             Action::HalfUp => sel = sel.saturating_sub(10),
+            Action::ClickVersion(_) if runs == 0 => return fail(self, only_disk),
             Action::ClickVersion(k) => {
                 if k == sel && !disk {
                     return self.open_diff(v.path, sel, DiffMode::Disk, true, false);
                 }
                 disk = false;
-                sel = k.min(runs.saturating_sub(1));
+                sel = k.min(runs - 1);
             }
             Action::GoDisk => {
                 if disk {

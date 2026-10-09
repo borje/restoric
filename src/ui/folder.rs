@@ -168,7 +168,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         .map(|e| match &e.delta {
             Delta::Same => 0,
             Delta::Gone(_) => 4,
-            Delta::Counts(c) => counts_width(c, ""),
+            Delta::Counts(c) | Delta::New(c) => counts_width(c, ""),
             _ => 1,
         })
         .max()
@@ -226,7 +226,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             Delta::Changed => {
                 g.put(dx, y, "~", t.changed);
             }
-            Delta::Counts(c) => {
+            Delta::Counts(c) | Delta::New(c) => {
                 put_counts(g, dx, y, c, "", l1 + 1);
             }
             Delta::Same => {}
@@ -238,14 +238,35 @@ pub fn draw(app: &App, g: &mut Grid) {
             g.put(l0 + 3, y, "loading…", t.dim);
         }
         Some(None) if y <= bottom => {
-            g.put(l0 + 3, y, "not in this snapshot", t.dim);
+            let what = if app.on_disk() {
+                "not on disk"
+            } else {
+                "not in this snapshot"
+            };
+            g.put(l0 + 3, y, what, t.dim);
         }
         _ => {}
     }
+    // Hints about hidden rows, bottom up, where the listing leaves room.
+    let mut hints: Vec<(String, Action)> = Vec::new();
     let hidden = app.hidden();
-    if hidden > 0 && rows.len() < height {
-        let label = format!("{hidden} deleted · . to show");
-        g.put_act(l0 + 3, bottom, &label, t.dim2, Action::ToggleDeleted);
+    if hidden > 0 {
+        hints.push((
+            format!("{hidden} deleted · . to show"),
+            Action::ToggleDeleted,
+        ));
+    }
+    let new_hidden = app.new_hidden();
+    if new_hidden > 0 {
+        hints.push((
+            format!("{new_hidden} not backed up · zn to show"),
+            Action::HideNew,
+        ));
+    }
+    for (n, (label, a)) in hints.into_iter().enumerate() {
+        if rows.len() + n < height {
+            g.put_act(l0 + 3, bottom - n as u16, &label, t.dim2, a);
+        }
     }
 
     if let Some((p0, p1)) = p.preview {

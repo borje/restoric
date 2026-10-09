@@ -102,7 +102,7 @@ impl Index {
                         ..Counts::default()
                     };
                     total += c;
-                    Delta::Counts(c)
+                    Delta::New(c)
                 }
                 (None, false) => {
                     total.added += 1;

@@ -71,6 +71,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `r` | Restore options: overwrite, next to it, `~/Restored/`, `$PAGER` or tar |
 | `cc` `cd` `cf` | Copy `snapshot:path`, the folder, the name |
 | `.` | Show items deleted earlier |
+| `zn` | On disk: hide files and folders not in the backup |
 | `/` `n` `N` `f` | Search this folder, filter it |
 | `s`, `:find NAME` | Search every snapshot |
 | `:sep 1` `:yesterday` `:3d` | Jump to a date |

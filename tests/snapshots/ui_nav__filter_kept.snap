@@ -12,5 +12,5 @@ expression: "h.screen(100, 12)"
 ▶Sep 27 08:52 ~1      │                                        │
    ┄ 2 unchanged ┄    │                                        │   5  }
  Sep 20 20:35 ~1      │                                        │   6  // defaults
-   ┄ 2 unchanged ┄    │   2 deleted · . to show                │   7  // timeouts
+   ┄ 2 unchanged ┄    │                                        │   7  // timeouts
  NOR  Sep 27 08:52  c177b849  src/ ~1  filter "co"                        Sep 20 20:35  1/1  ? help

@@ -293,3 +293,150 @@ fn disk_listing_kind_change() {
     let s = h.screen(100, 34);
     assert!(s.contains("on disk  +1~1−1"), "{s}");
 }
+
+fn has_row(h: &Harness, name: &str) -> bool {
+    h.app
+        .rows()
+        .iter()
+        .any(|r| h.app.entry(*r).is_some_and(|e| e.node.name == name))
+}
+
+/// `zn` hides the files and folders not in the newest snapshot, and shows
+/// them again.
+#[test]
+fn on_disk_hide_new() {
+    // Drift plus a whole new folder.
+    let dsl = format!(
+        "{}  mkdir src/tmp\n  write src/tmp/notes.txt scratch\\n\n",
+        drifted()
+    );
+    let mut h = Harness::with(&dsl, SRC);
+    h.keys("LL");
+    assert!(h.app.on_disk());
+    assert!(has_row(&h, "scratch.go"));
+    assert!(has_row(&h, "tmp"));
+    assert_eq!(h.app.new_hidden(), 0);
+    h.keys("zn");
+    assert!(h.app.hide_new);
+    assert!(!has_row(&h, "scratch.go"), "{:?}", h.app.rows());
+    assert!(!has_row(&h, "tmp"), "a new folder goes too");
+    assert!(has_row(&h, "main.go"));
+    assert!(has_row(&h, "util.go"), "the − row stays");
+    assert!(has_row(&h, "models"), "a folder in the backup stays");
+    assert_eq!(h.app.new_hidden(), 2);
+    let s = h.screen(100, 34);
+    assert!(s.contains("2 not backed up · zn to show"), "{s}");
+    insta::assert_snapshot!(s);
+    h.keys("zn");
+    assert!(has_row(&h, "scratch.go"));
+    assert!(has_row(&h, "tmp"));
+    assert_eq!(h.app.new_hidden(), 0);
+}
+
+/// `zn` is for the on disk version only.
+#[test]
+fn hide_new_off_disk() {
+    let mut h = Harness::with(&drifted(), SRC);
+    assert!(!h.app.on_disk());
+    h.keys("zn");
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Only for the files on disk.")
+    );
+    assert!(!h.app.hide_new);
+}
+
+/// Hiding keeps the selection on the same item, and the hidden row isn't
+/// hidden on a snapshot even with the flag on.
+#[test]
+fn hide_new_keeps_selection() {
+    let mut h = on_disk();
+    h.select("main.go").keys("zn");
+    assert_eq!(
+        h.app.selected().map(|e| e.node.name.clone()),
+        Some("main.go".into())
+    );
+    h.keys("[");
+    assert!(!h.app.on_disk());
+    assert_eq!(h.app.new_hidden(), 0);
+    let s = h.screen(100, 34);
+    assert!(!s.contains("not backed up"), "{s}");
+}
+
+/// A file never backed up has only the `on disk` row in its versions view:
+/// moving down is refused, and `z` offers nothing there.
+#[test]
+fn versions_of_never_backed_up() {
+    let mut h = on_disk();
+    h.select("scratch.go").keys("l");
+    let disk_row = |h: &Harness| match &h.app.view {
+        View::Versions(v) => v.disk,
+        v => panic!("{v:?}"),
+    };
+    assert!(disk_row(&h));
+    for keys in ["j", "H", "G"] {
+        h.app.message = None;
+        h.keys(keys);
+        assert_eq!(
+            h.app.message.as_deref(),
+            Some("Not in any backup."),
+            "{keys}"
+        );
+        assert!(disk_row(&h), "{keys}");
+    }
+    h.key(KeyCode::PageDown);
+    assert!(disk_row(&h));
+    h.app.message = None;
+    h.keys("z");
+    let s = h.screen(100, 34);
+    assert!(!s.contains("zd"), "{s}");
+    h.keys("n");
+    assert!(disk_row(&h));
+}
+
+/// The hint counts only what the name filter would show.
+#[test]
+fn hide_new_hint_follows_filter() {
+    let mut h = on_disk();
+    h.keys("zn");
+    assert_eq!(h.app.new_hidden(), 1);
+    h.keys("fmain").key(KeyCode::Enter);
+    assert_eq!(h.app.new_hidden(), 0);
+    let s = h.screen(100, 34);
+    assert!(!s.contains("not backed up"), "{s}");
+    h.key(KeyCode::Esc);
+    assert_eq!(h.app.new_hidden(), 1);
+}
+
+/// Hiding rows keeps the visual anchor on its entry.
+#[test]
+fn hide_new_keeps_visual_anchor() {
+    let mut h = on_disk();
+    h.select("main.go").keys("vjj");
+    let name_at = |h: &Harness, k: usize| {
+        let rows = h.app.rows();
+        h.app.entry(rows[k]).map(|e| e.node.name.clone())
+    };
+    assert_eq!(name_at(&h, h.app.sel), Some("server.go".into()));
+    assert_eq!(name_at(&h, h.app.visual.unwrap()), Some("main.go".into()));
+    h.keys("zn");
+    assert_eq!(name_at(&h, h.app.sel), Some("server.go".into()));
+    assert_eq!(name_at(&h, h.app.visual.unwrap()), Some("main.go".into()));
+    assert_eq!(
+        h.app.visual.unwrap() + 1,
+        h.app.sel,
+        "scratch.go is gone from between"
+    );
+}
+
+/// With the folder gone from disk, the placeholder says so.
+#[test]
+fn on_disk_folder_missing() {
+    let dsl = format!("{PROJECT}  rm src/models\n");
+    let mut h = Harness::with(&dsl, &format!("{SRC}/models"));
+    h.keys("LL");
+    assert!(h.app.on_disk());
+    let s = h.screen(100, 34);
+    assert!(s.contains("not on disk"), "{s}");
+    assert!(!s.contains("not in this snapshot"), "{s}");
+}
