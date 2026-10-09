@@ -479,7 +479,7 @@ function renderConfirm(){const c=S.confirm,lines=wrap(c.text,50),w=56,h=lines.le
   rbox(y,x,h,w,'Overwrite?','warn');lines.forEach((l,k)=>put(y+2+k,x+3,l,''));
   const by=y+h-2;put(by,x+3,'[y] Overwrite','warn',()=>key('y'));put(by,x+19,'[n] Cancel','dim',()=>key('n'));}
 const WK={main:{g:[['gg','top of list'],['gh','backup root'],['G','bottom (no prefix)']],
-  z:[['zh','show / hide deleted'],['zi','zoom timeline in'],['zo','zoom timeline out']],
+  z:[['zd','show / hide deleted'],['zi','zoom timeline in'],['zo','zoom timeline out']],
   c:[['cc','copy snapshot:path'],['cd','copy folder path'],['cf','copy file name']]},
   hist:{g:[['gg','newest version']]},diff:{g:[['gg','top']],']':[[']c','next change']],'[':[['[c','previous change']]},find:{g:[['gg','top']]}};
 function renderWhichKey(){const items=(WK[S.view]||{})[S.pend];if(!items)return;const w=34,h=items.length+2,x=COLS-w-1,y=ROWS-2-h;
@@ -491,7 +491,7 @@ function renderHelp(){
     ['H L','older / newer change in this folder'],['[ ]   { }','every snapshot / changes of the selected item'],
     ['⇥  J K','preview: content or diff vs disk, scroll'],['␣  v','select / visual select'],['y  p  P','yank, restore next to it, overwrite'],
     ['r  d  o','restore options / full-screen diff / $PAGER'],['cc cd cf','copy snapshot:path, folder, name'],['/ n N   f','search / next, previous / filter'],
-    ['.  zh   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
+    ['.  zd   zi zo','show deleted items / zoom timeline'],['gh   3H 5j','backup root / counts with motions'],['',''],
     ['Commands',''],[':sep 1  :2026-09-01','jump to a date (:yesterday :3d :2w)'],[':find NAME   s','search every snapshot for a name'],
     [':latest :oldest :undo',''],['',''],['Diff','']];
   const w=Math.min(74,COLS-4),h=L.length+4,x=Math.floor((COLS-w)/2),y=Math.floor((ROWS-h)/2);rbox(y,x,h,w,'Help');
@@ -635,7 +635,7 @@ function stepMain(k){const cp=cps[S.dir],{rows}=mainRows();
     case 'r':openRestore();break;case 'o':showFile();break;
     case 'y':yank();break;case 'p':paste(false);break;case 'P':paste(true);break;
     case 'cc':copy('c');break;case 'cd':copy('d');break;case 'cf':copy('f');break;
-    case 'zh':case '.':S.ghosts=!S.ghosts;break;
+    case 'zd':case '.':S.ghosts=!S.ghosts;break;
     case 'zi':zoom(1);break;case 'zo':zoom(-1);break;
     case '/':S.input={kind:'/',text:'',origin:S.sel,prev:S.search};break;
     case 'f':S.input={kind:'f',text:S.filter,prev:S.filter};break;

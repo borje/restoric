@@ -78,7 +78,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         return match (p, k.code) {
             ('g', KeyCode::Char('g')) => Some(Top),
             ('g', KeyCode::Char('h')) => Some(Root),
-            ('z', KeyCode::Char('h')) => Some(ToggleDeleted),
+            ('z', KeyCode::Char('d')) => Some(ToggleDeleted),
             ('c', KeyCode::Char(c @ ('c' | 'd' | 'f'))) => Some(Copy(c)),
             _ => None,
         };

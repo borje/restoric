@@ -20,7 +20,7 @@ expression: "h.screen(100, 34)"
  Sep 06 18:03│  r  d  o                restore options / full-screen diff / $PAGER    │
    ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
  Sep 02 20:16│  / n N   f              search / next, previous / filter               │
-   ┄ 2 unchan│  .  zh   zi zo          show deleted items / zoom timeline             │
+   ┄ 2 unchan│  .  zd   zi zo          show deleted items / zoom timeline             │
  Aug 22 11:59│  gh   3H 5j             backup root / counts with motions              │
    ┄ 1 unchan│                                                                        │
  Aug 17 16:04│  Commands                                                              │

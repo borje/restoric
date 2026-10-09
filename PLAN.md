@@ -74,7 +74,7 @@ fingerprint(folder)  = H(sorted [(name, fingerprint(child))])
 | Entry change marker | The entry's node at snapshot n compared with n−1: `+` added, `~` changed, `−` deleted | Δ column |
 | Folder counts | Number of files added, changed and deleted under P between n−1 and n | `+1 ~3 −1` labels |
 | Versions | Consecutive runs of snapshots with an identical file fingerprint | Versions view |
-| Deleted items | Names seen in P's trees in earlier snapshots that are missing now | `zh` |
+| Deleted items | Names seen in P's trees in earlier snapshots that are missing now | `zd` |
 
 Folder counts need a tree diff. Only walk subtrees whose ids differ. An **item** is anything but a folder, or an empty folder, so a change always counts as at least one.
 
@@ -296,7 +296,7 @@ Pressing a prefix key (`g`, `z`, `c`, and `]` `[` in the diff) shows what can fo
    ┄ 1 unchanged ┄    │                                   │  42    ctx, cancel := context.WithTimeo…
  Aug 07 08:15 +1      │                                   │  43    w.Header().Set("Content-Type", "…
    ┄ 1 unchanged ┄    │                                   │  44  ╭─ z ────────────────────────────╮
- Aug 03 16:19 +1~1    │                                   │  45  │ zh   show / hide deleted       │…
+ Aug 03 16:19 +1~1    │                                   │  45  │ zd   show / hide deleted       │…
    ┄ 2 unchanged ┄    │                                   │  46  │ zi   zoom timeline in          │
  Jul 28 15:59 ~1      │                                   │  47  │ zo   zoom timeline out         │…
  Jul 26 11:57 ~1      │                                   │  48  ╰────────────────────────────────╯
@@ -556,7 +556,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 ```
 
 ### 3.7 Deleted items
-`.` (or `zh`) shows items deleted earlier, marked `gone` in Δ and in italics. The timeline shows the item's history: dots up to the deletion, then only the folder's `○`. The preview shows the last version. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
+`.` (or `zd`) shows items deleted earlier, marked `gone` in Δ and in italics. The timeline shows the item's history: dots up to the deletion, then only the folder's `○`. The preview shows the last version. `⏎`/`l` on a deleted folder jumps to the last snapshot that had it.
 
 <sub>`docs/screens/11-deleted-shown.txt`</sub>
 
@@ -847,7 +847,7 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
    ┄ 1 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
  Sep 06 18:03│  cc cd cf               copy snapshot:path, folder, name               │ontext.Conte…
    ┄ 2 unchan│  / n N   f              search / next, previous / filter               │equest
- Sep 02 20:16│  .  zh   zi zo          show deleted items / zoom timeline             │
+ Sep 02 20:16│  .  zd   zi zo          show deleted items / zoom timeline             │
    ┄ 5 unchan│  gh   3H 5j             backup root / counts with motions              │hLabelValues…
  Aug 22 11:59│                                                                        │ORT", 8080)
    ┄ 1 unchan│  Commands                                                              │
@@ -930,7 +930,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `o` | Show the file, as it was in that snapshot, in `$PAGER` (yazi's open; read only) |
 | `d` | Full-screen diff against disk |
 | `cc` `cd` `cf` | Copy `snapshotid:/abs/path` / folder path / file name |
-| `.` `zh` | Show / hide deleted items |
+| `.` `zd` | Show / hide deleted items |
 | `zi` `zo` | Zoom the timeline |
 | `/` then `n` `N` | Search this folder as you type, next / previous match |
 | `f` | Filter the listing |
@@ -1306,7 +1306,7 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 - The Versions column's `on disk` row and the timeline's `on disk` marker (what changed on disk since the newest snapshot). Moved here from M2, because they need the comparison with disk.
 - The selected entry's changes in the timeline row (`●` over the folder's `○`) with its label, `{` `}`.
 - Versions view with on-disk row, compared-to-disk stats (computed lazily for visible rows) and preview.
-- Deleted items (`.` `zh`), jump on deleted items.
+- Deleted items (`.` `zd`), jump on deleted items.
 - `restoric versions FILE`.
 - **Done when:** screens 01, 02, 03, 11 and 13 match.
 
@@ -1381,6 +1381,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 
 Settled during review:
 - Accented names (2026-10-08): macOS stores `ä` as `a` + U+0308. Names are drawn grapheme by grapheme (ratatui's `set_stringn`), so the accent stays in its cell. Search (`/`), filter (`f`), `:find` and the picker filter compare lowercased NFC text (`index::fold`), so a typed `ä` finds a decomposed one. Names are never normalized for paths or restores.
+- `zd` replaces `zh` for show / hide deleted items (2026-10-09). `.` stays. The rows are deleted items, not hidden files, and `h` is the parent-folder motion, so `zh` read as a prefixed motion. The `z` keys now name the kind of row they toggle (`zd` deleted, `zi` `zo` zoom), leaving `zn` for new files on the `on disk` version, not built yet. The review's P2b (drop `zh`, keep `z` for zoom only) was decided the other way.
 - Picker details (2026-10-08, M9 built): a repo row shows the full location and the hosts, no name column and no `name` key. On a foreign host `r` is the same directory prompt as `p` (no reduced dialog); the item lands at `<dir>/<name>`. The config `tag` is dropped for a foreign host and kept for one of this machine's. The picker is keyboard-only.
 - Repository picker (2026-10-08), §3.18, M9. It lists (host, path) groups, not a snapshot file tree, so the folder-anchored design stays. It opens with `--browse` and in place of the §4.6 dead ends (no terminal: the old message, exit non-zero). With several `[[repo]]` there is a repo level first (A2), drawn from `repos.json` without opening any repo. A row is (host, path) only, with no tags. `q` in the folder view goes back to the picker for another repo, host or path (2026-10-08; at first this needed a restart). Restoring from a foreign host always asks for a target directory and disables `P`. The `on disk` comparison is left as it is: it is read-only, and for a renamed machine it is correct.
 - Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.

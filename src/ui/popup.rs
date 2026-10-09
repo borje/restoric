@@ -12,7 +12,7 @@ fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Ac
         (View::Diff(_), ']') => &[("]c", "next change", Action::NextHunk)],
         (View::Diff(_), '[') => &[("[c", "previous change", Action::PrevHunk)],
         (_, 'z') => &[
-            ("zh", "show / hide deleted", Action::ToggleDeleted),
+            ("zd", "show / hide deleted", Action::ToggleDeleted),
             ("zi", "zoom timeline in", Action::ZoomIn),
             ("zo", "zoom timeline out", Action::ZoomOut),
         ],
@@ -77,7 +77,7 @@ const HELP: &[(&str, &str)] = &[
     ("r  d  o", "restore options / full-screen diff / $PAGER"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
-    (".  zh   zi zo", "show deleted items / zoom timeline"),
+    (".  zd   zi zo", "show deleted items / zoom timeline"),
     ("gh   3H 5j", "backup root / counts with motions"),
     ("", ""),
     ("Commands", ""),

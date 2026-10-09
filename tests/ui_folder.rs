@@ -182,7 +182,7 @@ fn deleted_items_toggle() {
         rows.iter()
             .any(|r| h.app.entry(*r).is_some_and(|e| e.node.name == "feature.go"))
     );
-    h.keys("zh");
+    h.keys("zd");
     assert_eq!(h.app.hidden(), 1);
 }
 

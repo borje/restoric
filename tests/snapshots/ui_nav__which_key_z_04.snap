@@ -30,7 +30,7 @@ expression: "h.screen(100, 34)"
  Aug 03 16:19 +1~1    │                                        │
    ┄ 1 unchanged ┄    │                                        │
  Jul 28 15:59 ~1      │                                        │ ╭─ z ────────────────────────────╮
- Jul 26 11:57 ~1      │                                        │ │ zh   show / hide deleted       │
+ Jul 26 11:57 ~1      │                                        │ │ zd   show / hide deleted       │
  Jul 24 12:16 ~1      │                                        │ │ zi   zoom timeline in          │
    ┄ 2 unchanged ┄    │                                        │ │ zo   zoom timeline out         │
  Jul 14 09:00 +7      │                                        │ ╰────────────────────────────────╯
