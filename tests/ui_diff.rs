@@ -77,11 +77,15 @@ fn keys_move_between_versions() {
     );
     h.keys("L");
     assert_eq!(diff_view(&h).run, first - 1);
+    // Past the newest saved version is the file on disk.
     h.keys("99L");
+    assert!(diff_view(&h).disk);
     assert_eq!(
         h.app.message.as_deref(),
-        Some("This is the newest saved version.")
+        Some("This is the version on disk.")
     );
+    h.keys("H");
+    assert!(!diff_view(&h).disk);
     // Back to where the diff was opened from. `q` quits instead.
     h.keys("h");
     assert_eq!(h.app.view, View::Folder);

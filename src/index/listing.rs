@@ -129,14 +129,32 @@ impl Index {
     ) -> Result<Vec<Entry>> {
         let mut now = BTreeSet::new();
         for j in [i.checked_sub(1), Some(i)].into_iter().flatten() {
-            if let NodeRef::Dir(t) = self.node_ref(&set[j], folder)? {
-                now.extend(self.tree(t)?.nodes.iter().map(|n| n.name.clone()));
-            }
+            now.extend(self.names_at(&set[j], folder)?);
         }
+        self.deleted_before(set, i.saturating_sub(1), &now, folder)
+    }
+
+    /// The names in `folder` at `snap`; none if it isn't a folder there.
+    pub fn names_at(&self, snap: &SnapshotInfo, folder: &Path) -> Result<BTreeSet<OsString>> {
+        Ok(match self.node_ref(snap, folder)? {
+            NodeRef::Dir(t) => self.tree(t)?.nodes.iter().map(|n| n.name.clone()).collect(),
+            _ => BTreeSet::new(),
+        })
+    }
+
+    /// Items in `folder` at some snapshot before `set[upto]` whose names
+    /// aren't in `now`, with the last snapshot that had each.
+    pub fn deleted_before(
+        &self,
+        set: &[SnapshotInfo],
+        upto: usize,
+        now: &BTreeSet<OsString>,
+        folder: &Path,
+    ) -> Result<Vec<Entry>> {
         // Name → (last snapshot with it, its node there).
         let mut last: BTreeMap<OsString, (usize, Node)> = BTreeMap::new();
         let mut prev = None;
-        for (j, s) in set.iter().enumerate().take(i.saturating_sub(1)) {
+        for (j, s) in set.iter().enumerate().take(upto) {
             let NodeRef::Dir(t) = self.node_ref(s, folder)? else {
                 prev = None;
                 continue;

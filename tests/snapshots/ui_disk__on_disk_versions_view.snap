@@ -1,0 +1,38 @@
+---
+source: tests/ui_disk.rs
+expression: "h.screen(100, 34)"
+---
+ restoric  Versions  ~/dev/project/src/main.go                           7 versions in 32 snapshots
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ● · ·  · ●   ·  ··    ● ·  · ·  ·    ●· ·●·● · · ·  ··  · ·· ·  ·  ┊ ● main.go
+                                                                                ▲          − 1× +
+
+ VERSION         SIZE  SNAPSHOTS  VS DISK       │main.go · on disk                       ⇥ content
+▶on disk        124 B                           │changed since Oct 02 12:21
+ Sep 09 19:23   108 B  11 snaps   +1 −0         │
+ Sep 06 18:03    96 B  2 snaps    +2 −0         │  1  package main
+ Sep 02 20:16    87 B  3 snaps    +3 −0         │  2
+ Aug 17 16:04    76 B  5 snaps    +4 −0         │  3  func main() {
+ Aug 03 16:19    60 B  4 snaps    +5 −0         │  4    run()
+ Jul 24 12:16    46 B  4 snaps    +6 −0         │  5  }
+ Jul 14 09:00    37 B  3 snaps    +7 −0         │  6  // flags
+                                                │  7  // middleware
+                                                │  8  // feature flag
+                                                │  9  // signals
+                                                │ 10  // serve
+                                                │ 11  // shutdown
+                                                │ 12+ // unsaved edit
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+                                                │
+ NOR  ~/dev/project/src/main.go                                                     on disk  ? help

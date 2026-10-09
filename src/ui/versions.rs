@@ -1,7 +1,7 @@
 //! The versions view (PLAN.md §3.9): one row per distinct version of a
 //! file, newest first, with deleted periods as their own rows.
 
-use super::preview::{content, head};
+use super::preview::{Source, content, head};
 use super::timeline::{self, Axis, TrackRow};
 use super::{Grid, fmt};
 use crate::app::{Action, App, VersionsView};
@@ -44,10 +44,12 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         return;
     };
     let runs: Vec<_> = track.runs.iter().rev().copied().collect();
-    let Some(&sel) = runs.get(v.sel) else { return };
+    // On disk, a file that was never backed up has no runs.
+    let sel = runs.get(v.sel).copied();
+    let centre = sel.map_or(track.set.len().saturating_sub(1), |s| s.from);
 
     // Timeline: the file's changes.
-    if let Some(axis) = Axis::new(&track.set, sel.from, app.zoom, cols) {
+    if let Some(axis) = Axis::new(&track.set, centre, app.zoom, cols) {
         let (change, exists) = timeline::track_row(&track.set, Some(track));
         let row = TrackRow {
             change,
@@ -63,7 +65,7 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             g,
             &axis,
             app.zoom,
-            sel.from,
+            if v.disk { None } else { sel.map(|s| s.from) },
             &row,
             &app.tz,
             &Action::GoSnapshot,
@@ -86,7 +88,13 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
     g.put(17, top, "SIZE", t.dim2);
     g.put(23, top, "SNAPSHOTS", t.dim2);
     g.put(34, top, "VS DISK", t.dim2);
-    g.put(1, top + 1, "on disk", t.live);
+    if v.disk {
+        g.fill(top + 1, 0, l1, t.selected);
+        g.put(0, top + 1, "▶", t.accent);
+    }
+    let style = if v.disk { t.live.patch(t.bold) } else { t.live };
+    g.put(1, top + 1, "on disk", style);
+    g.hit(0, l1 + 1, top + 1, Action::GoDisk);
     match app.disk_files.get(&v.path) {
         Some(Some(d)) => {
             let s = fmt::size(d.size);
@@ -104,7 +112,7 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         .min(runs.len().saturating_sub(height));
     for (k, run) in runs.iter().enumerate().skip(off).take(height) {
         let y = top + 2 + (k - off) as u16;
-        let here = k == v.sel;
+        let here = k == v.sel && !v.disk;
         if here {
             g.fill(y, 0, l1, t.selected);
             g.put(0, y, "▶", t.accent);
@@ -144,6 +152,44 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         return;
     }
     let (x0, x1) = (l1 + 2, cols - 1);
+    if v.disk {
+        // The file on disk, against its latest version.
+        let latest = runs.iter().find(|r| r.exists);
+        let sub = match (app.disk_files.get(&v.path), latest) {
+            (Some(None), _) => ("not on disk".to_string(), t.deleted),
+            (_, None) => ("not in any backup".to_string(), t.live),
+            (Some(Some(_)), Some(r)) => {
+                // Since the last backup that had the version, as the folder view.
+                let since = |i: usize| fmt::time(track.set[i].time, &app.tz);
+                let node = app.nodes.get(&(v.path.clone(), r.from));
+                match node.and_then(|n| vs_disk(app, n.as_ref()?, v)) {
+                    Some(Some((0, 0))) => (format!("unchanged since {}", since(r.from)), t.dim),
+                    Some(_) => (format!("changed since {}", since(r.to)), t.changed),
+                    None => (String::new(), t.dim),
+                }
+            }
+            (None, _) => (String::new(), t.dim),
+        };
+        head(
+            app,
+            g,
+            (x0, x1, top),
+            &format!("{name} · on disk"),
+            t.bold,
+            Some((&sub.0, sub.1)),
+        );
+        let prev = app.latest_version(&v.path);
+        content(
+            app,
+            g,
+            (x0, x1, top + 3, bottom),
+            Source::Disk,
+            prev,
+            &v.path,
+        );
+        return;
+    }
+    let Some(sel) = sel else { return };
     let snapshot = &track.set[sel.from];
     let n = sel.snapshots();
     if !sel.exists {
@@ -180,5 +226,12 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         None => Some(None),
         Some(r) => app.nodes.get(&(v.path.clone(), r.from)).map(Option::as_ref),
     };
-    content(app, g, (x0, x1, top + 3, bottom), node, prev, &v.path);
+    content(
+        app,
+        g,
+        (x0, x1, top + 3, bottom),
+        Source::Repo(node),
+        prev,
+        &v.path,
+    );
 }

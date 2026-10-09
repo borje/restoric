@@ -6,15 +6,15 @@ expression: "h.screen(100, 34)"
   Jul 2026        Aug                         Sep                              on disk
   ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
                                                                       ▲                    − 1× +
-
- on disk  ~1 ╭─ Help ─────────────────────────────────────────────────────────────────╮
-   ┄ 2 unchan│                                                                        │
-▶Sep 27 08:52│  Folder view                                                           │
-   ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
- Sep 20 20:35│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
-   ┄ 2 unchan│  H L                    older / newer change in this folder            │
- Sep 13 20:51│  [ ]   { }              every snapshot / changes of the selected item  │
-   ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+             ╭─ Help ─────────────────────────────────────────────────────────────────╮
+ on disk  ~1 │                                                                        │
+   ┄ 2 unchan│  Folder view                                                           │
+▶Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+ Sep 20 20:35│  H L                    older / newer change in this folder, then disk │
+   ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │
+ Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+   ┄ 1 unchan│  on disk                files now vs the last backup, by size or time  │
  Sep 09 19:23│  ␣  v                   select / visual select                         │
    ┄ 1 unchan│  y  p  P                yank, restore next to it, overwrite            │
  Sep 06 18:03│  r  d  o                restore options / full-screen diff / $PAGER    │

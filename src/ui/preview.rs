@@ -2,17 +2,19 @@
 //! was in the snapshot being viewed.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use ratatui::style::Style;
 
 use super::folder::{counts_width, put_counts};
 use super::{Grid, fmt, icons};
-use crate::app::{Action, App, PreviewMode, Row};
+use crate::app::{Action, App, PreviewMode, Row, View};
 use crate::diff::{self, HunkLine, Op};
+use crate::index::Version;
 use crate::index::fingerprint;
 use crate::index::listing::Delta;
 use crate::index::versions::run_at;
-use crate::repo::Node;
+use crate::repo::{FileBytes, Node};
 
 /// The heading, with the `⇥ content` / `⇥ vs disk` switch on the right.
 pub fn head(
@@ -25,17 +27,27 @@ pub fn head(
 ) {
     let t = g.theme.clone();
     let w = (x1 - x0 + 1) as usize;
+    // Whether the version shown is the file on disk: a `−` row on the
+    // disk version is the newest snapshot's file, shown as any version.
+    let disk_version = match &app.view {
+        View::Versions(v) => v.disk,
+        _ => app.on_disk() && app.selected().is_none_or(|e| !e.is_gone()),
+    };
     let mode = match app.preview {
         PreviewMode::Content => "content",
+        PreviewMode::Disk if disk_version => "vs latest",
         PreviewMode::Disk => "vs disk",
     };
     let ml = mode.len() as u16;
-    g.put(
-        x0,
-        y,
-        &fmt::fit(text, w.saturating_sub(mode.len() + 6)),
-        style,
-    );
+    let room = w.saturating_sub(mode.len() + 6);
+    // Drop trailing ` · parts` rather than cut the name.
+    let mut text = text.to_string();
+    while fmt::width(&text) > room
+        && let Some(k) = text.rfind(" · ")
+    {
+        text.truncate(k);
+    }
+    g.put(x0, y, &fmt::fit(&text, room), style);
     g.put_act(x1 - ml - 3, y, "⇥", t.dim2, Action::TogglePreview);
     g.put_act(x1 - ml - 1, y, mode, t.accent, Action::TogglePreview);
     if let Some((s, style)) = sub {
@@ -43,23 +55,50 @@ pub fn head(
     }
 }
 
+/// Where the version shown in the preview comes from.
+#[derive(Clone, Copy)]
+pub enum Source<'a> {
+    /// A version in the repository.
+    Repo(&'a Node),
+    /// The file on disk (the `on disk` version).
+    Disk,
+}
+
 /// A file version's content from `top` to `y1`: with margin marks against
-/// `prev` (`None` while it's loading), or diffed against the file on disk.
+/// `prev` (`None` while it's loading), or diffed against the other end:
+/// a repository version against the file on disk (`vs disk`), the file on
+/// disk against `prev`, the newest snapshot's version (`vs latest`).
 #[allow(clippy::too_many_arguments)]
 pub fn content(
     app: &App,
     g: &mut Grid,
     (x0, x1, top, y1): (u16, u16, u16, u16),
-    node: &Node,
+    cur: Source,
     prev: Option<Option<&Node>>,
     disk_path: &Path,
 ) {
     let t = g.theme.clone();
     let w = (x1 - x0 + 1) as usize;
     let h = (y1 - top + 1) as usize;
-    let Some(bytes) = app.files.get(&fingerprint::content(node)) else {
-        g.put(x0, top, "loading…", t.dim);
-        return;
+    let bytes: Arc<FileBytes> = match cur {
+        Source::Repo(node) => match app.files.get(&fingerprint::content(node)) {
+            Some(b) => b.clone(),
+            None => {
+                g.put(x0, top, "loading…", t.dim);
+                return;
+            }
+        },
+        Source::Disk => match app.disk_files.get(disk_path) {
+            None => {
+                g.put(x0, top, "loading…", t.dim);
+                return;
+            }
+            Some(None) => {
+                g.put(x0, top, "(the file is missing on disk)", t.deleted);
+                return;
+            }
+            Some(Some(d)) => d.clone(),
+        },
     };
     let Some(text) = diff::text(&bytes.data) else {
         g.put(
@@ -73,27 +112,54 @@ pub fn content(
     let tabs = |s: &str| s.replace('\t', "  ");
 
     if app.preview == PreviewMode::Disk {
-        let disk = match app.disk_files.get(disk_path) {
-            None => {
-                g.put(x0, top, "loading…", t.dim);
-                return;
+        let (old_text, new_text, same) = match cur {
+            Source::Repo(_) => {
+                let disk = match app.disk_files.get(disk_path) {
+                    None => {
+                        g.put(x0, top, "loading…", t.dim);
+                        return;
+                    }
+                    Some(None) => {
+                        g.put(x0, top, "(the file is missing on disk)", t.deleted);
+                        return;
+                    }
+                    Some(Some(d)) => d,
+                };
+                let Some(disk_text) = diff::text(&disk.data) else {
+                    g.put(x0, top, "(the file on disk is binary)", t.dim);
+                    return;
+                };
+                (text, disk_text, "Identical to the file on disk.")
             }
-            Some(None) => {
-                g.put(x0, top, "(the file is missing on disk)", t.deleted);
-                return;
+            Source::Disk => {
+                let p = match prev {
+                    None => {
+                        g.put(x0, top, "loading…", t.dim);
+                        return;
+                    }
+                    Some(None) => {
+                        g.put(x0, top, "Not in any backup.", t.live);
+                        return;
+                    }
+                    Some(Some(p)) => p,
+                };
+                let Some(pb) = app.files.get(&fingerprint::content(p)) else {
+                    g.put(x0, top, "loading…", t.dim);
+                    return;
+                };
+                let Some(pt) = diff::text(&pb.data) else {
+                    g.put(x0, top, "(the version in the snapshot is binary)", t.dim);
+                    return;
+                };
+                (pt, text, "Identical to the latest snapshot.")
             }
-            Some(Some(d)) => d,
         };
-        let Some(disk_text) = diff::text(&disk.data) else {
-            g.put(x0, top, "(the file on disk is binary)", t.dim);
-            return;
-        };
-        let d = diff::diff(&text, &disk_text);
+        let d = diff::diff(&old_text, &new_text);
         if d.identical() {
-            g.put(x0, top, "Identical to the file on disk.", t.added);
+            g.put(x0, top, same, t.added);
             return;
         }
-        let (old, new) = (diff::lines(&text), diff::lines(&disk_text));
+        let (old, new) = (diff::lines(&old_text), diff::lines(&new_text));
         let lines = diff::hunks(&d, 3);
         let off = app.scroll.unwrap_or(0).min(lines.len().saturating_sub(h));
         app.scroll_base.set(off);
@@ -189,7 +255,12 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
             let last = format!("last seen {}", fmt::time(snap.time, &app.tz));
             g.put(x0, y0 + 1, &last, t.deleted);
         }
-        let Some(Some(entries)) = app.listings.get(&(snap.id, path)) else {
+        let at = if app.on_disk() && !e.is_gone() {
+            Version::Disk
+        } else {
+            Version::Snapshot(snap.id)
+        };
+        let Some(Some(entries)) = app.listings.get(&(at, path)) else {
             g.put(x0, y0 + 2, "loading…", t.dim);
             return;
         };
@@ -229,6 +300,44 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
     let track = app.tracks.get(&path).filter(|t| t.loaded());
     let sp = track.and_then(|t| t.index_of(snap.id));
     let run = track.zip(sp).and_then(|(t, sp)| run_at(&t.runs, sp));
+    if app.on_disk() && !e.is_gone() {
+        // The file on disk, against the newest snapshot (`snap`), or for a
+        // file that isn't in it, its latest version if there was one.
+        let size = fmt::size(e.node.size);
+        let (sub, style) = match (e.delta.clone(), app.latest_run(&path)) {
+            (Delta::Added, Some(None)) => ("not in any backup".to_string(), t.live),
+            (Delta::Added, Some(Some(_))) => ("not in the latest snapshot".to_string(), t.live),
+            (Delta::Added, None) => (String::new(), t.dim),
+            (Delta::Changed, _) => (
+                format!("changed since {}", fmt::time(snap.time, &app.tz)),
+                t.changed,
+            ),
+            _ => match run.zip(track) {
+                Some(((_, r), tr)) => (
+                    format!(
+                        "unchanged since {}",
+                        fmt::time(tr.set[r.from].time, &app.tz)
+                    ),
+                    t.dim,
+                ),
+                None => (String::new(), t.dim),
+            },
+        };
+        head(
+            app,
+            g,
+            (x0, x1, y0),
+            &format!("{name} · on disk · {size}"),
+            t.bold,
+            Some((&sub, style)),
+        );
+        if e.node.kind != crate::repo::NodeKind::File {
+            return;
+        }
+        let prev = app.latest_version(&path);
+        content(app, g, (x0, x1, y0 + 3, y1), Source::Disk, prev, &path);
+        return;
+    }
     if e.is_gone() {
         let gone_at = match e.delta {
             Delta::Gone(last) => last + 1,
@@ -241,6 +350,10 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
                 fmt::day(f.time, &app.tz),
                 fmt::day(gone.time, &app.tz)
             ),
+            // Deleted on disk: in the newest snapshot, not on disk.
+            (Some(f), None) if app.on_disk() => {
+                format!("last version {}, not on disk", fmt::day(f.time, &app.tz))
+            }
             _ => String::new(),
         };
         head(
@@ -293,5 +406,12 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
         return;
     }
     let prev = sp.and_then(|sp| app.previous_version(&path, sp));
-    content(app, g, (x0, x1, y0 + 3, y1), &e.node, prev, &path);
+    content(
+        app,
+        g,
+        (x0, x1, y0 + 3, y1),
+        Source::Repo(&e.node),
+        prev,
+        &path,
+    );
 }

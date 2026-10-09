@@ -185,12 +185,13 @@ pub fn header(app: &App, g: &mut Grid) {
 }
 
 /// Rows 1 to 3: date labels, the row of dots, and the caret with the zoom
-/// control. Clicking a dot does `pick(snapshot)`.
+/// control, under `sel`, or under the `on disk` cell for `None`. Clicking
+/// a dot does `pick(snapshot)`.
 pub fn draw(
     g: &mut Grid,
     axis: &Axis,
     zoom: u32,
-    sel: usize,
+    sel: Option<usize>,
     tr: &TrackRow,
     tz: &jiff::tz::TimeZone,
     pick: &dyn Fn(usize) -> Action,
@@ -253,7 +254,11 @@ pub fn draw(
         } else {
             (" ", t.dim2)
         };
-        let style = if list.contains(&sel) { t.marker } else { style };
+        let style = if sel.is_some_and(|s| list.contains(&s)) {
+            t.marker
+        } else {
+            style
+        };
         let target = list
             .iter()
             .copied()
@@ -267,7 +272,8 @@ pub fn draw(
         Some(o) if o.live == Some(true) => (o.on, t.live),
         _ => ("·", t.dim2),
     };
-    g.put(x0 + tw + 4, rr, live.0, live.1);
+    let style = if sel.is_none() { t.marker } else { live.1 };
+    g.put_act(x0 + tw + 4, rr, live.0, style, Action::GoDisk);
     let lx = x0 + tw + 6;
     let w = cols.saturating_sub(lx + 1) as usize;
     let mut c = g.put(lx, rr, &fmt::fit(&tr.label, w), tr.label_style);
@@ -282,7 +288,8 @@ pub fn draw(
     }
 
     let cr = rr + 1;
-    g.put(axis.col_of(sel), cr, "▲", t.accent);
+    let caret = sel.map_or(x0 + tw + 4, |s| axis.col_of(s));
+    g.put(caret, cr, "▲", t.accent);
     let zc = cols.saturating_sub(9);
     let c = g.put_act(zc, cr, "−", t.accent.patch(t.bold), Action::ZoomOut) + 1;
     let c = g.put(c, cr, &format!("{zoom}×"), t.dim) + 1;
@@ -294,10 +301,11 @@ pub fn draw(
 pub fn draw_folder(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let set = app.set();
-    let sel = app.idx();
-    let Some(axis) = Axis::new(&set, sel, app.zoom, g.cols()) else {
+    let i = app.idx();
+    let Some(axis) = Axis::new(&set, i.min(set.len().saturating_sub(1)), app.zoom, g.cols()) else {
         return;
     };
+    let sel = (!app.on_disk()).then_some(i);
     let name = app
         .folder
         .file_name()

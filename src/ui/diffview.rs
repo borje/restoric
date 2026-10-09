@@ -19,6 +19,7 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
         1,
         1,
         match d.mode {
+            _ if d.disk => "what changed on disk since this version",
             DiffMode::Disk => "what changed since this version",
             DiffMode::Previous => "what this version changed",
         },

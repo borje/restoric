@@ -19,8 +19,8 @@ use crate::index::folder::Counts;
 use crate::index::listing::Entry;
 use crate::index::timeline::ChangePoint;
 use crate::index::versions::Run;
-use crate::index::{Index, NodeRef};
-use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
+use crate::index::{Index, NodeRef, Version};
+use crate::repo::{FileBytes, Node, SnapshotInfo};
 use crate::restore::{self, Done, How, Places, Target};
 
 /// Most of a file the preview reads (PLAN.md §4.8).
@@ -60,6 +60,18 @@ pub enum Request {
         snap: usize,
         folder: PathBuf,
     },
+    /// The folder's entries on disk against the newest snapshot in `set`
+    /// (the `on disk` version), with its `on disk` counts.
+    DiskListing {
+        set: Arc<Vec<SnapshotInfo>>,
+        folder: PathBuf,
+    },
+    /// Items deleted from the folder before the newest snapshot that
+    /// aren't on disk either: the `gone` rows of the `on disk` version.
+    DiskDeletedEarlier {
+        set: Arc<Vec<SnapshotInfo>>,
+        folder: PathBuf,
+    },
     /// Items deleted from the folder before `set[snap - 1]`.
     DeletedEarlier {
         set: Arc<Vec<SnapshotInfo>>,
@@ -95,6 +107,8 @@ pub enum Request {
     Exists { paths: Vec<PathBuf> },
     /// A whole file (up to a limit), for the pager.
     ReadAll { node: Node, name: String },
+    /// A whole file on disk (up to a limit), for the pager.
+    ReadAllDisk { path: PathBuf, name: String },
     /// Read the snapshot list again (`:reload`, and every 5 minutes quietly).
     Reload { quiet: bool },
     /// Everything under `root` with `query` in its path, in every snapshot.
@@ -154,6 +168,7 @@ impl Request {
             | Request::Restore { .. }
             | Request::Undo
             | Request::ReadAll { .. }
+            | Request::ReadAllDisk { .. }
             | Request::Reload { .. }
             | Request::Find { .. } => false,
             _ => true,
@@ -179,13 +194,13 @@ pub enum Response {
         counts: Vec<(usize, Counts)>,
     },
     Listing {
-        snapshot: SnapshotId,
+        at: Version,
         folder: PathBuf,
-        /// `None` when the folder doesn't exist in that snapshot.
+        /// `None` when the folder doesn't exist in that version.
         entries: Option<Arc<Vec<Entry>>>,
     },
     DeletedEarlier {
-        snapshot: SnapshotId,
+        at: Version,
         folder: PathBuf,
         entries: Arc<Vec<Entry>>,
     },
@@ -279,7 +294,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
             Request::Listing { set, snap, folder } => {
                 let entries = index.listing(&set, snap, &folder)?;
                 send(Response::Listing {
-                    snapshot: set[snap].id,
+                    at: Version::Snapshot(set[snap].id),
                     folder,
                     entries: entries.map(Arc::new),
                 });
@@ -287,9 +302,39 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
             Request::DeletedEarlier { set, snap, folder } => {
                 let entries = index.deleted_earlier(&set, snap, &folder)?;
                 send(Response::DeletedEarlier {
-                    snapshot: set[snap].id,
+                    at: Version::Snapshot(set[snap].id),
                     folder,
                     entries: Arc::new(entries),
+                });
+            }
+            Request::DiskListing { set, folder } => {
+                let disk = ctx.disk.as_ref();
+                let (entries, counts) = match index.disk_listing(disk, set.last(), &folder)? {
+                    Some((e, c)) => (Some(Arc::new(e)), c),
+                    None => (
+                        None,
+                        match set.last() {
+                            Some(s) => index.live(disk, s, &folder)?,
+                            None => Counts::default(),
+                        },
+                    ),
+                };
+                send(Response::Live {
+                    path: folder.clone(),
+                    counts,
+                });
+                send(Response::Listing {
+                    at: Version::Disk,
+                    folder,
+                    entries,
+                });
+            }
+            Request::DiskDeletedEarlier { set, folder } => {
+                let gone = index.disk_deleted_earlier(ctx.disk.as_ref(), &set, &folder)?;
+                send(Response::DeletedEarlier {
+                    at: Version::Disk,
+                    folder,
+                    entries: Arc::new(gone),
                 });
             }
             Request::Live { set, path, .. } => {
@@ -364,6 +409,10 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 let bytes = index.repo().read_at(&node, 0, PAGER_LIMIT)?;
                 send(Response::Pager { name, bytes });
             }
+            Request::ReadAllDisk { path, name } => match ctx.disk.read(&path, PAGER_LIMIT) {
+                Some(bytes) => send(Response::Pager { name, bytes }),
+                None => send(Response::Error(format!("Can't read {name} on disk."))),
+            },
             Request::Reload { quiet } => send(Response::Snapshots {
                 snaps: index.repo().snapshots()?,
                 quiet,

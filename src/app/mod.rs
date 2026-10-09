@@ -24,8 +24,8 @@ use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
 use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
-use crate::index::{Mode, ModeSwitch, fold};
-use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo};
+use crate::index::{Mode, ModeSwitch, Version, fold};
+use crate::repo::{FileBytes, Node, NodeKind, SnapshotId, SnapshotInfo};
 use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request, Response, Side};
@@ -131,6 +131,9 @@ pub struct VersionsView {
     pub path: PathBuf,
     /// Index into the runs, newest first.
     pub sel: usize,
+    /// The `on disk` row is selected: the file on disk, the version after
+    /// the newest one. `sel` is then 0.
+    pub disk: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,6 +151,10 @@ pub struct DiffView {
     /// Index into the runs, newest first; always a version that exists.
     pub run: usize,
     pub mode: DiffMode,
+    /// The version shown is the file on disk, and `run` (the newest
+    /// version that exists) is the one before it: the diff is `run` →
+    /// disk whatever the mode.
+    pub disk: bool,
     pub scroll: usize,
     /// Read past the size limit (asked for with ⏎).
     pub force: bool,
@@ -200,6 +207,8 @@ pub enum Action {
     OlderItemChange,
     NewerItemChange,
     GoSnapshot(usize),
+    /// The `on disk` row: view the files on disk.
+    GoDisk,
     GoFolder(PathBuf),
     /// A click on a listing row: select it, or open it if it's selected.
     ClickRow(usize),
@@ -285,8 +294,8 @@ pub type DiskStat = Option<(usize, usize)>;
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Pending {
     Track(PathBuf),
-    Listing(SnapshotId, PathBuf),
-    Deleted(SnapshotId, PathBuf),
+    Listing(Version, PathBuf),
+    Deleted(Version, PathBuf),
     Live(PathBuf),
     File(Fp),
     Disk(PathBuf),
@@ -353,13 +362,13 @@ pub struct App {
     /// The backup root: `h` stops here.
     pub root: PathBuf,
     pub folder: PathBuf,
-    /// The snapshot being viewed.
-    pub snap: SnapshotId,
+    /// The version being viewed: a snapshot, or the files on disk.
+    pub snap: Version,
     pub view: View,
     pub tracks: HashMap<PathBuf, Track>,
-    pub listings: HashMap<(SnapshotId, PathBuf), Option<Arc<Vec<Entry>>>>,
-    /// Items deleted before the snapshot before, by snapshot and folder.
-    pub deleted: HashMap<(SnapshotId, PathBuf), Arc<Vec<Entry>>>,
+    pub listings: HashMap<(Version, PathBuf), Option<Arc<Vec<Entry>>>>,
+    /// Items deleted before the version before, by version and folder.
+    pub deleted: HashMap<(Version, PathBuf), Arc<Vec<Entry>>>,
     /// What changed on disk since the newest snapshot, by path.
     pub live: HashMap<PathBuf, Counts>,
     /// File contents from the repository, by content.
@@ -463,7 +472,7 @@ impl App {
             start_at: None,
             root,
             folder: folder.clone(),
-            snap: SnapshotId::default(),
+            snap: Version::Snapshot(SnapshotId::default()),
             view: View::Folder,
             tracks: HashMap::new(),
             listings: HashMap::new(),
@@ -505,7 +514,7 @@ impl App {
         };
         let set = app.set_for(&folder);
         if let Some(last) = set.last() {
-            app.snap = last.id;
+            app.snap = Version::Snapshot(last.id);
         }
         app.sel = usize::from(app.folder != app.root);
         app.ensure();
@@ -535,12 +544,28 @@ impl App {
         self.set_for(&self.folder)
     }
 
-    /// Index of the viewed snapshot in the folder's timeline set.
+    /// Index of the viewed version in the folder's timeline set. On disk
+    /// it's one past the newest snapshot.
     pub fn idx(&self) -> usize {
         let set = self.set();
-        set.iter()
-            .position(|s| s.id == self.snap)
-            .unwrap_or(set.len().saturating_sub(1))
+        match self.snap {
+            Version::Disk => set.len(),
+            Version::Snapshot(id) => set
+                .iter()
+                .position(|s| s.id == id)
+                .unwrap_or(set.len().saturating_sub(1)),
+        }
+    }
+
+    /// Whether the files on disk are the version being viewed.
+    pub fn on_disk(&self) -> bool {
+        self.snap == Version::Disk
+    }
+
+    /// Index of the newest snapshot in the folder's set: what the files on
+    /// disk are compared with.
+    pub fn newest(&self) -> Option<usize> {
+        self.set().len().checked_sub(1)
     }
 
     pub fn listing(&self) -> Option<&Option<Arc<Vec<Entry>>>> {
@@ -621,7 +646,8 @@ impl App {
         match e.delta {
             Delta::Deleted => i.saturating_sub(1),
             Delta::Gone(last) => last,
-            _ => i,
+            // On disk, the newest snapshot: what the entry is compared with.
+            _ => i.min(self.newest().unwrap_or(0)),
         }
     }
 
@@ -634,6 +660,22 @@ impl App {
             .get(&(v.path.clone(), run.from))
             .and_then(Option::as_ref);
         Some((run, node))
+    }
+
+    /// The newest version of `path` in the snapshots: what the file on
+    /// disk is compared with. `None` while the track loads, `Some(None)`
+    /// when no snapshot has the file.
+    pub fn latest_run(&self, path: &Path) -> Option<Option<usize>> {
+        let t = self.tracks.get(path).filter(|t| t.loaded())?;
+        Some(t.runs.iter().rev().find(|r| r.exists).map(|r| r.from))
+    }
+
+    /// The node of [`App::latest_run`], once known.
+    pub fn latest_version(&self, path: &Path) -> Option<Option<&Node>> {
+        match self.latest_run(path)? {
+            None => Some(None),
+            Some(s) => self.nodes.get(&(path.to_path_buf(), s)).map(Option::as_ref),
+        }
     }
 
     fn request(&mut self, p: Pending, r: Request) {
@@ -681,7 +723,9 @@ impl App {
     }
 
     fn want_live(&mut self, path: &Path, item: bool) {
-        if !self.live.contains_key(path) {
+        // A disk listing on its way brings the counts with it.
+        let listing = Pending::Listing(Version::Disk, path.to_path_buf());
+        if !self.live.contains_key(path) && !self.pending.contains(&listing) {
             let set = self.set_for(path);
             self.request(
                 Pending::Live(path.to_path_buf()),
@@ -694,15 +738,18 @@ impl App {
         }
     }
 
-    fn want_listing(&mut self, folder: &Path, snap: SnapshotId) {
-        let key = (snap, folder.to_path_buf());
+    fn want_listing(&mut self, folder: &Path, at: Version) {
+        let key = (at, folder.to_path_buf());
         if self.listings.contains_key(&key) {
             return;
         }
         let set = self.set_for(folder);
+        let Version::Snapshot(snap) = at else {
+            return self.want_disk_listing(folder);
+        };
         if let Some(i) = set.iter().position(|s| s.id == snap) {
             self.request(
-                Pending::Listing(snap, folder.to_path_buf()),
+                Pending::Listing(at, folder.to_path_buf()),
                 Request::Listing {
                     set,
                     snap: i,
@@ -710,6 +757,23 @@ impl App {
                 },
             );
         }
+    }
+
+    /// The folder on disk against the newest snapshot. Its `on disk`
+    /// counts and the items deleted earlier come with it.
+    fn want_disk_listing(&mut self, folder: &Path) {
+        let key = (Version::Disk, folder.to_path_buf());
+        if self.listings.contains_key(&key) {
+            return;
+        }
+        let set = self.set_for(folder);
+        self.request(
+            Pending::Listing(Version::Disk, folder.to_path_buf()),
+            Request::DiskListing {
+                set,
+                folder: folder.to_path_buf(),
+            },
+        );
     }
 
     fn want_file(&mut self, node: &Node) {
@@ -763,24 +827,28 @@ impl App {
     fn ensure(&mut self) {
         let folder = self.folder.clone();
         self.want_track(&folder, false);
+        // Before the counts: a disk listing brings them with it.
+        self.want_listing(&folder, self.snap);
         self.want_live(&folder, false);
         self.want_counts(&folder);
         if self.set().is_empty() {
             return;
         }
-        self.want_listing(&folder, self.snap);
         let key = (self.snap, folder.clone());
         if !self.deleted.contains_key(&key) {
             let set = self.set();
-            let snap = self.idx();
-            self.request(
-                Pending::Deleted(self.snap, folder.clone()),
-                Request::DeletedEarlier {
+            let req = match self.snap {
+                Version::Disk => Request::DiskDeletedEarlier {
                     set,
-                    snap,
                     folder: folder.clone(),
                 },
-            );
+                Version::Snapshot(_) => Request::DeletedEarlier {
+                    set,
+                    snap: self.idx(),
+                    folder: folder.clone(),
+                },
+            };
+            self.request(Pending::Deleted(self.snap, folder.clone()), req);
         }
 
         match self.view.clone() {
@@ -803,16 +871,37 @@ impl App {
         };
         let path = self.folder.join(&e.node.name);
         self.want_track(&path, true);
+        if self.on_disk() && !e.is_gone() {
+            // An entry on disk: a folder's listing from disk; a file's bytes
+            // from disk, and the newest snapshot's version for the margin
+            // marks and `vs latest`. The entry's node is only what the
+            // listing shows and is never read from the repository.
+            if e.is_dir() {
+                self.want_disk_listing(&path);
+            }
+            self.want_live(&path, true);
+            if e.is_dir() || e.node.kind != NodeKind::File {
+                return;
+            }
+            self.want_disk(&path);
+            if let Some(Some(s)) = self.latest_run(&path) {
+                self.want_node(&path, s);
+                if let Some(Some(node)) = self.nodes.get(&(path.clone(), s)).cloned() {
+                    self.want_file(&node);
+                }
+            }
+            return;
+        }
         self.want_live(&path, true);
         let s = self.entry_snapshot(&e);
         let snap_id = self.set().get(s).map(|x| x.id);
         if e.is_dir() {
             if let Some(id) = snap_id {
-                self.want_listing(&path, id);
+                self.want_listing(&path, Version::Snapshot(id));
             }
             return;
         }
-        if e.node.kind != crate::repo::NodeKind::File {
+        if e.node.kind != NodeKind::File {
             return;
         }
         match self.preview {
@@ -871,8 +960,11 @@ impl App {
         let node = |r: &Run| -> Option<Node> { self.nodes.get(&(d.path.clone(), r.from))?.clone() };
         let label = |r: &Run| fmt::time(t.set[r.from].time, &self.tz);
         let repo_side = |n: Node| (SideKey::Content(fingerprint::content(&n)), Side::Repo(n));
+        // On the disk version it's the newest version → the file on disk,
+        // whatever the mode.
+        let to_disk = d.disk || d.mode == DiffMode::Disk;
         let ((ok, os, ol), (nk, ns, nl)) = match d.mode {
-            DiffMode::Disk => {
+            _ if to_disk => {
                 let (k, s) = repo_side(node(r0)?);
                 (
                     (k, s, label(r0)),
@@ -883,7 +975,7 @@ impl App {
                     ),
                 )
             }
-            DiffMode::Previous => {
+            _ => {
                 let older = runs[d.run + 1..].iter().find(|r| r.exists);
                 let old = match older {
                     Some(r) => {
@@ -938,13 +1030,15 @@ impl App {
     }
 
     /// Opens the full-screen diff at the version `run` (newest first) or
-    /// the next older one that exists.
+    /// the next older one that exists; with `disk`, the diff from there to
+    /// the file on disk, as the `on disk` version.
     fn open_diff(
         &mut self,
         path: PathBuf,
         run: usize,
         mode: DiffMode,
         from_versions: bool,
+        disk: bool,
     ) -> bool {
         let runs: Vec<Run> = self
             .tracks
@@ -956,15 +1050,16 @@ impl App {
             return false;
         };
         // Look at the file on disk afresh.
-        let disk = SideKey::Disk(path.clone());
+        let side = SideKey::Disk(path.clone());
         self.diffs
-            .retain(|key, _| key.old != disk && key.new != disk);
+            .retain(|key, _| key.old != side && key.new != side);
         self.disk_files.remove(&path);
         self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
         self.view = View::Diff(DiffView {
             path,
             run: k,
             mode,
+            disk,
             scroll: 0,
             force: false,
             from_versions,
@@ -977,14 +1072,20 @@ impl App {
         match &self.view {
             View::Find(_) => "find".into(),
             View::Folder => format!(
-                "f|{}|{:?}|{}|{:?}",
+                "f|{}|{:?}|{:?}|{:?}",
                 self.folder.display(),
                 self.sel_name,
                 self.snap,
                 self.preview
             ),
-            View::Versions(v) => format!("v|{}|{}|{:?}", v.path.display(), v.sel, self.preview),
-            View::Diff(d) => format!("d|{}|{}|{:?}", d.path.display(), d.run, d.mode),
+            View::Versions(v) => format!(
+                "v|{}|{}|{}|{:?}",
+                v.path.display(),
+                v.sel,
+                v.disk,
+                self.preview
+            ),
+            View::Diff(d) => format!("d|{}|{}|{}|{:?}", d.path.display(), d.run, d.disk, d.mode),
         }
     }
 
@@ -1042,24 +1143,22 @@ impl App {
                 }
             }
             Response::Listing {
-                snapshot,
+                at,
                 folder,
                 entries,
             } => {
-                self.pending
-                    .remove(&Pending::Listing(snapshot, folder.clone()));
-                self.listings.insert((snapshot, folder), entries);
+                self.pending.remove(&Pending::Listing(at, folder.clone()));
+                self.listings.insert((at, folder), entries);
                 self.restore_selection();
                 self.ensure();
             }
             Response::DeletedEarlier {
-                snapshot,
+                at,
                 folder,
                 entries,
             } => {
-                self.pending
-                    .remove(&Pending::Deleted(snapshot, folder.clone()));
-                self.deleted.insert((snapshot, folder), entries);
+                self.pending.remove(&Pending::Deleted(at, folder.clone()));
+                self.deleted.insert((at, folder), entries);
                 self.restore_selection();
             }
             Response::Live { path, counts } => {
@@ -1246,8 +1345,8 @@ impl App {
     }
 
     fn go_snapshot_id(&mut self, id: SnapshotId) {
-        if id != self.snap {
-            self.snap = id;
+        if Version::Snapshot(id) != self.snap {
+            self.snap = Version::Snapshot(id);
             self.moved = true;
             self.restore_selection();
             self.moved_on();
@@ -1264,13 +1363,18 @@ impl App {
     fn go_folder(&mut self, folder: PathBuf, select: Option<OsString>) {
         let time = self.set().get(self.idx()).map(|s| s.time);
         self.folder = folder;
+        if self.on_disk() {
+            self.forget_disk_folder();
+        }
         let set = self.set_for(&self.folder);
-        // Same snapshot if the new folder's set has it, else the last one before.
-        if !set.iter().any(|s| s.id == self.snap)
+        // Same snapshot if the new folder's set has it, else the last one
+        // before. On disk, stay on disk.
+        if let Version::Snapshot(id) = self.snap
+            && !set.iter().any(|s| s.id == id)
             && let Some(t) = time
             && let Some(s) = set.iter().rev().find(|s| s.time <= t).or(set.first())
         {
-            self.snap = s.id;
+            self.snap = Version::Snapshot(s.id);
         }
         self.sel_name = select;
         self.sel = usize::from(self.folder != self.root);
@@ -1294,9 +1398,73 @@ impl App {
         !self.filter.hosts.is_empty() && self.filter.hosts.iter().any(|h| !self.mine.contains(h))
     }
 
-    /// Whether files changed on disk since the newest snapshot of the folder.
-    pub fn changed_on_disk(&self) -> bool {
-        self.live.get(&self.folder).is_some_and(|c| !c.is_empty())
+    /// Why the `on disk` version can't be shown, if it can't: for another
+    /// machine's snapshots it would be this machine's files (§3.18).
+    fn disk_refusal(&self) -> Option<String> {
+        self.foreign().then(|| {
+            format!(
+                "on disk is this machine. The snapshots are {}'s.",
+                self.filter.hosts.join(", ")
+            )
+        })
+    }
+
+    /// Steps onto the `on disk` version, reading the folder from disk afresh.
+    fn go_disk(&mut self) -> bool {
+        if let Some(why) = self.disk_refusal() {
+            self.message = Some(why);
+            return false;
+        }
+        if !self.on_disk() {
+            self.snap = Version::Disk;
+            self.moved = true;
+        }
+        let folder = self.folder.clone();
+        self.forget_disk(Some(&folder));
+        self.restore_selection();
+        self.moved_on();
+        true
+    }
+
+    /// Forgets the current folder's own disk listing and counts, so they're
+    /// read again on entering it on the disk version; what's known about
+    /// its subfolders and files is kept.
+    fn forget_disk_folder(&mut self) {
+        let f = self.folder.clone();
+        self.listings.remove(&(Version::Disk, f.clone()));
+        self.deleted.remove(&(Version::Disk, f.clone()));
+        self.live.remove(&f);
+        self.pending.retain(|p| match p {
+            Pending::Live(q)
+            | Pending::Listing(Version::Disk, q)
+            | Pending::Deleted(Version::Disk, q) => *q != f,
+            _ => true,
+        });
+    }
+
+    /// Forgets what was read from disk under a path (everything for
+    /// `None`), so it's read again: on stepping onto `on disk`, and after
+    /// a restore or undo.
+    pub(crate) fn forget_disk(&mut self, under: Option<&Path>) {
+        let within = |p: &Path| under.is_none_or(|u| p.starts_with(u));
+        self.listings
+            .retain(|(v, p), _| *v != Version::Disk || !within(p));
+        self.deleted
+            .retain(|(v, p), _| *v != Version::Disk || !within(p));
+        self.live.retain(|p, _| !within(p));
+        self.disk_files.retain(|p, _| !within(p));
+        self.disk_stats.borrow_mut().retain(|(_, p), _| !within(p));
+        self.exists.retain(|p, _| !within(p));
+        let disk_side = |k: &SideKey| matches!(k, SideKey::Disk(p) if within(p));
+        self.diffs
+            .retain(|k, _| !disk_side(&k.old) && !disk_side(&k.new));
+        self.pending.retain(|p| match p {
+            Pending::Live(q)
+            | Pending::Disk(q)
+            | Pending::Listing(Version::Disk, q)
+            | Pending::Deleted(Version::Disk, q) => !within(q),
+            _ => true,
+        });
     }
 
     fn not_there(&self) -> String {
@@ -1426,6 +1594,14 @@ impl App {
                             ));
                         }
                         self.go_folder(path, None);
+                    } else if self.on_disk() && !e.is_gone() {
+                        self.want_track(&path, false);
+                        self.view = View::Versions(VersionsView {
+                            path,
+                            sel: 0,
+                            disk: true,
+                        });
+                        self.moved_on();
                     } else {
                         let s = self.entry_snapshot(&e);
                         let id = self.set()[s].id;
@@ -1439,7 +1615,11 @@ impl App {
                                 Some(t.runs.len() - 1 - k)
                             })
                             .unwrap_or(0);
-                        self.view = View::Versions(VersionsView { path, sel });
+                        self.view = View::Versions(VersionsView {
+                            path,
+                            sel,
+                            disk: false,
+                        });
                         self.moved_on();
                     }
                 }
@@ -1474,25 +1654,29 @@ impl App {
                     {
                         self.go_index(set.len() - 1)
                     }
-                    None => {
-                        let msg = if self.changed_on_disk() {
-                            "Newest snapshot. Newer changes exist only on disk."
-                        } else {
-                            "Newest snapshot. Nothing changed on disk since."
-                        };
-                        return fail(self, msg.into());
-                    }
+                    None if !self.on_disk() => return self.go_disk(),
+                    None => return fail(self, "This is the version on disk.".into()),
                 }
             }
             Action::OlderSnapshot => {
-                if i == 0 || !self.state().is_some_and(|s| s.exists(i - 1)) {
-                    return fail(self, "No older snapshot of this folder.".into());
+                // From disk, the version before is the newest snapshot that
+                // has the folder; from a snapshot, one step.
+                let target = match self.state() {
+                    Some(s) if self.on_disk() => (0..i).rev().find(|&j| s.exists(j)),
+                    Some(s) if i > 0 && s.exists(i - 1) => Some(i - 1),
+                    _ => None,
+                };
+                match target {
+                    Some(j) => self.go_index(j),
+                    None => return fail(self, "No older snapshot of this folder.".into()),
                 }
-                self.go_index(i - 1);
             }
             Action::NewerSnapshot => {
+                if self.on_disk() {
+                    return fail(self, "This is the version on disk.".into());
+                }
                 if i + 1 >= set.len() {
-                    return fail(self, "This is the newest snapshot.".into());
+                    return self.go_disk();
                 }
                 if !self.state().is_some_and(|s| s.exists(i + 1)) {
                     let msg = self.not_there();
@@ -1560,6 +1744,7 @@ impl App {
                     return fail(self, msg);
                 }
             }
+            Action::GoDisk => return self.go_disk(),
             Action::GoFolder(p) => {
                 if p != self.folder {
                     self.go_folder(p, None);
@@ -1580,11 +1765,14 @@ impl App {
                 let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
                     return true;
                 };
+                if self.on_disk() && !e.is_gone() {
+                    return self.open_diff(path, 0, DiffMode::Previous, false, true);
+                }
                 let run = t
                     .index_of(id)
                     .and_then(|s| run_at(&t.runs, s))
                     .map_or(0, |(k, _)| t.runs.len() - 1 - k);
-                return self.open_diff(path, run, DiffMode::Disk, false);
+                return self.open_diff(path, run, DiffMode::Disk, false, false);
             }
             Action::DiffPrevious | Action::NextHunk | Action::PrevHunk => {}
             Action::ToggleMark => self.toggle_mark(),
@@ -1656,55 +1844,110 @@ impl App {
             app.message = Some(msg.into());
             false
         };
-        let mut sel = v.sel;
+        let (mut sel, mut disk) = (v.sel, v.disk);
+        // Up from the newest version is the `on disk` row, if it can be shown.
+        let refusal = self.disk_refusal();
+        let up = |app: &mut App, disk: &mut bool| -> bool {
+            match &refusal {
+                Some(why) => fail(app, why),
+                None => {
+                    *disk = true;
+                    true
+                }
+            }
+        };
         match a {
             Action::Down(n) => {
-                if sel + 1 >= runs {
+                if disk {
+                    disk = false;
+                } else if sel + 1 >= runs {
                     return fail(self, "This is the oldest version.");
+                } else {
+                    sel = (sel + n).min(runs - 1);
                 }
-                sel = (sel + n).min(runs - 1);
             }
             Action::OlderChange | Action::OlderItemChange => {
-                if sel + 1 >= runs {
+                if disk {
+                    disk = false;
+                } else if sel + 1 >= runs {
                     return fail(self, "This is the oldest version.");
+                } else {
+                    sel += 1;
                 }
-                sel += 1;
             }
             Action::Up(n) => {
-                if sel == 0 {
-                    return fail(self, "This is the newest version.");
+                if disk {
+                    return fail(self, "This is the version on disk.");
+                } else if sel == 0 {
+                    if !up(self, &mut disk) {
+                        return false;
+                    }
+                } else {
+                    sel = sel.saturating_sub(n);
                 }
-                sel = sel.saturating_sub(n);
             }
             Action::NewerChange | Action::NewerItemChange => {
-                if sel == 0 {
-                    return fail(self, "This is the newest version.");
+                if disk {
+                    return fail(self, "This is the version on disk.");
+                } else if sel == 0 {
+                    if !up(self, &mut disk) {
+                        return false;
+                    }
+                } else {
+                    sel -= 1;
                 }
-                sel -= 1;
             }
-            Action::Top => sel = 0,
-            Action::Bottom => sel = runs.saturating_sub(1),
-            Action::HalfDown => sel = (sel + 10).min(runs.saturating_sub(1)),
+            Action::Top => {
+                // The top row is `on disk`; where it can't be shown, the
+                // newest version.
+                sel = 0;
+                if refusal.is_none() {
+                    disk = true;
+                } else if v.sel == 0 && !up(self, &mut disk) {
+                    return false;
+                }
+            }
+            Action::Bottom => {
+                disk = false;
+                sel = runs.saturating_sub(1);
+            }
+            Action::HalfDown => {
+                disk = false;
+                sel = (sel + 10).min(runs.saturating_sub(1));
+            }
             Action::HalfUp => sel = sel.saturating_sub(10),
             Action::ClickVersion(k) => {
-                if k == sel {
-                    return self.open_diff(v.path, sel, DiffMode::Disk, true);
+                if k == sel && !disk {
+                    return self.open_diff(v.path, sel, DiffMode::Disk, true, false);
                 }
+                disk = false;
                 sel = k.min(runs.saturating_sub(1));
+            }
+            Action::GoDisk => {
+                if disk {
+                    return self.open_diff(v.path, 0, DiffMode::Previous, true, true);
+                }
+                if !up(self, &mut disk) {
+                    return false;
+                }
             }
             Action::GoSnapshot(j) => {
                 // A click on the timeline selects the version holding it.
                 if let Some(t) = self.tracks.get(&v.path)
                     && let Some((k, _)) = run_at(&t.runs, j)
                 {
+                    disk = false;
                     sel = t.runs.len() - 1 - k;
                 }
             }
+            Action::Open | Action::Diff | Action::DiffPrevious if disk => {
+                return self.open_diff(v.path, 0, DiffMode::Previous, true, true);
+            }
             Action::Open | Action::Diff => {
-                return self.open_diff(v.path, sel, DiffMode::Disk, true);
+                return self.open_diff(v.path, sel, DiffMode::Disk, true, false);
             }
             Action::DiffPrevious => {
-                return self.open_diff(v.path, sel, DiffMode::Previous, true);
+                return self.open_diff(v.path, sel, DiffMode::Previous, true, false);
             }
             Action::Back | Action::Parent | Action::Escape => {
                 self.view = View::Folder;
@@ -1717,8 +1960,8 @@ impl App {
             Action::Prefix(c) => self.prefix = Some(c),
             _ => {}
         }
-        if sel != v.sel {
-            self.view = View::Versions(VersionsView { sel, ..v });
+        if sel != v.sel || disk != v.disk {
+            self.view = View::Versions(VersionsView { sel, disk, ..v });
             self.moved_on();
         }
         true
@@ -1771,6 +2014,10 @@ impl App {
                 Some(&h) => next.scroll = h,
                 None => return fail(self, "No more changes above."),
             },
+            Action::OlderChange | Action::OlderItemChange if d.disk => {
+                next.disk = false;
+                next.scroll = 0;
+            }
             Action::OlderChange | Action::OlderItemChange => {
                 match (d.run + 1..runs.len()).find(|&k| runs[k].exists) {
                     Some(k) => {
@@ -1780,19 +2027,30 @@ impl App {
                     None => return fail(self, "This is the oldest version."),
                 }
             }
+            Action::NewerChange | Action::NewerItemChange if d.disk => {
+                return fail(self, "This is the version on disk.");
+            }
             Action::NewerChange | Action::NewerItemChange => {
                 match (0..d.run).rev().find(|&k| runs[k].exists) {
                     Some(k) => {
                         next.run = k;
                         next.scroll = 0;
                     }
-                    None => return fail(self, "This is the newest saved version."),
+                    None => match self.disk_refusal() {
+                        Some(why) => return fail(self, &why),
+                        None => {
+                            next.disk = true;
+                            next.scroll = 0;
+                        }
+                    },
                 }
             }
+            Action::Diff if d.disk => return fail(self, "Already the version on disk."),
             Action::Diff => {
                 next.mode = DiffMode::Disk;
                 next.scroll = 0;
             }
+            Action::DiffPrevious if d.disk => {}
             Action::DiffPrevious => {
                 next.mode = DiffMode::Previous;
                 next.scroll = 0;
@@ -1803,6 +2061,7 @@ impl App {
                     View::Versions(VersionsView {
                         path: d.path,
                         sel: d.run,
+                        disk: d.disk,
                     })
                 } else {
                     View::Folder
@@ -1815,7 +2074,10 @@ impl App {
             _ => {}
         }
         if next != d {
-            let reload = next.run != d.run || next.mode != d.mode || next.force != d.force;
+            let reload = next.run != d.run
+                || next.mode != d.mode
+                || next.force != d.force
+                || next.disk != d.disk;
             self.view = View::Diff(next);
             if reload {
                 self.moved_on();
@@ -1879,13 +2141,23 @@ impl App {
             .cloned()
             .collect();
         self.forget_history();
+        // The disk is compared with the newest snapshot shown.
+        self.forget_disk(None);
         let set = self.set_for(&self.folder);
-        if !set.iter().any(|s| s.id == self.snap)
+        // Another host's snapshots have no version on disk here (§3.3a).
+        if self.on_disk()
+            && self.disk_refusal().is_some()
+            && let Some(s) = set.last()
+        {
+            self.snap = Version::Snapshot(s.id);
+        }
+        if let Version::Snapshot(id) = self.snap
+            && !set.iter().any(|s| s.id == id)
             && let Some(s) = time
                 .and_then(|t| set.iter().rev().find(|s| s.time <= t))
                 .or(set.last())
         {
-            self.snap = s.id;
+            self.snap = Version::Snapshot(s.id);
         }
         self.moved_on();
     }
@@ -2016,7 +2288,7 @@ impl App {
         let parent = path.parent().unwrap_or(&f.root).to_path_buf();
         let snap = f.set[found.last].clone();
         self.view = View::Folder;
-        self.snap = snap.id;
+        self.snap = Version::Snapshot(snap.id);
         self.moved = true;
         let name = path.file_name().map(|n| n.to_os_string());
         self.go_folder(parent, name.clone());

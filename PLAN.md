@@ -97,10 +97,10 @@ To look at another machine's snapshots on purpose, use the repository picker (§
 So: **yes, it can tell machines apart**, as reliably as restic itself does. The one case it can't handle on its own is two machines sharing a hostname, and tags solve that.
 
 ### 2.5 Changes on disk since the newest snapshot
-The `on disk` row, the `on disk` marker at the right end of the timeline row, "vs disk" and the versions view compare with the files on disk (M3):
+The `on disk` row, the `on disk` marker at the right end of the timeline row, "vs disk" and the versions view compare with the files on disk (M3). The `on disk` row is also a **version**, the one after the newest snapshot (M10, §3.1): selecting it lists the folder on disk, marked against the newest snapshot the way every version is marked against the one before.
 
-- A file **counts as changed on disk** when its kind, size, modification time or permissions differ from the newest snapshot. That's the same test restic uses to decide whether to read a file again. Content isn't hashed, so a file that's only touched counts as changed here, unlike between snapshots (§2.2).
-- A folder's `on disk` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done.
+- A file **counts as changed on disk** when its kind, size, modification time or permissions differ from the newest snapshot. That's the same test restic uses to decide whether to read a file again. Content isn't hashed, so a file that's only touched counts as changed here, unlike between snapshots (§2.2); the help says "by size or time", and `⇥` shows whether the content differs.
+- A folder's `on disk` counts walk the folder on disk and its tree in the newest snapshot. This runs in the background, once per folder, and is cached for the session. A large folder takes a while, and the row shows `…` until it's done. The `on disk` listing comes from the same walk, so it costs the same; it's read again each time the row is selected or the folder changes while on it, and after a restore, `:undo` or a filter change.
 - "vs disk" and the VS DISK column diff the first 64 KB of each side.
 - Disk access goes through a `Disk` trait, so tests use a fake disk built from the same DSL as `FakeRepo` (a `disk` block after the snapshots). Symlinks are never followed.
 
@@ -164,18 +164,18 @@ Starting `restoric` with no arguments opens the **current folder**, at the newes
 | 5–32 | Three columns, separated by thin `│` lines: **Versions** (22 wide) · **listing** (40% of the rest, 40 to 50 wide) · **preview** (the rest) |
 | 33 | **Status bar** (or the `:` / `/` / `f` input line) |
 
-**Versions column:** the top row is `on disk`, showing what changed on disk since the last backup (`on disk  ~1`, in purple; `= latest` when nothing has). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
+**Versions column:** the top row is `on disk`, showing what changed on disk since the last backup (`on disk  ~1`, in purple; `= latest` when nothing has). It is a version like the others, the one after the newest snapshot: `L` or `]` past the newest snapshot, `K` in the versions view, or a click selects it (see "The `on disk` version" below). After that come the change points, newest first, with compact counts (`+1~3−1`). Unchanged runs fold into `┄ 5 unchanged ┄`. `▶` marks the current version, or the folded run when you're viewing an unchanged snapshot. Clicking a row jumps there.
 
 **Listing:** mark bar (`┃` for selected items), icon, name (folders end in `/`, a deleted name is crossed out), size, Δ (`+` added, `~` changed, `−` deleted in this snapshot, compact counts for folders, `gone` for items deleted earlier; the Δ column is as wide as its widest visible entry). No column headers. With items deleted earlier hidden, the bottom says `1 deleted · . to show`.
 
 **Preview** of the selected entry *as it was in this snapshot*:
 - **File:** a heading (`main.go · v5/6 · 1.3K`) and a second line saying whether it changed here ("changed here · + new line · − removed", "new in this snapshot", or "unchanged since Sep 09 19:23"). Below that, the content with line numbers. The margin marks `+` for lines that are new in this version and `−` where lines were removed, compared with the previous version. It scrolls to the first change automatically.
-- `⇥` (Tab) switches between **content** and **vs disk** (an inline diff against the file on disk). `J`/`K` scroll. The mode shows at the top right and is clickable.
+- `⇥` (Tab) switches between **content** and **vs disk** (an inline diff against the file on disk; **vs latest** on the `on disk` version, where it diffs the file on disk against its newest version in the snapshots). `J`/`K` scroll. The mode shows at the top right and is clickable. A heading that doesn't fit loses its trailing ` · parts` rather than its name.
 - **Folder:** its contents in that snapshot, with icons and change markers.
 - **Deleted item:** the last version, headed "deleted · last version Aug 22, gone Sep 06".
 - `..`: the parent folder's path.
 
-**Status bar:** mode badge (`NOR`; `SEL` when items are selected; `VIS` in visual mode; `DIFF`, `FIND`, `RST` in those screens), then date · snapshot id · folder counts (or "unchanged since Sep 02"), then extra notes ("2 in column · zi", `filter "go"`, "2 yanked"). On the right: the selected file's modification time, position (`5/7`), any pending count or prefix key, and `? help`. While a restore runs, the middle shows its progress instead, in every view: `restoring 2/5 src/  ━━━━━━──────  35%  1.2M / 3.4M  esc stop` (§3.11).
+**Status bar:** mode badge (`NOR`; `SEL` when items are selected; `VIS` in visual mode; `DIFF`, `FIND`, `RST` in those screens), then date · snapshot id · folder counts (or "unchanged since Sep 02"; on the `on disk` version `on disk  vs Oct 02  src/ +2 ~1 −1`, the date being the newest snapshot's), then extra notes ("2 in column · zi", `filter "go"`, "2 yanked"). On the right: the selected file's modification time, position (`5/7`), any pending count or prefix key, and `? help`. While a restore runs, the middle shows its progress instead, in every view: `restoring 2/5 src/  ━━━━━━──────  35%  1.2M / 3.4M  esc stop` (§3.11).
 
 **Messages** appear as a small rounded popup at the top right of the panes, like yazi's notifications, and disappear at the next key press.
 
@@ -261,6 +261,53 @@ After `}`, the view jumps to the next change of `main.go`. A file changing means
  Jul 24 12:16 ~1      │   1 deleted · . to show           │
                       │                                   │
  NOR  Sep 09 19:23  62c0e9c7  src/ ~1                                     Sep 09 18:25  4/6  ? help
+```
+
+### 3.3a The `on disk` version
+The files on disk are the newest version, the one after the newest snapshot (M10). `L` or `]` from the newest snapshot, or a click on the `on disk` row or the timeline's `on disk` cell, selects it; `H` and `[` go back; `Home` and `End` still mean the oldest and newest change. The listing is the folder on disk, marked against the newest snapshot the way every version is marked against the one before: `+` a file not in it, `~` a file that differs by kind, size, time or permissions (§2.5), `−` (crossed out) a file in it that's missing on disk or replaced by a folder (and the other way round), compact counts on folders from the same walk as the `on disk` row. `.` shows items deleted before the newest snapshot, as in any version. `▶` marks the row and `▲` sits under the `on disk` cell.
+
+- **Preview:** `main.go · on disk · 1.3K` and "changed since Oct 02 12:21" (the newest snapshot), "unchanged since Sep 09 19:23", "not in any backup" or "not in the latest snapshot" (an older snapshot has it). The content comes from disk, with margin marks against the file's newest version in the snapshots. `⇥` is **vs latest**: the file on disk against that version, "Identical to the latest snapshot." when nothing differs, "Not in any backup." when there is none.
+- **A row that exists on disk** is the file itself, not a version to restore: `y` `p` `P` `r` say "That's the file on disk. Pick a version to restore."; `⏎` `l` open its versions view on the `on disk` row, `d` the diff from the newest version to disk; `o` shows the file on disk and `cc` copies its path (no snapshot id). **A `−` row** restores as always, from the newest snapshot (§3.11).
+- **Another host's snapshots** (§3.18) have no version on disk here: the row keeps its counts, and selecting it says "on disk is this machine. The snapshots are dev-vm's." The same at the versions view's `on disk` row.
+- The folder is read again each time the version is selected or the folder changes while on it, so an edit in another terminal shows after `H` `L`. Selecting the row again re-reads everything under it. A filter that makes the host foreign (`:host`) leaves the version for the newest snapshot.
+
+<sub>`docs/screens/21-on-disk.txt`</sub>
+
+```text
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ● ○ ○  · ●   ○  ○·    ● ·  ○ ·  ·    ●· ·●·● · ○ ·  ·○  · ·○ ·  ·  ┊ ● main.go  ○ src/
+                                                                                ▲          − 1× +
+
+▶on disk  +2~1−1      │   ..                                   │ main.go · on disk       ⇥ content
+   ┄ 2 unchanged ┄    │ ▸ api/                                 │ changed since Oct 02 12:21
+ Sep 27 08:52 ~1      │ ▸ models/                           +1 │
+   ┄ 2 unchanged ┄    │ ◇ config.go                   96 B     │   1  package main
+ Sep 20 20:35 ~1      │ ◇ main.go                    124 B  ~  │   2
+   ┄ 2 unchanged ┄    │ ◇ scratch.go                  49 B  +  │   3  func main() {
+ Sep 13 20:51 ~2      │ ◇ server.go                   42 B     │   4    run()
+   ┄ 1 unchanged ┄    │ ◇ util.go                    104 B  −  │   5  }
+ Sep 09 19:23 ~1      │                                        │   6  // flags
+   ┄ 1 unchanged ┄    │                                        │   7  // middleware
+ Sep 06 18:03 +1~3−1  │                                        │   8  // feature flag
+   ┄ 2 unchanged ┄    │                                        │   9  // signals
+ Sep 02 20:16 ~1      │                                        │  10  // serve
+   ┄ 2 unchanged ┄    │                                        │  11  // shutdown
+ Aug 22 11:59 ~2−1    │                                        │  12+ // unsaved edit
+   ┄ 1 unchanged ┄    │                                        │
+ Aug 17 16:04 +1~1    │                                        │
+   ┄ 1 unchanged ┄    │                                        │
+ Aug 10 15:44 ~1      │                                        │
+ Aug 07 08:15 +1      │                                        │
+ Aug 03 16:19 +1~1    │                                        │
+   ┄ 1 unchanged ┄    │                                        │
+ Jul 28 15:59 ~1      │                                        │
+ Jul 26 11:57 ~1      │                                        │
+ Jul 24 12:16 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │
+ Jul 14 09:00 +7      │                                        │
+                      │   2 deleted · . to show                │
+ NOR  on disk  vs Oct 02  src/ +2 ~1 −1                                   Oct 02 13:21  4/7  ? help
 ```
 
 ### 3.4 Which-key popups
@@ -640,7 +687,7 @@ How it works (M6): the search starts at the backup root and matches paths relati
 ```
 
 ### 3.9 Versions of a file (`⏎` or `l` on a file)
-One row per **distinct version**, newest first, with deleted periods as their own rows. The `on disk` row is always first. "VS DISK" shows lines added and removed, or `identical`. The preview on the right shows the selected version, with its changes marked.
+One row per **distinct version**, newest first, with deleted periods as their own rows. The `on disk` row is always first, and is a version: `k` or `L` from the newest version selects it (§3.3a), the preview shows the file on disk against its newest version, `⏎` `d` `p` open the diff from that version to disk, and `y` `r` say it isn't a version to restore. "VS DISK" shows lines added and removed, or `identical`. The preview on the right shows the selected version, with its changes marked.
 
 <sub>`docs/screens/13-versions.txt`</sub>
 
@@ -682,7 +729,7 @@ One row per **distinct version**, newest first, with deleted periods as their ow
 ```
 
 ### 3.10 Full-screen diff (`d`)
-Two modes. `c` (the default): selected version → on disk, "what changed since this version". `p`: previous distinct version → selected version, "what this version changed". Unified diff with 3 lines of context, both line numbers, and `┄┄ around line N ┄┄` between changes.
+Two modes. `c` (the default): selected version → on disk, "what changed since this version". `p`: previous distinct version → selected version, "what this version changed". On the `on disk` version (`L` past the newest version, or `d` from the `on disk` listing), the diff is newest version → on disk whatever the mode, "what changed on disk since this version"; `c` says "Already the version on disk." Unified diff with 3 lines of context, both line numbers, and `┄┄ around line N ┄┄` between changes.
 
 <sub>`docs/screens/14-diff.txt`</sub>
 
@@ -776,7 +823,9 @@ For targets other than "next to it" and "overwrite". Works on files and folders,
 
 Showing a file in `$PAGER` is not a restore, so it isn't in the dialog: `o` does it from the folder, versions and diff views.
 
-**Foreign host** (the host shown isn't one of this machine's, §3.18): there is no original on disk to overwrite or sit next to, so `p` and `r` both open one prompt in the status bar, `restore to: ~/dev/project/src█`, with the last directory used this session, else the folder restoric started in. `⏎` restores the item (or the yanked items) to `<dir>/<name>`, with `-2`, `-3`, … on a clash, and says "Restored to …"; `esc` cancels. `~` is expanded; a relative path is taken from the start folder. `P` says "Overwriting is off for another host's snapshots. p restores into a directory you choose." `:undo` is unchanged.
+**Foreign host** (the host shown isn't one of this machine's, §3.18): there is no original on disk to overwrite or sit next to, so `p` and `r` both open one prompt in the status bar, `restore to: ~/dev/project/src█`, with the last directory used this session, else the folder restoric started in. `⏎` restores the item (or the yanked items) to `<dir>/<name>`, with `-2`, `-3`, … on a clash, and says "Restored to …"; `esc` cancels. `~` is expanded; a relative path is taken from the start folder. `P` says "Overwriting is off for another host's snapshots. p restores into a directory you choose." `:undo` is unchanged. The `on disk` version can't be selected (§3.3a).
+
+**On the `on disk` version** (§3.3a): an entry that exists on disk is the file itself, so `y` `p` `P` `r` refuse with "That's the file on disk. Pick a version to restore." A `−` entry, in the newest snapshot but not on disk, restores from the newest snapshot as any deleted entry restores from the last snapshot that had it.
 
 How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restorer, which keeps mode, modification time and symlinks; owner and group are set only when running as root. Folder tar archives are written by restoric from the trees. An overwrite moves what's on disk into `undo/<time>/files/<absolute path>` with a `manifest.json`. If the restore fails, the old version is moved back. `:undo` undoes the newest overwrite, all of its items at once. Moves fall back to copy and delete across file systems. The dialog's "next to it" name comes without the `-2` a clash would add, because the UI doesn't look at the disk; the message after the restore gives the real name. The `:` line handles `:undo`, `:q`, `:help`, `:deleted`, `:latest`/`:now` and `:oldest`/`:first`; the rest of §3.15 comes in M6.
 
@@ -832,38 +881,38 @@ How it works (M5): restores run in the worker. `RusticRepo` uses rustic's restor
 ```text
  restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              on disk
-  ● · ·  ○·○ ○ ●  · ● · ○· ○·  ··○  · ●· · · · ·○·  ● ● · ○ · · ○ · · ○  · ·  ┊ ● main.go  ○ src/
-                                                                           ▲               − 1× +
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ○ api/  ○ src/
+                                                                      ▲                    − 1× +
              ╭─ Help ─────────────────────────────────────────────────────────────────╮
- now  ~1 unsa│                                                                        │  ⇥ content
-▶  ┄ 2 unchan│  Folder view                                                           │3
- Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
-   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │er(w).Encode…
- Sep 20 20:35│  H L                    older / newer change in this folder            │equest
-   ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │, "id")
- Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │etUser(ctx, …
-   ┄ 1 unchan│  ␣  v                   select / visual select                         │ORT", 8080)
- Sep 09 19:23│  y  p  P                yank, restore next to it, overwrite            │
-   ┄ 1 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
- Sep 06 18:03│  cc cd cf               copy snapshot:path, folder, name               │ontext.Conte…
-   ┄ 2 unchan│  / n N   f              search / next, previous / filter               │equest
- Sep 02 20:16│  .  zd   zi zo          show deleted items / zoom timeline             │
-   ┄ 5 unchan│  gh   3H 5j             backup root / counts with motions              │hLabelValues…
- Aug 22 11:59│                                                                        │ORT", 8080)
-   ┄ 1 unchan│  Commands                                                              │
- Aug 17 16:04│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
-   ┄ 3 unchan│  :find NAME   s         search every snapshot for a name               │ntext.Contex…
- Aug 10 15:44│  :latest :oldest :undo                                                 │eq); err != …
-   ┄ 1 unchan│                                                                        │xt.WithTimeo…
- Aug 07 08:15│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │ent-Type", "…
-   ┄ 1 unchan│  Press any key to close                                                │ %s", name)
- Aug 03 16:19╰────────────────────────────────────────────────────────────────────────╯return errNo…
-   ┄ 2 unchanged ┄    │                                   │  46    defer cancel()
- Jul 28 15:59 ~1      │                                   │  47    for i := 0; i < retries; i++ { t…
- Jul 26 11:57 ~1      │                                   │  48  }
- Jul 24 12:16 ~1      │   1 deleted · . to show           │  49
-                      │                                   │
- NOR  Oct 02 12:21  b41050ad  unchanged since Sep 27  2 yanked            Sep 09 18:25  4/6  ? help
+ on disk  ~1 │                                                                        │
+   ┄ 2 unchan│  Folder view                                                           │
+▶Sep 27 08:52│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+ Sep 20 20:35│  H L                    older / newer change in this folder, then disk │
+   ┄ 2 unchan│  [ ]   { }              every snapshot / changes of the selected item  │
+ Sep 13 20:51│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+   ┄ 1 unchan│  on disk                files now vs the last backup, by size or time  │
+ Sep 09 19:23│  ␣  v                   select / visual select                         │
+   ┄ 1 unchan│  y  p  P                yank, restore next to it, overwrite            │
+ Sep 06 18:03│  r  d  o                restore options / full-screen diff / $PAGER    │
+   ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
+ Sep 02 20:16│  / n N   f              search / next, previous / filter               │
+   ┄ 2 unchan│  .  zd   zi zo          show deleted items / zoom timeline             │
+ Aug 22 11:59│  gh   3H 5j             backup root / counts with motions              │
+   ┄ 1 unchan│                                                                        │
+ Aug 17 16:04│  Commands                                                              │
+   ┄ 1 unchan│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
+ Aug 10 15:44│  :find NAME   s         search every snapshot for a name               │
+ Aug 07 08:15│  :latest :oldest :undo                                                 │
+ Aug 03 16:19│                                                                        │
+   ┄ 1 unchan│  Diff  ]c [c or n N changes · c vs disk · p vs previous                │
+ Jul 28 15:59│  Press any key to close                                                │
+ Jul 26 11:57╰────────────────────────────────────────────────────────────────────────╯
+ Jul 24 12:16 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │
+ Jul 14 09:00 +7      │                                        │
+                      │   2 deleted · . to show                │
+ NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
 ```
 
 ### 3.13 Narrow terminals
@@ -918,11 +967,11 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `h` `←` `-` `⌫` | Parent folder (selects the folder you came from) |
 | `l` `→` `⏎` | Open folder / versions of the file. On a deleted item, jump to its last snapshot first. |
 | `gh` | Backup root |
-| `H` `L` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot. |
-| `[` `]` / `Shift-←` `Shift-→` | Every snapshot, changed or not |
+| `H` `L` | Older / newer **change in this folder**. `L` past the last change goes to the newest snapshot, then to `on disk` (§3.3a). |
+| `[` `]` / `Shift-←` `Shift-→` | Every snapshot, changed or not; `]` past the newest is `on disk`, and `[` from there is the newest snapshot that has the folder |
 | `{` `}` | Older / newer change of the **selected item** |
 | `Home` `End` | Oldest / newest change |
-| `⇥` | Preview: content ↔ diff against disk |
+| `⇥` | Preview: content ↔ diff against disk (against the latest version, on disk) |
 | `J` `K` | Scroll the preview |
 | `Space` / `v` | Select and move down / visual select |
 | `y` `p` `P` | Yank / restore next to the original / overwrite (with confirmation) |
@@ -941,7 +990,7 @@ At **under 100 columns** the Versions column folds away, leaving listing (40% of
 | `q` | Back one level: a sub-view to the view it came from, the folder view to the picker when the session started there (§3.18), else quit. `Ctrl-c` and `:q` quit from anywhere |
 | *count* | `3H`, `5j`, `2J`, … repeat a motion. Stops at the first boundary message. |
 
-**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `o` pager · `y` yank · `zi` `zo` · `h` `←` `esc` `⌫` `q` back.
+**Versions view:** `j` `k` / `H` `L` / `{` `}` move older and newer (up from the newest is `on disk`) · `gg` `G` · `⏎` `d` `l` diff against disk · `p` diff against previous · `⇥` `J` `K` preview · `r` restore · `o` pager · `y` yank · `zi` `zo` · `h` `←` `esc` `⌫` `q` back.
 
 **Diff view:** `j` `k` scroll · `Ctrl-d` `Ctrl-u` `space` · `gg` `G` · `]c` `[c` and `n` `N` next / previous change · `H` `L` older / newer version · `c` against disk · `p` against previous · `r` · `o` · `y` · `h` `←` `esc` `⌫` `q` back.
 
@@ -976,7 +1025,8 @@ An unknown command shows: `Unknown command ":x". Try :sep 1, :yesterday, :3d, :f
 Dates are local days; `:09-01` and `:sep 1` mean this year. `:host` takes one name or several, separated by commas. `:tag` with no tag clears the tag filter. A filter that would leave the folder without snapshots is refused, with the §4.6 explanation. `:set strict` switches the worker's change detection while running and recomputes what's on screen; the status bar then says `strict`. Zoom doubles from 1× up to whatever separates the closest two snapshots (at least 8×, at most 4096×).
 
 ### 3.16 Messages (copy the mockup's wording)
-- "This is the oldest version of this folder." / "Newest snapshot. Newer changes exist only on disk." / "Newest snapshot. Nothing changed on disk since."
+- "This is the oldest version of this folder." / "This is the version on disk."
+- `on disk` (§3.3a): "That's the file on disk. Pick a version to restore." · "Already the version on disk." · "Not in any backup." · "Identical to the latest snapshot." · "on disk is this machine. The snapshots are dev-vm's."
 - "No older snapshot of this folder." · "No older change to main.go." · "Select a file or folder first."
 - "Jumped to Sep 04 08:08, the last snapshot that has legacy.go"
 - "Yanked 2 items from Sep 09 19:23. p restores next to the original, P overwrites."
@@ -1342,6 +1392,13 @@ Run it on the **large** synthetic repo (§4.8) as well as yours, and record memo
 
 How it works (M8): a `@sync` entry reads the hovered file (or the folder, if nothing is hovered) and emits yazi's `shell --block` with `restoric <path>`. A file path makes restoric open its folder with the file selected, so `--select` isn't needed. Arguments after `--` in the keymap pass through; yazi turns `--no-icons` into `no_icons`, so the plugin turns it back. Tested with yazi 26.9.1. Publishing for `ya pkg` needs the plugin at the root of a published repository, so it waits until restoric has a public home; until then the README says to copy the folder.
 
+### M10: the `on disk` version
+- **Read first:** §3.3a (the screen and rules), §2.5 (the comparison and its cost), §3.9 and §3.10 (the row in the versions and diff views), §3.11 (restore keys), §3.16 (messages) and the 2026-10-08 `on disk` entry in §8 "Settled".
+- `App::snap` is a `Version`: a snapshot, or `Disk`, one past the newest snapshot in the folder's set (`idx()`), so the time keys, `entry_snapshot` and the caches need no special case. The disk listing is `Index::disk_listing`: the folder read from disk against the newest snapshot's tree, with `Entry`/`Delta` as any listing, so the listing pane has no new row kind; a disk entry's `Node` is only what the UI shows and is never read from the repository. One worker request brings the listing and the `on disk` counts; the items deleted earlier are a second request, sent for the current folder only, as for a snapshot.
+- `L` `]` onto disk, `H` `[` back; `▶` and `▲`; the status bar line; the preview from disk with `vs latest`; the versions and diff views' `on disk` row; the restore-key guards; the foreign-host refusal; the disk read again on entry and after a filter change.
+- Insta snapshots: the folder view on disk (`21-on-disk.txt`), `vs latest`, the versions and diff views on disk; tests for the keys, the restore keys on present and `−` rows, and the foreign host.
+- **Done when:** with the drifted fixture, `L` from the newest snapshot lands on `on disk` listing `+` `~` `−` rows, `y` refuses on a present row and yanks a `−` row from the newest snapshot, and on another host's snapshots the row refuses with the host's name.
+
 ### M9: repository picker
 - **Read first:** §3.18 (the screen), §4.6 and §4.7 (start-up and `--browse`), §2.4 (host), §3.11 (restore) and the 2026-10-08 entry in §8 "Settled".
 - `--browse` and the §4.6 dead ends open the picker (§3.18): repo level (several `[[repo]]`) and group level, `/` filter, PATH pre-selection, this machine's rows first.
@@ -1382,6 +1439,7 @@ How it works (M8): a `@sync` entry reads the hovered file (or the folder, if not
 Settled during review:
 - Accented names (2026-10-08): macOS stores `ä` as `a` + U+0308. Names are drawn grapheme by grapheme (ratatui's `set_stringn`), so the accent stays in its cell. Search (`/`), filter (`f`), `:find` and the picker filter compare lowercased NFC text (`index::fold`), so a typed `ä` finds a decomposed one. Names are never normalized for paths or restores.
 - `zd` replaces `zh` for show / hide deleted items (2026-10-09). `.` stays. The rows are deleted items, not hidden files, and `h` is the parent-folder motion, so `zh` read as a prefixed motion. The `z` keys now name the kind of row they toggle (`zd` deleted, `zi` `zo` zoom), leaving `zn` for new files on the `on disk` version, not built yet. The review's P2b (drop `zh`, keep `z` for zoom only) was decided the other way.
+- The `on disk` row is a selectable version (2026-10-08), M10, §3.3a. The question was how to name what changed on disk since the last backup, which the counts only summarise. Markers on existing rows, or disk-only rows behind `.`, were rejected for their row-kind cost: a row that exists only on disk inside a snapshot's listing is a second kind of row that every key and every future feature must handle. As a version, a never-backed-up file is an ordinary `+` row, the Δ column keeps one meaning (what this version did compared with the one before) and the special cases sit in the few places that read the current version. The entry point stays the newest snapshot that changed the folder. The comparison stays stat-based (§2.5) and against this machine's disk, so on another host's snapshots the row keeps its counts and refuses to be selected. `⏎` on a file on disk opens its versions view rather than refusing: it is the "pick a version" screen. A scriptable `restoric changes` list and `--at disk` were left for later.
 - Picker details (2026-10-08, M9 built): a repo row shows the full location and the hosts, no name column and no `name` key. On a foreign host `r` is the same directory prompt as `p` (no reduced dialog); the item lands at `<dir>/<name>`. The config `tag` is dropped for a foreign host and kept for one of this machine's. The picker is keyboard-only.
 - Repository picker (2026-10-08), §3.18, M9. It lists (host, path) groups, not a snapshot file tree, so the folder-anchored design stays. It opens with `--browse` and in place of the §4.6 dead ends (no terminal: the old message, exit non-zero). With several `[[repo]]` there is a repo level first (A2), drawn from `repos.json` without opening any repo. A row is (host, path) only, with no tags. `q` in the folder view goes back to the picker for another repo, host or path (2026-10-08; at first this needed a restart). Restoring from a foreign host always asks for a target directory and disables `P`. The `on disk` comparison is left as it is: it is read-only, and for a renamed machine it is correct.
 - Several repositories in the config (2026-10-07): `[[repo]]` blocks with `repository`, `password_file`, `password_command`, `insecure_no_password`, and optional `host` and `tag` that replace the top-level ones. There's no `paths` key: restoric lists each repository's snapshots to find the one that holds the folder, and caches what it saw so a usual start opens one repository (§4.6). `--repo` comes first, then the config, then `RESTIC_REPOSITORY`, so the variable can stay set for restic itself. Principle 5 still holds: with no `[[repo]]`, restic's variables work as before.
@@ -1482,3 +1540,4 @@ Tick milestones here as they're done, with the commit.
 - [ ] M7: polish and release
 - [x] M8: yazi plugin — abb5806 (not yet published for `ya pkg`)
 - [x] M9: repository picker — c725494
+- [ ] M10: the `on disk` version

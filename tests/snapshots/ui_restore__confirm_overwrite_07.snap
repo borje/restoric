@@ -7,7 +7,7 @@ expression: "h.screen(100, 34)"
   ○        ○ ○ ○    ○   ○  ○     ○    ○         ○   ●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ server.go  ○ src/
                                                       ▲                                    − 1× +
 
- on disk  ~1          │   ..                                   │ server.go · v1/2 · 30…  ⇥ content
+ on disk  ~1          │   ..                                   │ server.go · v1/2        ⇥ content
    ┄ 2 unchanged ┄    │ ▸ api/                                 │ unchanged since Sep 06 18:03
  Sep 27 08:52 ~1      │ ▸ models/                              │
    ┄ 2 unchanged ┄    │ ◇ config.go                    89 B    │   1  package main

@@ -20,8 +20,16 @@ use quick_cache::Weighter;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::cache::{Cache, Table};
-use crate::repo::{Id, Node, Repo, SnapshotInfo, Tree, TreeId};
+use crate::repo::{Id, Node, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
 use fingerprint::Fp;
+
+/// The version being viewed: a snapshot, or the files on disk, which count
+/// as the newest version, the one after the newest snapshot (PLAN.md §3.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Version {
+    Snapshot(SnapshotId),
+    Disk,
+}
 
 /// What counts as a change (PLAN.md §2.2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

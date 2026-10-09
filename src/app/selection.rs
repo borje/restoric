@@ -5,12 +5,17 @@ use std::path::PathBuf;
 
 use super::cmdline::InputKind;
 use super::{App, Effect, Row, View};
+use crate::index::listing::Entry;
 use crate::index::versions::Run;
 use crate::repo::NodeKind;
 use crate::repo::RestoreStep;
 use crate::restore::{How, Progress, Target, planned};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request};
+
+/// What the restore keys say on an entry that exists on disk, viewing the
+/// `on disk` version: it isn't a version to restore.
+const ON_DISK: &str = "That's the file on disk. Pick a version to restore.";
 
 /// The restore dialog (`r`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,8 +185,35 @@ impl App {
         })
     }
 
+    /// The picked listing rows: the selection, or what's under the cursor.
+    fn picked_rows(&self) -> Vec<Row> {
+        let rows = self.rows();
+        let marked = self.marked_rows();
+        if marked.is_empty() {
+            rows.get(self.sel).copied().into_iter().collect()
+        } else {
+            marked.iter().map(|&k| rows[k]).collect()
+        }
+    }
+
+    /// On the `on disk` version, the picked entry that exists on disk when
+    /// it's the only one: the file itself, not a version to restore.
+    fn disk_pick(&self) -> Option<(PathBuf, Entry)> {
+        if !self.on_disk() || self.view != View::Folder {
+            return None;
+        }
+        let [row] = self.picked_rows()[..] else {
+            return None;
+        };
+        let e = self.entry(row).filter(|e| !e.is_gone())?;
+        Some((self.folder.join(&e.node.name), e.clone()))
+    }
+
     /// The selected version in the versions or diff view.
-    fn version_target(&self, path: &PathBuf, run: usize) -> Result<Target, String> {
+    fn version_target(&self, path: &PathBuf, run: usize, disk: bool) -> Result<Target, String> {
+        if disk {
+            return Err(ON_DISK.into());
+        }
         let t = self.tracks.get(path).ok_or_else(String::new)?;
         let runs: Vec<Run> = t.runs.iter().rev().copied().collect();
         let r = runs.get(run).ok_or_else(String::new)?;
@@ -207,13 +239,16 @@ impl App {
     pub fn targets(&self) -> Result<Vec<Target>, String> {
         match &self.view {
             View::Folder => {
-                let rows = self.rows();
-                let marked = self.marked_rows();
-                let picked: Vec<Row> = if marked.is_empty() {
-                    rows.get(self.sel).copied().into_iter().collect()
-                } else {
-                    marked.iter().map(|&k| rows[k]).collect()
-                };
+                let picked = self.picked_rows();
+                // On disk, an entry that's there is the file itself; one
+                // that's gone restores from the last snapshot that had it.
+                if self.on_disk()
+                    && picked
+                        .iter()
+                        .any(|&r| self.entry(r).is_some_and(|e| !e.is_gone()))
+                {
+                    return Err(ON_DISK.into());
+                }
                 let t: Vec<Target> = picked
                     .into_iter()
                     .filter_map(|r| self.row_target(r))
@@ -224,8 +259,8 @@ impl App {
                     Ok(t)
                 }
             }
-            View::Versions(v) => self.version_target(&v.path, v.sel).map(|t| vec![t]),
-            View::Diff(d) => self.version_target(&d.path, d.run).map(|t| vec![t]),
+            View::Versions(v) => self.version_target(&v.path, v.sel, v.disk).map(|t| vec![t]),
+            View::Diff(d) => self.version_target(&d.path, d.run, d.disk).map(|t| vec![t]),
             View::Find(_) => Err(String::new()),
         }
     }
@@ -412,7 +447,7 @@ impl App {
     }
 
     /// Whether the dialog's target exists on disk (assumed while unknown).
-    pub fn on_disk(&self, t: &Target) -> bool {
+    pub fn exists_on_disk(&self, t: &Target) -> bool {
         self.exists.get(&t.path).copied().unwrap_or(true)
     }
 
@@ -428,7 +463,7 @@ impl App {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default()
         };
-        let first = if self.on_disk(t) {
+        let first = if self.exists_on_disk(t) {
             ("Overwrite original".to_string(), show(&t.path))
         } else {
             (
@@ -436,7 +471,7 @@ impl App {
                 format!("{} (missing now)", show(&t.path)),
             )
         };
-        let next = if self.on_disk(t) {
+        let next = if self.exists_on_disk(t) {
             format!(
                 "→ {}{slash}",
                 file_name(planned(t, &How::NextTo, &self.places))
@@ -464,6 +499,15 @@ impl App {
 
     /// `o`: show the selected file, as it was in that snapshot, in `$PAGER`.
     pub(super) fn pager(&mut self) -> bool {
+        if let Some((path, e)) = self.disk_pick() {
+            if e.is_dir() {
+                self.message = Some("Select a file to show. o shows a file in $PAGER.".into());
+                return false;
+            }
+            let name = e.node.name.to_string_lossy().into_owned();
+            self.outbox.push(Request::ReadAllDisk { path, name });
+            return true;
+        }
         let t = match self.targets() {
             Ok(t) if t.len() == 1 => t[0].clone(),
             Ok(_) => {
@@ -491,7 +535,7 @@ impl App {
         let Some(d) = self.dialog.clone() else { return };
         let t = d.target.clone();
         match d.sel {
-            0 if self.on_disk(&t) && !d.confirm => {
+            0 if self.exists_on_disk(&t) && !d.confirm => {
                 self.dialog = Some(Dialog { confirm: true, ..d });
                 return;
             }
@@ -503,8 +547,19 @@ impl App {
         self.dialog = None;
     }
 
-    /// `cc` `cd` `cf`: snapshot:path, the folder, the name.
+    /// `cc` `cd` `cf`: snapshot:path (the path alone on disk), the folder,
+    /// the name.
     pub(super) fn copy(&mut self, what: char) -> bool {
+        if let Some((path, e)) = self.disk_pick() {
+            let text = match what {
+                'c' => path.display().to_string(),
+                'd' => self.folder.display().to_string(),
+                _ => e.node.name.to_string_lossy().into_owned(),
+            };
+            self.message = Some(format!("Copied {text}"));
+            self.effects.push(Effect::Clipboard(text));
+            return true;
+        }
         let t = match self.targets() {
             Ok(t) => t[0].clone(),
             Err(_) => {
@@ -531,16 +586,7 @@ impl App {
 
     /// After a restore or undo, what's on disk has changed.
     pub(super) fn disk_changed(&mut self) {
-        self.live.clear();
-        self.disk_files.clear();
-        self.disk_stats.borrow_mut().clear();
-        self.exists.clear();
-        self.diffs.retain(|k, _| {
-            !matches!(k.old, crate::diff::SideKey::Disk(_))
-                && !matches!(k.new, crate::diff::SideKey::Disk(_))
-        });
-        self.pending
-            .retain(|p| !matches!(p, super::Pending::Live(_) | super::Pending::Disk(_)));
+        self.forget_disk(None);
         self.ensure();
     }
 }

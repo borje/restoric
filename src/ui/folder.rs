@@ -84,7 +84,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                     rows.push(VRow::Version(v));
                 }
                 let on = |r: &VRow| match r {
-                    VRow::Now => false,
+                    VRow::Now => app.on_disk(),
                     VRow::Version(v) => *v == i,
                     VRow::Fold { from, to } => (*from..=*to).contains(&i),
                 };
@@ -97,7 +97,12 @@ pub fn draw(app: &App, g: &mut Grid) {
                     let here = on(row);
                     match row {
                         VRow::Now => {
-                            let c = g.put(v0 + 1, y, "on disk  ", t.live);
+                            if here {
+                                g.fill(y, v0, v1, t.selected);
+                                g.put(v0, y, "▶", t.accent);
+                            }
+                            let style = if here { t.live.patch(t.bold) } else { t.live };
+                            let c = g.put(v0 + 1, y, "on disk  ", style);
                             match app.live.get(&app.folder) {
                                 Some(lc) if !lc.is_empty() => {
                                     put_counts(g, c, y, lc, "", v1 + 1);
@@ -109,6 +114,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                                     g.put(c, y, "…", t.dim);
                                 }
                             }
+                            g.hit(v0, v1 + 1, y, Action::GoDisk);
                         }
                         VRow::Fold { from, to } => {
                             if here {

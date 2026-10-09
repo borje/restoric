@@ -7,6 +7,7 @@ use super::timeline::Axis;
 use super::{Grid, fmt};
 use crate::app::cmdline::InputKind;
 use crate::app::{Action, App, Restoring, View};
+use crate::index::folder::Counts;
 use crate::repo::RestoreStep;
 
 pub fn draw(app: &App, g: &mut Grid) {
@@ -52,6 +53,7 @@ pub fn draw(app: &App, g: &mut Grid) {
     if let View::Diff(d) = &app.view {
         let c = g.put(0, r, " DIFF ", t.badge_blue) + 1;
         let mode = match d.mode {
+            _ if d.disk => "vs previous (p)",
             crate::app::DiffMode::Disk => "vs disk (c)",
             crate::app::DiffMode::Previous => "vs previous (p)",
         };
@@ -78,7 +80,9 @@ pub fn draw(app: &App, g: &mut Grid) {
     let mut right: Vec<(String, Style, Option<Action>)> = Vec::new();
     if let View::Versions(v) = &app.view {
         mid.push((fmt::path(&v.path, app.home.as_deref()), t.dim));
-        if let Some(tr) = app.tracks.get(&v.path).filter(|t| t.loaded()) {
+        if v.disk {
+            right.push(("on disk".into(), t.live, None));
+        } else if let Some(tr) = app.tracks.get(&v.path).filter(|t| t.loaded()) {
             right.push((format!("{}/{}", v.sel + 1, tr.runs.len()), t.text, None));
         }
         finish(app, g, c, mid, right);
@@ -86,45 +90,71 @@ pub fn draw(app: &App, g: &mut Grid) {
     }
     let set = app.set();
     let i = app.idx();
-    if let Some(s) = set.get(i) {
-        mid.push((fmt::time(s.time, &app.tz), t.bold));
-        mid.push(("  ".into(), t.text));
-        mid.push((s.id.0.short(), t.accent));
-        mid.push(("  ".into(), t.text));
-    }
-    if let Some(state) = app.state().filter(|s| s.loaded()) {
-        let name = app
-            .folder
-            .file_name()
-            .map(|n| format!("{}/ ", n.to_string_lossy()))
-            .unwrap_or_else(|| "/ ".into());
-        if state.versions().contains(&i) {
-            mid.push((name, t.dim));
-            if let Some(counts) = state.counts.get(&i) {
-                let parts = [
-                    (counts.added, "+", t.added),
-                    (counts.changed, "~", t.changed),
-                    (counts.deleted, "−", t.deleted),
-                ];
-                let mut first = true;
-                for (n, sign, style) in parts {
-                    if n > 0 {
-                        mid.push((format!("{}{sign}{n}", if first { "" } else { " " }), style));
-                        first = false;
-                    }
-                }
+    let name = app
+        .folder
+        .file_name()
+        .map(|n| format!("{}/ ", n.to_string_lossy()))
+        .unwrap_or_else(|| "/ ".into());
+    let push_counts = |mid: &mut Vec<(String, Style)>, counts: &Counts| {
+        let parts = [
+            (counts.added, "+", t.added),
+            (counts.changed, "~", t.changed),
+            (counts.deleted, "−", t.deleted),
+        ];
+        let mut first = true;
+        for (n, sign, style) in parts {
+            if n > 0 {
+                mid.push((format!("{}{sign}{n}", if first { "" } else { " " }), style));
+                first = false;
             }
-        } else if let Some(v) = state.version_at(i) {
-            mid.push((
-                format!("unchanged since {}", fmt::day(state.set[v].time, &app.tz)),
-                t.dim,
-            ));
         }
-    }
-    if let Some(axis) = Axis::new(&set, i, app.zoom, cols) {
-        let share = axis.share(i);
-        if share > 1 {
-            mid.push((format!("  {share} in column · zi"), t.dim));
+    };
+    if app.on_disk() {
+        // The files on disk against the newest snapshot.
+        mid.push(("on disk".into(), t.live.patch(t.bold)));
+        mid.push(("  ".into(), t.text));
+        if let Some(s) = set.last() {
+            mid.push((format!("vs {}", fmt::day(s.time, &app.tz)), t.dim));
+            mid.push(("  ".into(), t.text));
+        }
+        match (app.live.get(&app.folder), set.last()) {
+            (Some(c), _) if !c.is_empty() => {
+                mid.push((name, t.dim));
+                push_counts(&mut mid, c);
+            }
+            (Some(_), Some(s)) => {
+                mid.push((
+                    format!("unchanged since {}", fmt::day(s.time, &app.tz)),
+                    t.dim,
+                ));
+            }
+            _ => mid.push(("…".into(), t.dim)),
+        }
+    } else {
+        if let Some(s) = set.get(i) {
+            mid.push((fmt::time(s.time, &app.tz), t.bold));
+            mid.push(("  ".into(), t.text));
+            mid.push((s.id.0.short(), t.accent));
+            mid.push(("  ".into(), t.text));
+        }
+        if let Some(state) = app.state().filter(|s| s.loaded()) {
+            if state.versions().contains(&i) {
+                mid.push((name, t.dim));
+                if let Some(counts) = state.counts.get(&i) {
+                    push_counts(&mut mid, counts);
+                }
+            } else if let Some(v) = state.version_at(i) {
+                mid.push((
+                    format!("unchanged since {}", fmt::day(state.set[v].time, &app.tz)),
+                    t.dim,
+                ));
+            }
+        }
+        if let Some(axis) = Axis::new(&set, i, app.zoom, cols) {
+            let share = axis.share(i);
+            if share > 1 {
+                mid.push((format!("  {share} in column · zi"), t.dim));
+            }
         }
     }
     if !app.name_filter.is_empty() {
