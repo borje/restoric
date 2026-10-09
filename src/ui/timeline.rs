@@ -1,4 +1,4 @@
-//! The header and the timeline (PLAN.md §3.1 rows 0–4, §3.9).
+//! The header and the timeline.
 
 use std::collections::BTreeMap;
 
@@ -93,7 +93,7 @@ pub struct TrackRow {
     pub outer: Option<Outer>,
 }
 
-/// The folder's changes, under the selected item's in the same row (§3.2).
+/// The folder's changes, under the selected item's in the same row.
 /// The item can only change where its folder does.
 pub struct Outer {
     pub change: Vec<bool>,

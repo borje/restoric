@@ -1,4 +1,4 @@
-//! `:find NAME` (PLAN.md §3.6): where something with NAME in its path was,
+//! `:find NAME`: where something with NAME in its path was,
 //! across every snapshot. Matches are memoised by (folder path, tree id),
 //! so a folder that didn't change is read once; the cost follows the number
 //! of distinct trees, not snapshots × files.

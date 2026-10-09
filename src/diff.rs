@@ -152,7 +152,7 @@ pub fn hunks(d: &LineDiff, context: usize) -> Vec<HunkLine> {
     out
 }
 
-/// Most of a file the full-screen diff reads unless asked (PLAN.md §3.10).
+/// Most of a file the full-screen diff reads unless asked.
 pub const DIFF_LIMIT: u64 = 2 * 1024 * 1024;
 
 /// What "diff it anyway" reads at most.

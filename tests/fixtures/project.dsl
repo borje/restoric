@@ -1,5 +1,5 @@
 # The sample project for UI tests and `restoric demo`: a FakeRepo history
-# shaped like the mockup's (PLAN.md §3). See src/repo/fake.rs for the DSL.
+# shaped like the mockup's. See src/repo/fake.rs for the DSL.
 host bege-laptop
 root /home/bege/dev/project
 

@@ -1,4 +1,4 @@
-//! The full-screen diff (PLAN.md §3.10): a unified diff with 3 lines of
+//! The full-screen diff: a unified diff with 3 lines of
 //! context, both line numbers, and `┄┄ around line N ┄┄` between changes.
 
 use super::{Grid, fmt};

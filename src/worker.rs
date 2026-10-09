@@ -1,4 +1,4 @@
-//! Background work (PLAN.md §4.5). The UI thread sends [`Request`]s and
+//! Background work. The UI thread sends [`Request`]s and
 //! draws from the [`Response`]s; it never touches the repository or disk.
 //!
 //! Each request carries a generation. When the user moves on, the UI bumps
@@ -23,7 +23,7 @@ use crate::index::{Index, NodeRef, Version};
 use crate::repo::{FileBytes, Node, SnapshotInfo};
 use crate::restore::{self, Done, How, Places, Target};
 
-/// Most of a file the preview reads (PLAN.md §4.8).
+/// Most of a file the preview reads.
 pub const PREVIEW_LIMIT: u64 = 64 * 1024;
 
 /// What the worker works with.

@@ -1,4 +1,4 @@
-//! The preview column (PLAN.md §3.1, §3.3, §3.7): the selected entry as it
+//! The preview column: the selected entry as it
 //! was in the snapshot being viewed.
 
 use std::path::Path;

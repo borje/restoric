@@ -1,4 +1,4 @@
-//! The status bar (PLAN.md §3.1, last row).
+//! The status bar (last row).
 
 use ratatui::style::Style;
 

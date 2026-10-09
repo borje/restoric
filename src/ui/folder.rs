@@ -1,4 +1,4 @@
-//! The folder view's panes (PLAN.md §3.1): the Versions column, the
+//! The folder view's panes: the Versions column, the
 //! listing and the preview.
 
 use ratatui::layout::Rect;

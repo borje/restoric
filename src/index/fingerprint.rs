@@ -1,5 +1,5 @@
 //! Content fingerprints of files, links and other non-folder entries
-//! (PLAN.md §2.2). Modification time and the rest of restic's metadata
+//!. Modification time and the rest of restic's metadata
 //! churn (atime, ctime, inode, device id) are left out; mode, owner and
 //! group are in.
 //!

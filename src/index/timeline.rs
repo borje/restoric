@@ -1,4 +1,4 @@
-//! The timeline set and change points (PLAN.md §2.3, §2.4).
+//! The timeline set and change points.
 
 use std::path::{Path, PathBuf};
 
@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::{Index, NodeRef};
 use crate::repo::SnapshotInfo;
 
-/// Which snapshots belong to this machine (§2.4).
+/// Which snapshots belong to this machine.
 #[derive(Clone, Debug, Default)]
 pub struct Filter {
     /// Accepted hostnames; several when the machine was renamed. Empty: any.
@@ -31,7 +31,7 @@ impl Filter {
 
 /// Whether snapshot `s` holds `path`: a backup path is `path`, above it, or
 /// below it. Below counts because the snapshot's tree has the folders above
-/// each backup path, so `restic backup dir/a.log dir/b.csv` holds `dir` (§2.3).
+/// each backup path, so `restic backup dir/a.log dir/b.csv` holds `dir`.
 pub fn covers(s: &SnapshotInfo, path: &Path) -> bool {
     holds(&s.paths, path)
 }
@@ -54,7 +54,7 @@ pub fn timeline_set(snaps: &[SnapshotInfo], filter: &Filter, path: &Path) -> Vec
     set
 }
 
-/// Why the timeline set is empty, in words for the user (§4.6 steps 4–5).
+/// Why the timeline set is empty, in words for the user.
 pub fn explain_empty(snaps: &[SnapshotInfo], filter: &Filter, path: &Path) -> String {
     let mine: Vec<&SnapshotInfo> = snaps.iter().filter(|s| filter.matches(s)).collect();
     if mine.is_empty() {

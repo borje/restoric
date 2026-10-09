@@ -1,5 +1,4 @@
-//! Search, filter, the command line, find and zoom (PLAN.md §3.4, §3.6,
-//! §3.8, §3.15).
+//! Search, filter, the command line, find and zoom.
 
 mod common;
 

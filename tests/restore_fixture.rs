@@ -1,5 +1,5 @@
 //! Restoring from the repository restic wrote (tests/fixtures/make_repo.sh),
-//! with every option, into the fixture's folder on disk (PLAN.md §5 M5).
+//! with every option, into the fixture's folder on disk.
 //! One test, in order: the steps change what's on disk.
 
 mod common;

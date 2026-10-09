@@ -1,4 +1,4 @@
-//! App state (PLAN.md §4.2): what's on screen and what's loaded. The UI
+//! App state: what's on screen and what's loaded. The UI
 //! draws from this; repository and disk work goes out as [`Request`]s in
 //! `outbox` and comes back through [`App::apply`].
 
@@ -125,7 +125,7 @@ pub enum PreviewMode {
     Disk,
 }
 
-/// The versions of one file (PLAN.md §3.9).
+/// The versions of one file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VersionsView {
     pub path: PathBuf,
@@ -144,7 +144,7 @@ pub enum DiffMode {
     Previous,
 }
 
-/// The full-screen diff (PLAN.md §3.10).
+/// The full-screen diff.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiffView {
     pub path: PathBuf,
@@ -162,7 +162,7 @@ pub struct DiffView {
     pub from_versions: bool,
 }
 
-/// `:find` results (PLAN.md §3.6).
+/// `:find` results.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FindView {
     pub query: String,
@@ -322,10 +322,10 @@ pub struct App {
     pub home: Option<PathBuf>,
     /// Every snapshot in the repository.
     everything: Vec<SnapshotInfo>,
-    /// Which of them are this machine's (§2.4); `:host`, `:tag`.
+    /// Which of them are this machine's; `:host`, `:tag`.
     pub filter: Filter,
     /// This machine's hosts. A filter host outside them is a foreign host
-    /// (§3.18): restores ask for a directory and `P` is off.
+    ///: restores ask for a directory and `P` is off.
     pub mine: Vec<String>,
     /// The host picked in the picker, for the title bar.
     pub shown_host: Option<String>,
@@ -1121,7 +1121,7 @@ impl App {
                 t.points = points;
                 t.runs = runs;
                 t.progress = None;
-                // Start at the newest snapshot that changed the folder (§3.1),
+                // Start at the newest snapshot that changed the folder,
                 // or at `--at`.
                 if path == self.folder && !self.moved {
                     if let Some(at) = self.start_at.take() {
@@ -1393,13 +1393,13 @@ impl App {
         fmt::time(self.set()[i].time, &self.tz)
     }
 
-    /// Whether the snapshots shown are another machine's (§3.18).
+    /// Whether the snapshots shown are another machine's.
     pub fn foreign(&self) -> bool {
         !self.filter.hosts.is_empty() && self.filter.hosts.iter().any(|h| !self.mine.contains(h))
     }
 
     /// Why the `on disk` version can't be shown, if it can't: for another
-    /// machine's snapshots it would be this machine's files (§3.18).
+    /// machine's snapshots it would be this machine's files.
     fn disk_refusal(&self) -> Option<String> {
         self.foreign().then(|| {
             format!(
@@ -2144,7 +2144,7 @@ impl App {
         // The disk is compared with the newest snapshot shown.
         self.forget_disk(None);
         let set = self.set_for(&self.folder);
-        // Another host's snapshots have no version on disk here (§3.3a).
+        // Another host's snapshots have no version on disk here.
         if self.on_disk()
             && self.disk_refusal().is_some()
             && let Some(s) = set.last()

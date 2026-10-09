@@ -1,4 +1,4 @@
-//! The repository picker screen (PLAN.md §3.18).
+//! The repository picker screen.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;

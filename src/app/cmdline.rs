@@ -1,4 +1,4 @@
-//! The input line in the status bar (PLAN.md §3.6, §3.8, §3.15): `:`
+//! The input line in the status bar: `:`
 //! commands, `/` search and `f` filter.
 
 use jiff::civil::Date;
@@ -15,7 +15,7 @@ pub enum InputKind {
     Command,
     Search,
     Filter,
-    /// `restore to:` on a foreign host (§3.18).
+    /// `restore to:` on a foreign host.
     Dir,
 }
 

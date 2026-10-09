@@ -1,4 +1,4 @@
-//! Drawing (PLAN.md §3). Everything is drawn from [`App`] state; nothing
+//! Drawing. Everything is drawn from [`App`] state; nothing
 //! here reads the repository. Layout follows the mockup cell by cell, so
 //! drawing works on a grid of cells rather than with ratatui widgets.
 
@@ -117,7 +117,7 @@ impl Grid<'_> {
     }
 }
 
-/// Columns of the three panes (§3.13): Versions, listing, preview.
+/// Columns of the three panes: Versions, listing, preview.
 pub struct Panes {
     pub versions: Option<(u16, u16)>,
     pub listing: (u16, u16),

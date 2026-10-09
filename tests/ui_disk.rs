@@ -1,4 +1,4 @@
-//! The `on disk` version (PLAN.md §3.1): the files on disk as the newest
+//! The `on disk` version: the files on disk as the newest
 //! version, compared with the newest snapshot.
 
 mod common;

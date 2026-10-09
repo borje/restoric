@@ -156,8 +156,8 @@ pub fn fmt_like(when: &str) -> String {
     )
 }
 
-/// The sample project with more drift on disk, for the `on disk` version
-/// (PLAN.md §3.1): a new file, a deleted file and a new file under `models/`.
+/// The sample project with more drift on disk, for the `on disk` version:
+/// a new file, a deleted file and a new file under `models/`.
 pub fn drifted() -> String {
     format!(
         "{PROJECT}  write src/scratch.go package main\\n\\n// scratch work\\nfunc tryThing() {{}}\\n\n  rm src/util.go\n  write src/models/draft.go package models\\n\n"

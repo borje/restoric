@@ -1,4 +1,4 @@
-//! Colours (PLAN.md §3.17): the 16 ANSI colours, so the terminal's theme
+//! Colours: the 16 ANSI colours, so the terminal's theme
 //! applies. With `NO_COLOR`, only bold, dim, italic, strikethrough and
 //! reverse video.
 

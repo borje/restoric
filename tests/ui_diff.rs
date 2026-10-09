@@ -1,4 +1,4 @@
-//! Snapshot tests of the full-screen diff (PLAN.md §3.10).
+//! Snapshot tests of the full-screen diff.
 
 mod common;
 
@@ -130,7 +130,7 @@ fn identical() {
     insta::assert_snapshot!(h.screen(100, 10));
 }
 
-/// `q` goes back one level: diff, versions, folder, then out (§3.14).
+/// `q` goes back one level: diff, versions, folder, then out.
 #[test]
 fn q_goes_back_one_level() {
     let mut h = Harness::new(SRC);
@@ -146,7 +146,7 @@ fn q_goes_back_one_level() {
 }
 
 /// After the picker, `q` in the folder view goes back to it; `Ctrl-c`
-/// and `:q` still quit (§3.18).
+/// and `:q` still quit.
 #[test]
 fn q_after_the_picker_goes_back_to_it() {
     let mut h = Harness::new(SRC);

@@ -1,5 +1,5 @@
 //! restoric: browse and restore a restic repository by time, anchored on a
-//! folder. See PLAN.md.
+//! folder.
 
 pub mod app;
 pub mod cache;

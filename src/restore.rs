@@ -1,4 +1,4 @@
-//! Restoring (PLAN.md §3.5, §3.11): next to the original, over it (with an
+//! Restoring: next to the original, over it (with an
 //! undo log), into the restore folder, or as a tar archive. Writes only to
 //! the destination it picks, and to the undo folder. Never to the repository.
 
@@ -45,7 +45,7 @@ pub enum How {
     /// A folder as `name-2026-09-09_1923.tar` next to the original.
     Tar,
     /// `<dir>/name`: a directory the user named (restores from another
-    /// host, §3.18).
+    /// host).
     Into(PathBuf),
 }
 

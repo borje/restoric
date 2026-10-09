@@ -1,5 +1,5 @@
 //! A path's versions: runs of consecutive snapshots where it stayed the
-//! same, and runs where it was missing (PLAN.md §2.3, §3.9).
+//! same, and runs where it was missing.
 
 use anyhow::Result;
 

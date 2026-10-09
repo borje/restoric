@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds a small restic repository with a known history, using the real
-# `restic` binary, for the index tests (PLAN.md §5 M1).
+# `restic` binary, for the index tests.
 #
 #   make_repo.sh OUTDIR
 #

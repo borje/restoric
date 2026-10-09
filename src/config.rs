@@ -1,4 +1,4 @@
-//! `~/.config/restoric/config.toml` (PLAN.md §10). Every key is optional.
+//! `~/.config/restoric/config.toml`. Every key is optional.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ pub enum Hosts {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    /// This machine's hostname(s), if snapshots use other names (§2.4).
+    /// This machine's hostname(s), if snapshots use other names.
     pub host: Option<Hosts>,
     pub tag: Option<String>,
     pub icons: Option<bool>,
@@ -35,7 +35,7 @@ pub struct Config {
     pub keys: BTreeMap<String, String>,
     /// Style name → colour, e.g. `accent = "magenta"` or `"#e4a84c"`.
     pub colors: BTreeMap<String, String>,
-    /// Repositories to look in, as `[[repo]]` blocks (§4.6).
+    /// Repositories to look in, as `[[repo]]` blocks.
     pub repo: Vec<RepoEntry>,
 }
 

@@ -1,5 +1,5 @@
 //! The files on disk, for "what changed since the newest snapshot" and
-//! "vs disk" (PLAN.md §3.1, §3.3). A trait, so tests can use a fake disk.
+//! "vs disk". A trait, so tests can use a fake disk.
 //! Symlinks are never followed.
 
 use std::ffi::OsString;

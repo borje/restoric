@@ -1,4 +1,4 @@
-//! Popups (PLAN.md §3.4, §3.12, §3.16): which-key, messages, help.
+//! Popups: which-key, messages, help.
 
 use super::{Grid, TOP, fmt};
 use crate::app::selection::Confirm;
@@ -128,7 +128,7 @@ pub fn help(app: &App, g: &mut Grid) {
     g.put_to(x + 3, y + h - 2, "Press any key to close", t.dim, end);
 }
 
-/// The restore dialog (PLAN.md §3.11).
+/// The restore dialog.
 pub fn restore_dialog(app: &App, g: &mut Grid) {
     let Some(d) = &app.dialog else { return };
     let t = g.theme.clone();

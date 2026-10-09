@@ -213,7 +213,7 @@ enum Start {
         location: String,
     },
     /// Several `[[repo]]` and none holds the folder, or `--browse`: nothing
-    /// is opened, the picker lists them (§3.18).
+    /// is opened, the picker lists them.
     Repos,
 }
 
@@ -227,7 +227,7 @@ fn save_cache(path: Option<&Path>, cache: &ProbeCache) {
 
 /// Opens the repository that holds `folder`: the one from `--repo`, else
 /// the config's `[[repo]]` whose snapshots hold it, else the one from the
-/// environment (PLAN.md §4.6).
+/// environment.
 fn start(
     args: &RepoArgs,
     view: &ViewArgs,
@@ -494,7 +494,7 @@ fn run(cli: Cli) -> Result<()> {
     }
 }
 
-/// The folder view on `folder`, through the picker (§3.18) when the folder
+/// The folder view on `folder`, through the picker when the folder
 /// isn't in this machine's snapshots or `--browse` says so.
 fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf) -> Result<()> {
     let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());

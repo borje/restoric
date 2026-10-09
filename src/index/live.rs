@@ -1,4 +1,4 @@
-//! What changed on disk since a snapshot (PLAN.md §3.1, the `on disk` row).
+//! What changed on disk since a snapshot (the `on disk` row).
 //! A file counts as changed when its kind, size, modification time or
 //! permissions differ, which is how restic decides to read it again.
 
@@ -51,7 +51,7 @@ impl Index {
     }
 
     /// The folder's entries on disk, compared with its tree in `newest`:
-    /// the `on disk` version (PLAN.md §3.1), whose version before is the
+    /// the `on disk` version, whose version before is the
     /// newest snapshot. With them, the folder's `on disk` counts from the
     /// same walk. `None` when the folder isn't a readable folder on disk.
     pub fn disk_listing(

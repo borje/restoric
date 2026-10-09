@@ -1,4 +1,4 @@
-//! Select, yank, paste and the restore dialog (PLAN.md §3.5, §3.11).
+//! Select, yank, paste and the restore dialog.
 
 mod common;
 

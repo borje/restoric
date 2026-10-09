@@ -26,7 +26,7 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
-      - name: Scale test on the small synthetic repo (PLAN.md §4.8)
+      - name: Scale test on the small synthetic repo
         run: |
           tests/fixtures/make_big_repo.sh small "$RUNNER_TEMP/big/small"
           RESTORIC_SCALE_REPO="$RUNNER_TEMP/big/small" cargo test --release --test scale -- --nocapture

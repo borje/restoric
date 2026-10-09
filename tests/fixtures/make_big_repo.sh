@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds a synthetic restic repository for scale testing (PLAN.md §4.8).
+# Builds a synthetic restic repository for scale testing.
 #
 #   make_big_repo.sh small|large|huge OUTDIR
 #

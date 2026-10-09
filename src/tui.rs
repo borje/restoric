@@ -1,4 +1,4 @@
-//! Terminal setup and teardown, and the event loop (PLAN.md §4.5).
+//! Terminal setup and teardown, and the event loop.
 
 use std::io::{Write, stdout};
 use std::sync::Arc;
@@ -186,8 +186,8 @@ impl Term {
         }
     }
 
-    /// The folder view's event loop (PLAN.md §4.5). True when `q` asks to
-    /// go back to the picker.
+    /// The folder view's event loop. True when `q` asks to go back to the
+    /// picker.
     pub fn run(
         &mut self,
         mut app: App,

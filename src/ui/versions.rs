@@ -1,4 +1,4 @@
-//! The versions view (PLAN.md §3.9): one row per distinct version of a
+//! The versions view: one row per distinct version of a
 //! file, newest first, with deleted periods as their own rows.
 
 use super::preview::{Source, content, head};

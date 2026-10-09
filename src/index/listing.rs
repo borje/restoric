@@ -1,5 +1,5 @@
 //! A folder's entries at one snapshot, with change markers against the
-//! snapshot before (PLAN.md §3.1), and items deleted earlier.
+//! snapshot before, and items deleted earlier.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;

@@ -1,4 +1,4 @@
-//! Snapshot tests of the folder view (PLAN.md §3.1, §3.4, §3.12, §3.13),
+//! Snapshot tests of the folder view,
 //! driven by FakeRepo with tests/fixtures/project.dsl. Times are in UTC.
 
 mod common;
@@ -211,7 +211,7 @@ fn item_changes_and_versions_keys() {
 }
 
 /// Backups that name files, not their folder (`restic backup trading/a.log …`):
-/// the folder above them still opens (PLAN.md §2.3).
+/// the folder above them still opens.
 #[test]
 fn folder_above_the_backup_paths() {
     let dsl = "\

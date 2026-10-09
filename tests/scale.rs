@@ -1,5 +1,5 @@
 //! Timing on a synthetic repository from tests/fixtures/make_big_repo.sh
-//! (PLAN.md §4.8). Runs only when RESTORIC_SCALE_REPO points at one, e.g.
+//!. Runs only when RESTORIC_SCALE_REPO points at one, e.g.
 //! `RESTORIC_SCALE_REPO=/tmp/big/small cargo test --release --test scale`.
 
 use std::path::PathBuf;
@@ -52,7 +52,7 @@ fn change_points_and_listing_are_fast() {
         );
         timings.push(took);
     }
-    // §4.8 targets: a folder's change points under 2 s; warm is from the cache.
+    // Targets: a folder's change points under 2 s; warm is from the cache.
     assert!(timings[0] < Duration::from_secs(2), "cold {:?}", timings[0]);
     assert!(
         timings[1] < Duration::from_millis(500),

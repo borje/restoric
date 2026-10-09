@@ -1,4 +1,4 @@
-//! Restore progress and stopping a restore (PLAN.md §3.11), on FakeRepo
+//! Restore progress and stopping a restore, on FakeRepo
 //! and a temporary folder.
 
 use std::fs;

@@ -1,4 +1,4 @@
-//! The repository picker (PLAN.md §3.18): a start-up screen for reaching
+//! The repository picker: a start-up screen for reaching
 //! snapshots the folder-anchored flow can't. It lists (host, backup path)
 //! groups and, with several `[[repo]]`, a repo level above them drawn from
 //! `repos.json` without opening any repository.
@@ -192,7 +192,7 @@ impl Picker {
     }
 
     /// The group level of a repository opened before the picker, with the
-    /// §4.6 dead-end message when there is one.
+    /// dead-end message when there is one.
     pub fn with_groups(
         mut self,
         location: &str,

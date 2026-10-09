@@ -106,4 +106,4 @@ Colours follow your terminal's 16-colour theme, and `NO_COLOR` turns them off. r
 
 ## Status
 
-Work in progress; see [PLAN.md](PLAN.md) for the design and what's done. Licensed under the [GNU AGPL v3](LICENSE) or later.
+Work in progress. Licensed under the [GNU AGPL v3](LICENSE) or later.

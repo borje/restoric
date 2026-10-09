@@ -24,14 +24,14 @@ use crate::repo::{Id, Node, Repo, SnapshotId, SnapshotInfo, Tree, TreeId};
 use fingerprint::Fp;
 
 /// The version being viewed: a snapshot, or the files on disk, which count
-/// as the newest version, the one after the newest snapshot (PLAN.md §3.1).
+/// as the newest version, the one after the newest snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Version {
     Snapshot(SnapshotId),
     Disk,
 }
 
-/// What counts as a change (PLAN.md §2.2).
+/// What counts as a change.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
     /// Content, mode, owner and group; metadata churn is ignored.

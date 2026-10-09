@@ -1,5 +1,4 @@
-//! Marks, visual mode, the yank register, restoring and copying
-//! (PLAN.md §3.5, §3.11).
+//! Marks, visual mode, the yank register, restoring and copying.
 
 use std::path::PathBuf;
 
@@ -380,7 +379,7 @@ impl App {
         }
     }
 
-    /// On a foreign host (§3.18): asks where the restore goes, with the
+    /// On a foreign host: asks where the restore goes, with the
     /// last directory used, else the folder restoric started in.
     pub(super) fn ask_dir(&mut self, targets: Vec<Target>) {
         let dir = self

@@ -1,4 +1,4 @@
-//! File-type icons (PLAN.md §3.17): Nerd Font glyphs, or the plain set
+//! File-type icons: Nerd Font glyphs, or the plain set
 //! from the mockup with `--no-icons` / `icons = false`.
 
 use ratatui::style::Style;

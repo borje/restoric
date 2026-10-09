@@ -1,4 +1,4 @@
-//! `:find` results (PLAN.md §3.6): one row per path, with when it was first
+//! `:find` results: one row per path, with when it was first
 //! and last seen and whether it's on disk now.
 
 use super::{Grid, fmt};

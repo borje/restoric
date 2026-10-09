@@ -1,4 +1,4 @@
-//! The on-disk cache (PLAN.md §4.4): one redb file per repository.
+//! The on-disk cache: one redb file per repository.
 //!
 //! Every key is content-addressed (snapshot ids, tree ids), so nothing ever
 //! needs invalidating. Writes collect in memory and go to disk on

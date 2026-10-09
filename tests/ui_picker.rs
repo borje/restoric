@@ -1,4 +1,4 @@
-//! The repository picker (PLAN.md §3.18) and restores from a foreign host.
+//! The repository picker and restores from a foreign host.
 //! Times are in UTC.
 
 mod common;

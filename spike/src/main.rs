@@ -1,5 +1,5 @@
 //! M0 spike: a throwaway check that rustic_core can do what restoric needs.
-//! See PLAN.md §5 M0. Not part of restoric.
+//! Not part of restoric.
 
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
@@ -115,7 +115,7 @@ impl<'a, S: IndexedTree> Trees<'a, S> {
     }
 }
 
-/// Content fingerprint (PLAN.md §2.2), memoised by tree id.
+/// Content fingerprint, memoised by tree id.
 struct Fingerprints {
     memo: HashMap<TreeId, [u8; 32]>,
 }

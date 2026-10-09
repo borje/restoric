@@ -1,4 +1,4 @@
-//! Which `[[repo]]` from the config holds the folder (PLAN.md §4.6).
+//! Which `[[repo]]` from the config holds the folder.
 //!
 //! restoric reads each repository's snapshot list and picks the one whose
 //! snapshots of this machine hold the folder. What it saw is remembered in

@@ -1,4 +1,4 @@
-//! Keys and mouse to actions (PLAN.md §3.14): counts, prefix keys, help.
+//! Keys and mouse to actions: counts, prefix keys, help.
 
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
