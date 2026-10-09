@@ -8,6 +8,7 @@
 //! root /home/bege/dev/project      # the backed-up folder; paths below are relative to it
 //!
 //! snapshot 2026-07-24 12:16        # optional: host=NAME tags=a,b root=/other/path
+//!                                  #   paths=a.log,b.csv: back up these, not the root
 //!   write src/main.go package main\nfunc main() {}\n
 //!   append src/main.go // more\n
 //!   touch src/util.go              # new mtime, same content
@@ -118,6 +119,16 @@ fn parse_time(date: &str, time: &str) -> Result<Timestamp> {
     Ok(dt.to_zoned(TimeZone::UTC)?.timestamp())
 }
 
+/// A `snapshot` line: its options, with the defaults filled in.
+struct Described {
+    time: Timestamp,
+    host: String,
+    tags: Vec<String>,
+    root: PathBuf,
+    /// The backup paths, relative to `root`; empty for `root` itself.
+    paths: Vec<PathBuf>,
+}
+
 /// The folder at `path`, created if missing.
 fn dir_mut<'a>(
     root: &'a mut BTreeMap<OsString, Entry>,
@@ -159,8 +170,8 @@ impl FakeRepo {
         let mut host = "fake-host".to_string();
         let mut root = PathBuf::from("/data");
         let mut files: BTreeMap<OsString, Entry> = BTreeMap::new();
-        // The snapshot being described: (time, host, tags, root).
-        let mut current: Option<(Timestamp, String, Vec<String>, PathBuf)> = None;
+        // The snapshot being described.
+        let mut current: Option<Described> = None;
 
         for (lineno, line) in text.lines().enumerate() {
             let err = || format!("line {}: {line}", lineno + 1);
@@ -179,13 +190,13 @@ impl FakeRepo {
             }
             let (cmd, rest) = trimmed.split_once(' ').unwrap_or((trimmed, ""));
             let mtime = disk_time
-                .or(current.as_ref().map(|c| c.0))
+                .or(current.as_ref().map(|c| c.time))
                 .unwrap_or_default();
             match cmd {
                 "host" => host = rest.trim().to_string(),
                 "root" => root = PathBuf::from(rest.trim()),
                 "disk" => {
-                    let last = current.as_ref().map(|c| c.0).unwrap_or_default();
+                    let last = current.as_ref().map(|c| c.time).unwrap_or_default();
                     if let Some(c) = current.take() {
                         repo.add_snapshot(&files, c)?;
                     }
@@ -203,19 +214,23 @@ impl FakeRepo {
                         words.next().with_context(err)?,
                         words.next().with_context(err)?,
                     );
-                    let mut snap = (
-                        parse_time(date, time)?,
-                        host.clone(),
-                        Vec::new(),
-                        root.clone(),
-                    );
+                    let mut snap = Described {
+                        time: parse_time(date, time)?,
+                        host: host.clone(),
+                        tags: Vec::new(),
+                        root: root.clone(),
+                        paths: Vec::new(),
+                    };
                     for w in words {
                         match w.split_once('=') {
-                            Some(("host", h)) => snap.1 = h.to_string(),
+                            Some(("host", h)) => snap.host = h.to_string(),
                             Some(("tags", t)) => {
-                                snap.2 = t.split(',').map(str::to_string).collect()
+                                snap.tags = t.split(',').map(str::to_string).collect()
                             }
-                            Some(("root", r)) => snap.3 = PathBuf::from(r),
+                            Some(("root", r)) => snap.root = PathBuf::from(r),
+                            Some(("paths", p)) => {
+                                snap.paths = p.split(',').map(PathBuf::from).collect()
+                            }
                             _ => bail!("{}: unknown option {w}", err()),
                         }
                     }
@@ -361,7 +376,13 @@ impl FakeRepo {
     fn add_snapshot(
         &mut self,
         files: &BTreeMap<OsString, Entry>,
-        (time, host, tags, root): (Timestamp, String, Vec<String>, PathBuf),
+        Described {
+            time,
+            host,
+            tags,
+            root,
+            paths,
+        }: Described,
     ) -> Result<()> {
         // Nest the files under the root path, as restic does.
         let mut whole = Entry::Dir(files.clone());
@@ -384,7 +405,11 @@ impl FakeRepo {
             id,
             time,
             host,
-            paths: vec![root],
+            paths: if paths.is_empty() {
+                vec![root]
+            } else {
+                paths.iter().map(|p| root.join(p)).collect()
+            },
             tags,
             tree,
         });

@@ -3,19 +3,20 @@
 //! groups and, with several `[[repo]]`, a repo level above them drawn from
 //! `repos.json` without opening any repository.
 //!
-//! This is pure state: the driver (`tui::Term::pick`) opens repositories
+//! This is pure state apart from [`Pick::open_at`]: the driver (`tui::Term::pick`) opens repositories
 //! when [`Step::Open`] or [`Step::Refresh`] asks and reports back with
 //! [`Picker::opened`], [`Picker::refreshed`] or [`Picker::failed`].
 
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use crate::index::fold;
+use crate::index::{Index, fold};
 use crate::repo::SnapshotInfo;
 use crate::repos::{Candidate, ProbeCache, fit};
 
@@ -114,6 +115,39 @@ pub struct Pick {
     pub host: String,
     pub path: PathBuf,
     pub repo: Option<usize>,
+}
+
+impl Pick {
+    /// Where the folder view opens after this pick, and the name to select
+    /// there: `folder` when the picked path holds it, else the picked path.
+    /// A backup path that is a file (`restic backup dir/a.log dir/b.csv`)
+    /// opens its folder with the file selected, as `restoric FILE` does.
+    /// Looks the path up in the newest snapshot that backed it up.
+    pub fn open_at(
+        &self,
+        folder: &Path,
+        snaps: &[SnapshotInfo],
+        index: &Index,
+    ) -> (PathBuf, Option<OsString>) {
+        if folder.starts_with(&self.path) {
+            return (folder.to_path_buf(), None);
+        }
+        let newest = snaps
+            .iter()
+            .filter(|s| s.host == self.host && s.paths.contains(&self.path))
+            .max_by_key(|s| s.time);
+        let file = newest.is_some_and(|s| match index.node_at(s, &self.path) {
+            Ok(node) => node.is_some_and(|n| !n.is_dir()),
+            Err(e) => {
+                tracing::warn!("looking up {}: {e:#}", self.path.display());
+                false
+            }
+        });
+        match (file, self.path.parent(), self.path.file_name()) {
+            (true, Some(parent), Some(name)) => (parent.to_path_buf(), Some(name.to_os_string())),
+            _ => (self.path.clone(), None),
+        }
+    }
 }
 
 /// What the driver does after a key.

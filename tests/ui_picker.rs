@@ -4,6 +4,7 @@
 mod common;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
@@ -13,7 +14,9 @@ use ratatui::layout::Rect;
 
 use common::{Harness, SRC};
 use restoric::app::cmdline::InputKind;
+use restoric::cache::Cache;
 use restoric::index::timeline::{Filter, explain_empty};
+use restoric::index::{Index, Mode};
 use restoric::picker::{Level, Pick, Picker, Step};
 use restoric::repo::fake::FakeRepo;
 use restoric::repo::{Repo, SnapshotInfo};
@@ -196,22 +199,66 @@ fn repos_empty() {
 
 /// The app as `main` builds it after a pick of `host` at `path`.
 fn after_pick(pick: &Pick) -> Harness {
+    after_pick_in(TWO_HOSTS, SRC, pick)
+}
+
+/// As `after_pick`, in history `dsl` with restoric started in `start`.
+fn after_pick_in(dsl: &str, start: &str, pick: &Pick) -> Harness {
     let foreign = !mine().contains(&pick.host);
-    let folder = if Path::new(SRC).starts_with(&pick.path) {
-        SRC.to_string()
-    } else {
-        pick.path.to_string_lossy().into_owned()
-    };
+    let repo = Arc::new(FakeRepo::parse(dsl).unwrap());
+    let snaps = repo.snapshots().unwrap();
+    let index = Index::new(repo, Cache::in_memory(), Mode::Content, 1 << 24);
+    let (folder, select) = pick.open_at(Path::new(start), &snaps, &index);
     let f = Filter {
         hosts: vec![pick.host.clone()],
         tag: None,
     };
-    let mut h = Harness::with_filter(TWO_HOSTS, &folder, f);
+    let mut h = Harness::with_filter(dsl, &folder.to_string_lossy(), f);
     h.app.mine = mine();
     h.app.shown_host = Some(pick.host.clone());
-    h.app.start_dir = PathBuf::from(SRC);
+    h.app.start_dir = PathBuf::from(start);
+    if let Some(name) = select {
+        h.app.select_name(name);
+        h.pump();
+    }
     assert_eq!(h.app.foreign(), foreign);
     h
+}
+
+/// `restic backup` given files, not a folder, as a log backup script does:
+/// each file is a backup path of its own.
+const FILES: &str = "
+host dev-vm
+root /home/bege/dev/trading
+snapshot 2026-10-06 08:04 tags=trading-logs paths=orders.csv,trading.log
+  write orders.csv id,qty\\n
+  write trading.log started\\n
+snapshot 2026-10-08 09:03 tags=trading-logs paths=orders.csv,trading.log
+  append trading.log bought\\n
+";
+
+/// Picking a backup path that is a file opens its folder with the file
+/// selected, not an empty listing of the file.
+#[test]
+fn picking_a_file_opens_its_folder() {
+    let snaps = FakeRepo::parse(FILES).unwrap().snapshots().unwrap();
+    let start = "/home/bege/dev/trading";
+    let mut p = picker(start).with_groups(LOCATION, &snaps, &mine(), None);
+    keys(&mut p, "j");
+    let Step::Picked(pick) = key(&mut p, KeyCode::Enter) else {
+        panic!("no pick");
+    };
+    assert_eq!(
+        pick.path,
+        PathBuf::from("/home/bege/dev/trading/trading.log")
+    );
+    let mut h = after_pick_in(FILES, start, &pick);
+    assert_eq!(h.app.folder, PathBuf::from(start));
+    assert_eq!(
+        h.app.selected().map(|e| e.node.name.clone()),
+        Some("trading.log".into())
+    );
+    insta::assert_snapshot!(h.screen(100, 20));
 }
 
 #[test]

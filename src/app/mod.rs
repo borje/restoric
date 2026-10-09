@@ -1349,6 +1349,7 @@ impl App {
     pub fn select_name(&mut self, name: OsString) {
         self.sel_name = Some(name);
         self.restore_selection();
+        self.ensure();
     }
 
     /// Keeps the same name selected when the listing changes.

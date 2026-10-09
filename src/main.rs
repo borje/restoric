@@ -608,17 +608,16 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
             hosts: vec![pick.host.clone()],
             tag: if foreign { None } else { base.tag },
         };
-        let open_at = if folder.starts_with(&pick.path) {
-            folder.clone()
-        } else {
-            pick.path.clone()
-        };
         let snaps = index.repo().snapshots()?;
+        let (open_at, select) = pick.open_at(&folder, &snaps, &index);
         let mut app = App::new(snaps, f, open_at, tz.clone(), home.clone());
         app.mine = base.hosts;
         app.shown_host = Some(pick.host);
         app.start_dir = folder.clone();
         app.from_picker = true;
+        if let Some(name) = select {
+            app.select_name(name);
+        }
         if !tui(&mut term, index, Arc::new(RealDisk), app, view, config)? {
             return Ok(());
         }
