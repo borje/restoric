@@ -11,6 +11,9 @@ keywords = ["restic", "backup", "restore", "tui", "snapshot"]
 categories = ["command-line-utilities", "filesystem"]
 exclude = ["docs/"]
 
+[package.metadata.deb]
+maintainer = "Borje Granberg <borje.granberg@gmail.com>"
+
 [dependencies]
 anyhow = "1.0.104"
 arboard = "3.6.1"

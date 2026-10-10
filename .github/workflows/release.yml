@@ -39,9 +39,17 @@ jobs:
           mkdir "$name"
           cp target/${{ matrix.target }}/release/restoric README.md LICENSE "$name/"
           tar czf "$name.tar.gz" "$name"
+      # The static musl binary goes in the .deb, so it installs on any
+      # Debian or Ubuntu regardless of glibc version.
+      - if: endsWith(matrix.target, '-musl')
+        run: |
+          cargo install --locked cargo-deb
+          cargo deb --no-build --target ${{ matrix.target }} --output .
       - uses: softprops/action-gh-release@v2
         with:
-          files: restoric-*.tar.gz
+          files: |
+            restoric-*.tar.gz
+            restoric_*.deb
 
   # Trusted publishing: crates.io trusts this workflow, no stored token.
   publish:
