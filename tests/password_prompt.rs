@@ -47,7 +47,7 @@ const COLS: u16 = 30;
 
 fn openpty() -> (OwnedFd, OwnedFd) {
     let (mut master, mut slave) = (0, 0);
-    let mut size = libc::winsize {
+    let size = libc::winsize {
         ws_row: 24,
         ws_col: COLS,
         ws_xpixel: 0,
@@ -59,7 +59,7 @@ fn openpty() -> (OwnedFd, OwnedFd) {
             &mut slave,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-            &mut size,
+            std::ptr::addr_of!(size).cast_mut(), // *const on Linux, *mut on macOS
         )
     };
     assert_eq!(r, 0, "openpty: {}", std::io::Error::last_os_error());
