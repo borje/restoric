@@ -334,3 +334,17 @@ fn labelled_snapshots() {
     h.at("2026-07-02 10:00");
     assert!(h.screen(100, 8).contains("“pre-migration”"));
 }
+
+/// `S` shows what's under each folder, and the folder's total and the
+/// bytes this snapshot added to it in the status bar.
+#[test]
+fn folder_sizes() {
+    let mut h = Harness::with(PHOTOS, "/home/bege/Bilder");
+    h.at("2026-07-02 10:00").keys("S");
+    insta::assert_snapshot!(h.screen(100, 12));
+    // 2026/ holds a (1 B) and b (2 B); the snapshot changed b to "bb" and
+    // e to "ee" and added g: 5 bytes of new or changed files.
+    let id = h.app.set()[h.app.idx()].id;
+    assert_eq!(h.app.added.get(&(id, "/home/bege/Bilder".into())), Some(&5));
+    assert_eq!(h.app.folder_size(), Some(9));
+}

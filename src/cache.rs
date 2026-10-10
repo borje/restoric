@@ -24,16 +24,20 @@ pub enum Table {
     Differs,
     /// (mode, tree a, tree b) → added, changed, deleted counts
     Counts,
+    /// tree → bytes and files under it; (mode, tree a, tree b) → bytes in
+    /// files new or changed in b
+    Sizes,
 }
 
 impl Table {
-    const ALL: [Table; 3] = [Table::PathRef, Table::Differs, Table::Counts];
+    const ALL: [Table; 4] = [Table::PathRef, Table::Differs, Table::Counts, Table::Sizes];
 
     fn def(self) -> TableDefinition<'static, &'static [u8], &'static [u8]> {
         TableDefinition::new(match self {
             Table::PathRef => "path_ref",
             Table::Differs => "differs",
             Table::Counts => "counts",
+            Table::Sizes => "sizes",
         })
     }
 }
@@ -122,7 +126,11 @@ impl Cache {
         }
         let Some(db) = &self.db else { return Ok(None) };
         let r = db.begin_read()?;
-        let t = r.open_table(table.def())?;
+        // A file from before the table was added: nothing in it yet.
+        let t = match r.open_table(table.def()) {
+            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
+            t => t?,
+        };
         Ok(t.get(key)?.map(|v| v.value().to_vec()))
     }
 
@@ -181,6 +189,34 @@ mod tests {
 
         let c = Cache::open(&path, "v2", u64::MAX)?;
         assert_eq!(c.get(Table::Differs, &[1, 2])?, None);
+        Ok(())
+    }
+
+    /// A cache file written before a table existed keeps what it has.
+    #[test]
+    fn a_table_added_later_starts_empty() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("c.redb");
+        let db = Database::create(&path)?;
+        let w = db.begin_write()?;
+        {
+            let mut meta = w.open_table(META)?;
+            meta.insert("schema", SCHEMA)?;
+            meta.insert("backend", "v1")?;
+            w.open_table(Table::Differs.def())?
+                .insert([1u8, 2].as_slice(), [1u8].as_slice())?;
+        }
+        w.commit()?;
+        drop(db);
+
+        let c = Cache::open(&path, "v1", u64::MAX)?;
+        assert_eq!(c.get(Table::Differs, &[1, 2])?, Some(vec![1]));
+        assert_eq!(c.get(Table::Sizes, &[1])?, None);
+        c.put(Table::Sizes, vec![1], vec![2]);
+        c.flush()?;
+        drop(c);
+        let c = Cache::open(&path, "v1", u64::MAX)?;
+        assert_eq!(c.get(Table::Sizes, &[1])?, Some(vec![2]));
         Ok(())
     }
 }

@@ -159,6 +159,16 @@ pub fn draw(app: &App, g: &mut Grid) {
                 ));
             }
         }
+        if app.sizes
+            && let (Some(s), Some(total)) = (set.get(i), app.folder_size())
+        {
+            mid.push((format!("  {}", fmt::size(total)), t.text));
+            if let Some(&a) = app.added.get(&(s.id, app.folder.clone()))
+                && a > 0
+            {
+                mid.push((format!(" +{} new or changed", fmt::size(a)), t.added));
+            }
+        }
         if let Some(axis) = Axis::new(&set, i, app.zoom, cols) {
             let share = axis.share(i);
             if share > 1 {

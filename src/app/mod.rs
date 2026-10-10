@@ -19,13 +19,13 @@ use crate::diff::{self, DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, S
 use crate::index::NodeRef;
 use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
-use crate::index::folder::Counts;
+use crate::index::folder::{Counts, Size};
 use crate::index::listing::{self, Delta, Entry};
 use crate::index::timeline::{ChangeKind, ChangePoint};
 use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
 use crate::index::{Mode, ModeSwitch, Version, fold};
-use crate::repo::{FileBytes, Node, NodeKind, SnapshotId, SnapshotInfo};
+use crate::repo::{FileBytes, Node, NodeKind, SnapshotId, SnapshotInfo, TreeId};
 use crate::restore::{How, Places, Target};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request, Response, Side};
@@ -222,6 +222,8 @@ pub enum Action {
     HideNew,
     /// Hide / show what didn't change (`zc`).
     ChangesOnly,
+    /// Show / hide folder sizes (`S`).
+    Sizes,
     /// Full-screen diff against disk (`d`; `⏎` in the versions view).
     Diff,
     /// Full-screen diff against the previous version (`p` in versions and diff).
@@ -309,6 +311,8 @@ enum Pending {
     /// Asked once per folder; never forgotten.
     Counts(PathBuf),
     Diff(DiffKey),
+    Size(TreeId),
+    Added(SnapshotId, PathBuf),
 }
 
 impl Pending {
@@ -395,6 +399,12 @@ pub struct App {
     pub hide_new: bool,
     /// Hide what didn't change (`zc`).
     pub changes_only: bool,
+    /// Show folder sizes (`S`).
+    pub sizes: bool,
+    /// What's under folder trees, once asked for with `S`.
+    pub tree_sizes: HashMap<TreeId, Size>,
+    /// Bytes in files new or changed in a folder at a snapshot.
+    pub added: HashMap<(SnapshotId, PathBuf), u64>,
     pub preview: PreviewMode,
     /// Preview scroll; `None` until the preview picks its first line.
     pub scroll: Option<usize>,
@@ -500,6 +510,9 @@ impl App {
             ghosts: false,
             hide_new: false,
             changes_only: false,
+            sizes: false,
+            tree_sizes: HashMap::new(),
+            added: HashMap::new(),
             preview: PreviewMode::Content,
             scroll: None,
             scroll_base: Cell::new(0),
@@ -927,6 +940,9 @@ impl App {
         if self.set().is_empty() {
             return;
         }
+        if self.sizes {
+            self.want_sizes();
+        }
         let key = (self.snap, folder.clone());
         if !self.deleted.contains_key(&key) {
             let set = self.set();
@@ -956,6 +972,50 @@ impl App {
             self.scroll_key = key;
             self.scroll = None;
         }
+    }
+
+    /// `S`: the size of every folder in the listing, and what this
+    /// snapshot added to the folder. Snapshots only: disk has no trees.
+    fn want_sizes(&mut self) {
+        let Version::Snapshot(id) = self.snap else {
+            return;
+        };
+        let trees: Vec<TreeId> = match self.listing() {
+            Some(Some(entries)) => entries
+                .iter()
+                .filter(|e| e.is_dir())
+                .filter_map(|e| e.node.subtree)
+                .filter(|t| !self.tree_sizes.contains_key(t))
+                .collect(),
+            _ => return,
+        };
+        for tree in trees {
+            self.request(Pending::Size(tree), Request::Size { tree });
+        }
+        let folder = self.folder.clone();
+        if !self.added.contains_key(&(id, folder.clone())) {
+            let (set, snap) = (self.set(), self.idx());
+            self.request(
+                Pending::Added(id, folder.clone()),
+                Request::Added { set, snap, folder },
+            );
+        }
+    }
+
+    /// The listing's total, once every folder in it has its size: what
+    /// `S` shows for the folder in the status bar.
+    pub fn folder_size(&self) -> Option<u64> {
+        let Some(Some(entries)) = self.listing() else {
+            return None;
+        };
+        let mut total = 0;
+        for e in entries.iter().filter(|e| e.delta != Delta::Deleted) {
+            total += match e.node.subtree.filter(|_| e.is_dir()) {
+                Some(t) => self.tree_sizes.get(&t)?.bytes,
+                None => e.node.size,
+            };
+        }
+        Some(total)
     }
 
     fn ensure_selected(&mut self) {
@@ -1290,6 +1350,14 @@ impl App {
                 self.pending.remove(&Pending::Disk(path.clone()));
                 self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
                 self.disk_files.insert(path, bytes);
+            }
+            Response::Size { tree, size } => {
+                self.pending.remove(&Pending::Size(tree));
+                self.tree_sizes.insert(tree, size);
+            }
+            Response::Added { at, folder, bytes } => {
+                self.pending.remove(&Pending::Added(at, folder.clone()));
+                self.added.insert((at, folder), bytes);
             }
             Response::Nodes { path, nodes } => {
                 for (i, n) in nodes {
@@ -1920,6 +1988,13 @@ impl App {
                 let anchor = self.visual_anchor();
                 self.changes_only = !self.changes_only;
                 self.rows_changed(anchor);
+            }
+            Action::Sizes => {
+                self.sizes = !self.sizes;
+                if self.sizes && self.on_disk() {
+                    self.message = Some("Folder sizes show on snapshots, not on disk.".into());
+                }
+                self.ensure();
             }
             Action::Diff => {
                 let Some(e) = self.selected().cloned().filter(|e| !e.is_dir()) else {

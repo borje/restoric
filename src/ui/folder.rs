@@ -212,6 +212,15 @@ pub fn draw(app: &App, g: &mut Grid) {
             let s = fmt::size(e.node.size);
             let size_style = if e.is_gone() { t.dim } else { t.text };
             g.put(se - fmt::width(&s) as u16, y, &s, size_style);
+        } else if app.sizes
+            && !app.on_disk()
+            && let Some(tree) = e.node.subtree
+        {
+            let s = app
+                .tree_sizes
+                .get(&tree)
+                .map_or("…".to_string(), |s| fmt::size(s.bytes));
+            g.put(se - fmt::width(&s) as u16, y, &s, t.dim);
         }
         match &e.delta {
             Delta::Deleted => {

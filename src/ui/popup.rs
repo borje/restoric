@@ -78,7 +78,7 @@ const HELP: &[(&str, &str)] = &[
     ("␣  v", "select / visual select"),
     ("y  p  P", "yank, restore next to it, overwrite"),
     ("r  d  o", "restore options / full-screen diff / $PAGER"),
-    ("i", "snapshot details: label, description, summary"),
+    ("i   S", "snapshot details / folder sizes"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
     (".  zd   zi zo", "show deleted items / zoom timeline"),

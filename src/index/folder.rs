@@ -106,6 +106,13 @@ fn merge<'a>(a: &'a Tree, b: &'a Tree) -> Vec<(Option<&'a Node>, Option<&'a Node
     out
 }
 
+/// Bytes and files under a folder (links and the like count as files).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Size {
+    pub bytes: u64,
+    pub files: u64,
+}
+
 fn key(mode: Mode, a: Option<TreeId>, b: Option<TreeId>) -> Vec<u8> {
     let mut k = vec![mode.byte()];
     k.extend(a.unwrap_or_default().0.0);
@@ -254,5 +261,70 @@ impl Index {
         }
         self.cache.put(Table::Counts, k, c.encode());
         Ok(c)
+    }
+
+    /// Everything under a folder tree, for `S`. The first time walks every
+    /// subtree; each is cached by its id, so unchanged ones are free after.
+    pub fn tree_size(&self, t: TreeId) -> Result<Size> {
+        let k = t.0.0.to_vec();
+        if let Some(v) = self.cache.get(Table::Sizes, &k)?
+            && let (Some(b), Some(f)) = (v.get(..8), v.get(8..16))
+        {
+            return Ok(Size {
+                bytes: u64::from_le_bytes(b.try_into()?),
+                files: u64::from_le_bytes(f.try_into()?),
+            });
+        }
+        let mut s = Size::default();
+        for n in &self.tree(t)?.nodes {
+            match n.subtree.filter(|_| n.is_dir()) {
+                Some(sub) => {
+                    let c = self.tree_size(sub)?;
+                    s.bytes += c.bytes;
+                    s.files += c.files;
+                }
+                None => {
+                    s.bytes += n.size;
+                    s.files += 1;
+                }
+            }
+        }
+        let v = [s.bytes.to_le_bytes(), s.files.to_le_bytes()].concat();
+        self.cache.put(Table::Sizes, k, v);
+        Ok(s)
+    }
+
+    /// Bytes in the files new or changed in folder tree `b` against `a`
+    /// (`None`: a missing folder). Goes only into subtrees whose ids differ.
+    pub fn added_bytes(&self, a: Option<TreeId>, b: Option<TreeId>) -> Result<u64> {
+        let Some(tb) = b.filter(|_| a != b) else {
+            return Ok(0);
+        };
+        let Some(ta) = a else {
+            return Ok(self.tree_size(tb)?.bytes);
+        };
+        let k = key(self.mode(), a, b);
+        if let Some(v) = self.cache.get(Table::Sizes, &k)?
+            && let Some(n) = v.get(..8)
+        {
+            return Ok(u64::from_le_bytes(n.try_into()?));
+        }
+        let (ta, tb) = (self.tree(ta)?, self.tree(tb)?);
+        let mut n = 0;
+        for y in &tb.nodes {
+            let x = ta.get(&y.name);
+            n += match x {
+                Some(x) if x.is_dir() && y.is_dir() => self.added_bytes(x.subtree, y.subtree)?,
+                _ if y.is_dir() => self.added_bytes(None, y.subtree)?,
+                Some(x)
+                    if !x.is_dir() && !self.refs_differ(&NodeRef::of(x), &NodeRef::of(y))? =>
+                {
+                    0
+                }
+                _ => y.size,
+            };
+        }
+        self.cache.put(Table::Sizes, k, n.to_le_bytes().to_vec());
+        Ok(n)
     }
 }

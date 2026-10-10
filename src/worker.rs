@@ -15,12 +15,12 @@ use crate::diff::{self, DiffKey, FileDiff};
 use crate::disk::Disk;
 use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
-use crate::index::folder::Counts;
+use crate::index::folder::{Counts, Size};
 use crate::index::listing::Entry;
 use crate::index::timeline::ChangePoint;
 use crate::index::versions::Run;
 use crate::index::{Index, NodeRef, Version};
-use crate::repo::{FileBytes, Node, SnapshotInfo};
+use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo, TreeId};
 use crate::restore::{self, Done, How, Places, Target};
 
 /// Most of a file the preview reads.
@@ -88,6 +88,15 @@ pub enum Request {
     ReadFile { node: Node },
     /// The start of a file on disk.
     ReadDisk { path: PathBuf },
+    /// What's under a folder tree (`S`).
+    Size { tree: TreeId },
+    /// Bytes in files new or changed in `folder` at `set[snap]` against
+    /// the snapshot before (`S`).
+    Added {
+        set: Arc<Vec<SnapshotInfo>>,
+        snap: usize,
+        folder: PathBuf,
+    },
     /// The nodes at `path` in some snapshots (the starts of versions).
     Nodes {
         set: Arc<Vec<SnapshotInfo>>,
@@ -220,6 +229,15 @@ pub enum Response {
     Nodes {
         path: PathBuf,
         nodes: Vec<(usize, Option<Node>)>,
+    },
+    Size {
+        tree: TreeId,
+        size: Size,
+    },
+    Added {
+        at: SnapshotId,
+        folder: PathBuf,
+        bytes: u64,
     },
     Diff {
         key: DiffKey,
@@ -366,6 +384,25 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     nodes.push((i, index.node_at(&set[i], &path)?));
                 }
                 send(Response::Nodes { path, nodes });
+            }
+            Request::Size { tree } => {
+                let size = index.tree_size(tree)?;
+                send(Response::Size { tree, size });
+            }
+            Request::Added { set, snap, folder } => {
+                let tree = |i: usize| -> anyhow::Result<Option<TreeId>> {
+                    Ok(match index.node_ref(&set[i], &folder)? {
+                        NodeRef::Dir(t) => Some(t),
+                        _ => None,
+                    })
+                };
+                let prev = snap.checked_sub(1).map(tree).transpose()?.flatten();
+                let bytes = index.added_bytes(prev, tree(snap)?)?;
+                send(Response::Added {
+                    at: set[snap].id,
+                    folder,
+                    bytes,
+                });
             }
             Request::Restore {
                 targets,
