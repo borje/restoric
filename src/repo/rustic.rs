@@ -16,7 +16,8 @@ use rustic_core::{
 use sha2::{Digest, Sha256};
 
 use super::{
-    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Tree, TreeId,
+    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Summary,
+    Tree, TreeId,
 };
 
 /// Names the cache's backend version: a new rustic_core starts a new cache.
@@ -226,6 +227,24 @@ fn snapshot_from(s: SnapshotFile) -> SnapshotInfo {
         paths: s.paths.iter().map(PathBuf::from).collect(),
         tags: s.tags.iter().cloned().collect(),
         tree: TreeId(id_from(&s.tree)),
+        label: s.label,
+        description: s.description,
+        program: s.program_version,
+        parent: s.parent.map(|p| SnapshotId(id_from(&p))),
+        summary: s.summary.map(|m| Summary {
+            files: (m.files_new, m.files_changed, m.files_unmodified),
+            dirs: (m.dirs_new, m.dirs_changed, m.dirs_unmodified),
+            total_files: m.total_files_processed,
+            total_bytes: m.total_bytes_processed,
+            added: m.data_added,
+            added_packed: m.data_added_packed,
+            // restic doesn't record backup_duration; both record start and end.
+            duration: m
+                .backup_end
+                .timestamp()
+                .duration_since(m.backup_start.timestamp()),
+            command: m.command,
+        }),
     }
 }
 

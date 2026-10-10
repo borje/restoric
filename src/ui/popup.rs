@@ -1,4 +1,4 @@
-//! Popups: which-key, messages, help.
+//! Popups: which-key, messages, help, snapshot details.
 
 use super::{Grid, TOP, fmt};
 use crate::app::selection::Confirm;
@@ -77,6 +77,7 @@ const HELP: &[(&str, &str)] = &[
     ("␣  v", "select / visual select"),
     ("y  p  P", "yank, restore next to it, overwrite"),
     ("r  d  o", "restore options / full-screen diff / $PAGER"),
+    ("i", "snapshot details: label, description, summary"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
     (".  zd   zi zo", "show deleted items / zoom timeline"),
@@ -126,6 +127,104 @@ pub fn help(app: &App, g: &mut Grid) {
             t.text,
             end,
         );
+    }
+    g.put_to(x + 3, y + h - 2, "Press any key to close", t.dim, end);
+}
+
+/// `3m 07s`, `1h 02m`.
+fn took(d: jiff::SignedDuration) -> String {
+    let s = d.as_secs().max(0);
+    match s {
+        ..60 => format!("{s}s"),
+        60..3600 => format!("{}m {:02}s", s / 60, s % 60),
+        _ => format!("{}h {:02}m", s / 3600, s % 3600 / 60),
+    }
+}
+
+/// `i`: everything the repository says about a snapshot.
+pub fn info(app: &App, g: &mut Grid) {
+    let Some(s) = &app.info else { return };
+    let t = g.theme.clone();
+    let w = 84.min(g.cols().saturating_sub(4));
+    let vw = w.saturating_sub(20) as usize;
+    let mut rows: Vec<(&str, String)> = vec![
+        ("snapshot", s.id.to_string()),
+        (
+            "time",
+            s.time
+                .to_zoned(app.tz.clone())
+                .strftime("%Y-%m-%d %H:%M:%S %Z")
+                .to_string(),
+        ),
+        ("host", s.host.clone()),
+    ];
+    for (k, p) in s.paths.iter().enumerate() {
+        let label = if k == 0 { "paths" } else { "" };
+        rows.push((label, fmt::path(p, app.home.as_deref())));
+    }
+    if !s.tags.is_empty() {
+        rows.push(("tags", s.tags.join(", ")));
+    }
+    if !s.label.is_empty() {
+        rows.push(("label", s.label.clone()));
+    }
+    if let Some(d) = &s.description {
+        let lines = d.lines().flat_map(|l| fmt::wrap(l, vw));
+        for (k, l) in lines.enumerate() {
+            rows.push((if k == 0 { "description" } else { "" }, l));
+        }
+    }
+    if !s.program.is_empty() {
+        rows.push(("made by", s.program.clone()));
+    }
+    if let Some(p) = s.parent {
+        let when = app
+            .snapshot(p)
+            .map(|p| format!("  {}", fmt::time(p.time, &app.tz)))
+            .unwrap_or_default();
+        rows.push(("parent", format!("{}{when}", p.0.short())));
+    }
+    rows.push(("", String::new()));
+    match &s.summary {
+        Some(m) => {
+            let (n, c, u) = m.files;
+            rows.push(("files", format!("{n} new · {c} changed · {u} unchanged")));
+            if m.dirs != (0, 0, 0) {
+                let (n, c, u) = m.dirs;
+                rows.push(("folders", format!("{n} new · {c} changed · {u} unchanged")));
+            }
+            let mut added = fmt::size(m.added);
+            if m.added_packed != m.added {
+                added.push_str(&format!(", {} stored", fmt::size(m.added_packed)));
+            }
+            rows.push(("added", added));
+            let read = format!("{} files, {}", m.total_files, fmt::size(m.total_bytes));
+            rows.push(("read", read));
+            if !m.duration.is_zero() {
+                rows.push(("took", took(m.duration)));
+            }
+            if !m.command.is_empty() {
+                rows.push(("command", m.command.clone()));
+            }
+        }
+        None => rows.push((
+            "",
+            "No summary: restic before 0.17 didn't record one.".into(),
+        )),
+    }
+    let h = (rows.len() as u16 + 5).min(g.rows());
+    let x = (g.cols() - w) / 2;
+    let y = (g.rows() - h) / 2;
+    g.rbox(x, y, w, h, "Snapshot", t.bold);
+    let end = x + w - 1;
+    for (n, (k, v)) in rows.iter().enumerate() {
+        let r = y + 2 + n as u16;
+        if r >= y + h - 2 {
+            break;
+        }
+        g.put_to(x + 3, r, k, t.dim, end);
+        let style = if *k == "snapshot" { t.accent } else { t.text };
+        g.put_to(x + 17, r, &fmt::fit(v, vw), style, end);
     }
     g.put_to(x + 3, y + h - 2, "Press any key to close", t.dim, end);
 }

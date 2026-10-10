@@ -9,6 +9,8 @@
 //!
 //! snapshot 2026-07-24 12:16        # optional: host=NAME tags=a,b root=/other/path
 //!                                  #   paths=a.log,b.csv: back up these, not the root
+//!                                  #   label=NAME
+//!   describe Before the migration  # the snapshot's description
 //!   write src/main.go package main\nfunc main() {}\n
 //!   append src/main.go // more\n
 //!   touch src/util.go              # new mtime, same content
@@ -40,7 +42,8 @@ use jiff::tz::TimeZone;
 use sha2::{Digest, Sha256};
 
 use super::{
-    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Tree, TreeId,
+    BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Summary,
+    Tree, TreeId,
 };
 
 #[derive(Clone)]
@@ -58,6 +61,8 @@ enum Entry {
 
 pub struct FakeRepo {
     snapshots: Vec<SnapshotInfo>,
+    /// The last snapshot's files, for the next one's summary.
+    last: BTreeMap<PathBuf, (Id, u64)>,
     trees: HashMap<TreeId, Arc<Tree>>,
     blobs: HashMap<BlobId, Vec<u8>>,
     disk: FakeDisk,
@@ -127,6 +132,38 @@ struct Described {
     root: PathBuf,
     /// The backup paths, relative to `root`; empty for `root` itself.
     paths: Vec<PathBuf>,
+    label: String,
+    description: Option<String>,
+}
+
+/// Every file and link under `entries` by path: what makes it change, and its size.
+fn flat(entries: &BTreeMap<OsString, Entry>, at: &Path, out: &mut BTreeMap<PathBuf, (Id, u64)>) {
+    for (name, e) in entries {
+        let p = at.join(name);
+        let key = match e {
+            Entry::Dir(d) => {
+                flat(d, &p, out);
+                continue;
+            }
+            Entry::File {
+                data,
+                mode,
+                uid,
+                gid,
+                ..
+            } => (
+                hash(&[
+                    data,
+                    &mode.to_le_bytes(),
+                    &uid.to_le_bytes(),
+                    &gid.to_le_bytes(),
+                ]),
+                data.len() as u64,
+            ),
+            Entry::Link(t) => (hash(&[t.as_encoded_bytes()]), 0),
+        };
+        out.insert(p, key);
+    }
 }
 
 /// The folder at `path`, created if missing.
@@ -159,6 +196,7 @@ impl FakeRepo {
     pub fn parse(text: &str) -> Result<Self> {
         let mut repo = FakeRepo {
             snapshots: Vec::new(),
+            last: BTreeMap::new(),
             trees: HashMap::new(),
             blobs: HashMap::new(),
             disk: FakeDisk {
@@ -220,6 +258,8 @@ impl FakeRepo {
                         tags: Vec::new(),
                         root: root.clone(),
                         paths: Vec::new(),
+                        label: String::new(),
+                        description: None,
                     };
                     for w in words {
                         match w.split_once('=') {
@@ -231,10 +271,14 @@ impl FakeRepo {
                             Some(("paths", p)) => {
                                 snap.paths = p.split(',').map(PathBuf::from).collect()
                             }
+                            Some(("label", l)) => snap.label = l.to_string(),
                             _ => bail!("{}: unknown option {w}", err()),
                         }
                     }
                     current = Some(snap);
+                }
+                "describe" => {
+                    current.as_mut().with_context(err)?.description = Some(rest.trim().into());
                 }
                 "write" | "append" => {
                     let (path, text) = rest.split_once(' ').unwrap_or((rest, ""));
@@ -382,8 +426,31 @@ impl FakeRepo {
             tags,
             root,
             paths,
+            label,
+            description,
         }: Described,
     ) -> Result<()> {
+        // What restic would have counted: files against the last snapshot.
+        let mut now = BTreeMap::new();
+        flat(files, Path::new(""), &mut now);
+        let mut s = Summary {
+            total_files: now.len() as u64,
+            total_bytes: now.values().map(|v| v.1).sum(),
+            ..Summary::default()
+        };
+        for (p, (id, size)) in &now {
+            match self.last.get(p) {
+                None => s.files.0 += 1,
+                Some((old, _)) if old != id => s.files.1 += 1,
+                Some(_) => {
+                    s.files.2 += 1;
+                    continue;
+                }
+            }
+            s.added += size;
+        }
+        s.added_packed = s.added;
+        self.last = now;
         // Nest the files under the root path, as restic does.
         let mut whole = Entry::Dir(files.clone());
         for p in parts(root.to_str().context("root must be UTF-8")?)
@@ -412,6 +479,11 @@ impl FakeRepo {
             },
             tags,
             tree,
+            label,
+            description,
+            program: "restic 0.17.3".into(),
+            parent: self.snapshots.last().map(|s| s.id),
+            summary: Some(s),
         });
         Ok(())
     }

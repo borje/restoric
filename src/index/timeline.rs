@@ -155,6 +155,7 @@ mod tests {
             paths: paths.iter().map(PathBuf::from).collect(),
             tags: vec![],
             tree: TreeId::default(),
+            ..Default::default()
         }
     }
 

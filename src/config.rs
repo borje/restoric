@@ -283,6 +283,7 @@ const ACTIONS: &[(&str, Action)] = &[
     ("zoom_in", Action::ZoomIn),
     ("zoom_out", Action::ZoomOut),
     ("help", Action::Help),
+    ("info", Action::Info),
     ("back", Action::Leave),
     ("quit", Action::Quit),
 ];

@@ -73,7 +73,7 @@ typed_id!(SnapshotId);
 typed_id!(TreeId);
 typed_id!(BlobId);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SnapshotInfo {
     pub id: SnapshotId,
     pub time: Timestamp,
@@ -81,6 +81,31 @@ pub struct SnapshotInfo {
     pub paths: Vec<PathBuf>,
     pub tags: Vec<String>,
     pub tree: TreeId,
+    /// rustic's `--label`; empty when unset.
+    pub label: String,
+    pub description: Option<String>,
+    /// What made it: "restic 0.17.3", "rustic v0.9.5".
+    pub program: String,
+    pub parent: Option<SnapshotId>,
+    pub summary: Option<Summary>,
+}
+
+/// What the backup recorded about its run (restic 0.17 and later, rustic).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Summary {
+    /// Files new, changed and unchanged since the parent snapshot.
+    pub files: (u64, u64, u64),
+    /// Folders new, changed and unchanged.
+    pub dirs: (u64, u64, u64),
+    /// What the backup read.
+    pub total_files: u64,
+    pub total_bytes: u64,
+    /// Bytes it added to the repository, before and after compression.
+    pub added: u64,
+    pub added_packed: u64,
+    pub duration: jiff::SignedDuration,
+    /// The command line; rustic records it, restic doesn't.
+    pub command: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

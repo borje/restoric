@@ -186,6 +186,7 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
     popup::confirm(app, &mut g);
     popup::message(app, &mut g);
     popup::help(app, &mut g);
+    popup::info(app, &mut g);
     g.hits
 }
 

@@ -256,6 +256,7 @@ mod tests {
                 vec![tag.into()]
             },
             tree: TreeId::default(),
+            ..Default::default()
         }
     }
 

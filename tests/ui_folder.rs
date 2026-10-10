@@ -264,3 +264,35 @@ fn snapshot_listing_kind_change() {
         .collect();
     assert_eq!(utils, vec![(true, false), (false, true)]);
 }
+
+const LABELLED: &str = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write a.txt one\\n
+  write b.txt two\\n
+snapshot 2026-07-02 10:00 label=pre-migration tags=manual
+  describe Before moving the catalog to the new disk
+  write a.txt one more\\n
+  write c.txt three\\n
+";
+
+/// `i` shows the snapshot's details; any key closes them. On disk has none.
+#[test]
+fn snapshot_info() {
+    let mut h = Harness::with(LABELLED, "/home/bege/data");
+    h.at("2026-07-02 10:00").keys("i");
+    insta::assert_snapshot!(h.screen(100, 30));
+    h.keys("j");
+    assert!(h.app.info.is_none());
+    h.keys("Li");
+    assert!(h.app.info.is_none());
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("The files on disk aren't a snapshot.")
+    );
+    // In the versions view, the selected version's snapshot.
+    h.keys("H").select("a.txt").keys("lji");
+    let info = h.app.info.as_ref().expect("details");
+    assert!(info.label.is_empty() && info.parent.is_none());
+}

@@ -122,6 +122,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('c') => Prefix('c'),
         KeyCode::Char(':') => CommandLine,
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
+        KeyCode::Char('i') => Info,
         KeyCode::Char('q') => Leave,
         _ => return None,
     })
@@ -153,9 +154,10 @@ impl App {
         if k.kind == KeyEventKind::Release {
             return;
         }
-        // Help and messages close on any key.
-        if self.help {
+        // Help, details and messages close on any key.
+        if self.help || self.info.is_some() {
             self.help = false;
+            self.info = None;
             return;
         }
         self.message = None;
@@ -240,8 +242,9 @@ impl App {
         };
         match m.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if self.help {
+                if self.help || self.info.is_some() {
                     self.help = false;
+                    self.info = None;
                     return;
                 }
                 self.message = None;

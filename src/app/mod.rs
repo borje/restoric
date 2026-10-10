@@ -257,6 +257,8 @@ pub enum Action {
     ConfirmYes,
     ConfirmNo,
     Help,
+    /// `i`: details of the snapshot on screen.
+    Info,
     Prefix(char),
     /// `q`: back one level; from the folder view, to the picker or out.
     Leave,
@@ -403,6 +405,8 @@ pub struct App {
     /// A prefix key waiting for the next key (`g`, `z`).
     pub prefix: Option<char>,
     pub help: bool,
+    /// `i`: the snapshot shown in the details popup.
+    pub info: Option<SnapshotInfo>,
     pub message: Option<String>,
     pub zoom: u32,
     /// Set once the user moves in time, so the start-up jump doesn't override it.
@@ -500,6 +504,7 @@ impl App {
             count: String::new(),
             prefix: None,
             help: false,
+            info: None,
             message: None,
             zoom: 1,
             moved: false,
@@ -687,6 +692,28 @@ impl App {
             // On disk, the newest snapshot: what the entry is compared with.
             _ => i.min(self.newest().unwrap_or(0)),
         }
+    }
+
+    /// Any snapshot in the repository, by id.
+    pub fn snapshot(&self, id: SnapshotId) -> Option<&SnapshotInfo> {
+        self.everything.iter().find(|s| s.id == id)
+    }
+
+    /// `i`: the snapshot on screen, or the selected version's, in a popup.
+    fn show_info(&mut self) -> bool {
+        let snap = match &self.view {
+            View::Folder if !self.on_disk() => self.set().get(self.idx()).cloned(),
+            View::Versions(v) if !v.disk => self
+                .version_node(v)
+                .and_then(|(r, _)| self.tracks.get(&v.path)?.set.get(r.from).cloned()),
+            View::Folder | View::Versions(_) => {
+                self.message = Some("The files on disk aren't a snapshot.".into());
+                return false;
+            }
+            _ => None,
+        };
+        self.info = snap;
+        self.info.is_some()
     }
 
     /// The file node shown in the preview of the versions view.
@@ -1589,6 +1616,7 @@ impl App {
             Action::PasteOver => return self.paste(true),
             Action::RestoreDialog => return self.open_dialog(),
             Action::Pager => return self.pager(),
+            Action::Info => return self.show_info(),
             Action::Copy(c) => return self.copy(c),
             Action::CommandLine => {
                 self.start_input(InputKind::Command, "");
@@ -1913,6 +1941,7 @@ impl App {
             | Action::RestoreDialog
             | Action::Pager
             | Action::Copy(_)
+            | Action::Info
             | Action::CommandLine
             | Action::DialogOption(_)
             | Action::DialogRestore
