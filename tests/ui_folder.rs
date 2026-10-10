@@ -323,3 +323,14 @@ fn changes_only() {
     assert!(!h.app.changes_only);
     assert_eq!(h.app.rows().len(), 6);
 }
+
+/// A snapshot with a label or description gets a ▵ under its dot, and
+/// its label in the status bar when it's the one shown.
+#[test]
+fn labelled_snapshots() {
+    let mut h = Harness::with(LABELLED, "/home/bege/data");
+    h.at("2026-07-01 10:00");
+    insta::assert_snapshot!(h.screen(100, 8));
+    h.at("2026-07-02 10:00");
+    assert!(h.screen(100, 8).contains("“pre-migration”"));
+}

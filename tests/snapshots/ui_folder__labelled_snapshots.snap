@@ -1,0 +1,12 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 8)"
+---
+ restoric  ~/data
+  Jul 2026                                                                     on disk
+  ●                                                                        ●  ┊ · a.txt  ○ data/
+  ▲                                                                        ▵               − 1× +
+
+ Jul 02 10:00 +1~1    │ ≡ a.txt                         4 B  + │ a.txt · v1/2 · 4 B      ⇥ content
+▶Jul 01 10:00 +2      │ ≡ b.txt                         4 B  + │ new in this snapshot
+ NOR  Jul 01 10:00  a4e1ae87  data/ +2                                    Jul 01 10:00  1/2  ? help

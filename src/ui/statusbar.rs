@@ -136,6 +136,15 @@ pub fn draw(app: &App, g: &mut Grid) {
             mid.push(("  ".into(), t.text));
             mid.push((s.id.0.short(), t.accent));
             mid.push(("  ".into(), t.text));
+            let about = match &s.description {
+                _ if !s.label.is_empty() => Some(s.label.as_str()),
+                Some(d) => d.lines().next(),
+                None => None,
+            };
+            if let Some(a) = about {
+                mid.push((format!("“{a}”"), t.accent));
+                mid.push(("  ".into(), t.text));
+            }
         }
         if let Some(state) = app.state().filter(|s| s.loaded()) {
             if state.versions().contains(&i) {

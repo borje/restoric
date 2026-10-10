@@ -288,6 +288,16 @@ pub fn draw(
     }
 
     let cr = rr + 1;
+    // ▵ under snapshots with a label or description; `i` shows them.
+    for (&c, list) in &columns {
+        let s = |i: usize| &axis.set[i];
+        if list
+            .iter()
+            .any(|&i| !s(i).label.is_empty() || s(i).description.is_some())
+        {
+            g.put(c, cr, "▵", t.dim);
+        }
+    }
     let caret = sel.map_or(x0 + tw + 4, |s| axis.col_of(s));
     g.put(caret, cr, "▲", t.accent);
     let zc = cols.saturating_sub(9);
