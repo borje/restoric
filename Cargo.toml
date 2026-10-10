@@ -5,7 +5,11 @@ edition = "2024"
 rust-version = "1.91"
 description = "Browse and restore a restic repository by time, anchored on a folder"
 license = "AGPL-3.0-or-later"
-exclude = ["docs/index.html", "spike/"]
+repository = "https://github.com/borje/restoric"
+homepage = "https://borje.github.io/restoric/"
+keywords = ["restic", "backup", "restore", "tui", "snapshot"]
+categories = ["command-line-utilities", "filesystem"]
+exclude = ["docs/"]
 
 [dependencies]
 anyhow = "1.0.104"
