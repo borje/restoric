@@ -90,6 +90,7 @@ const HELP: &[(&str, &str)] = &[
     (":sep 1  :2026-09-01", "jump to a date (:yesterday :3d :2w)"),
     (":find NAME   s", "search every snapshot for a name"),
     (":latest :oldest :undo", ""),
+    (":set strict / bytes", "count every change / only content"),
     ("", ""),
     ("Diff", ""),
 ];

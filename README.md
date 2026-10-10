@@ -7,7 +7,7 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 ![restoric browsing a folder's history, diffing a version and restoring it](docs/demo.gif)
 
 - The row of dots marks the snapshots where the selected file changed (`●`) and where only its folder did (`○`).
-- A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored).
+- A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored; `--bytes-only` only the content, for drives whose permissions or owner change wholesale, like a macOS external drive set to ignore ownership).
 - Only this machine's snapshots are shown, picked by hostname as `restic snapshots --host` does. `--browse` (or a folder that isn't in your backups) opens a picker of the other hosts and backup paths in the repository, for a renamed machine or a server's backups.
 - Restoring works like copy and paste: `y` yanks, `p` puts the old version next to the original, `P` overwrites it after asking. `:undo` puts back what was overwritten.
 - restoric never writes to the repository, and needs no FUSE or mount.
@@ -48,6 +48,7 @@ Every backend rustic supports works: local, sftp, REST, rclone, S3, B2, Azure an
 | `--insecure-no-password` | A repository made with `restic init --insecure-no-password` |
 | `--host NAME`, `--tag TAG` | Whose snapshots to show (default: this machine's hostname) |
 | `--strict` | Count any metadata change |
+| `--bytes-only` | Count only content changes, not permissions or owner |
 | `--select NAME`, `--at DATE` | Start with NAME selected, or at a date (`sep 1`, `2026-09-01`, `3d`) |
 | `--browse` | Start in the repository picker: other hosts and backup paths (restores from another host ask for a directory) |
 | `restoric log PATH [--json]` | Print when PATH changed, with counts |
@@ -81,6 +82,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `:sep 1` `:yesterday` `:3d` | Jump to a date |
 | `zi` `zo` | Zoom the timeline |
 | `:undo` | Undo the last overwrite |
+| `:set strict` `:set bytes` | Count every change / only content (`:set nostrict`, `:set nobytes` go back) |
 | `q` | Back one level: from the folder view, to the picker if restoric started there, else quit (`Ctrl-c` and `:q` always quit) |
 
 The mouse works too: click dots, rows, the breadcrumb and the arrows.

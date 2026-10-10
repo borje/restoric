@@ -125,12 +125,22 @@ impl Index {
     pub fn refs_differ(&self, a: &NodeRef, b: &NodeRef) -> Result<bool> {
         Ok(match (a, b) {
             (NodeRef::Dir(x), NodeRef::Dir(y)) => self.trees_differ(*x, *y)?,
-            (NodeRef::Leaf { fp: f1, raw: r1 }, NodeRef::Leaf { fp: f2, raw: r2 }) => {
-                match self.mode() {
-                    Mode::Content => f1 != f2,
-                    Mode::Strict => r1 != r2,
-                }
-            }
+            (
+                NodeRef::Leaf {
+                    fp: f1,
+                    bytes: b1,
+                    raw: r1,
+                },
+                NodeRef::Leaf {
+                    fp: f2,
+                    bytes: b2,
+                    raw: r2,
+                },
+            ) => match self.mode() {
+                Mode::Content => f1 != f2,
+                Mode::Strict => r1 != r2,
+                Mode::Bytes => b1 != b2,
+            },
             (x, y) => x != y,
         })
     }

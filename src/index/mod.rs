@@ -39,6 +39,8 @@ pub enum Mode {
     Content,
     /// Any difference restic stored (`--strict`).
     Strict,
+    /// Only what's in files and where links point (`--bytes-only`).
+    Bytes,
 }
 
 impl Mode {
@@ -46,6 +48,7 @@ impl Mode {
         match self {
             Mode::Content => 0,
             Mode::Strict => 1,
+            Mode::Bytes => 2,
         }
     }
 }
@@ -65,7 +68,13 @@ impl ModeSwitch {
 pub enum NodeRef {
     Missing,
     Dir(TreeId),
-    Leaf { fp: Fp, raw: Id },
+    /// `fp` and `bytes` from [`fingerprint::leaf`] and
+    /// [`fingerprint::bytes`], `raw` from the node.
+    Leaf {
+        fp: Fp,
+        bytes: Fp,
+        raw: Id,
+    },
 }
 
 impl NodeRef {
@@ -74,6 +83,7 @@ impl NodeRef {
             Some(t) if node.is_dir() => NodeRef::Dir(t),
             _ => NodeRef::Leaf {
                 fp: fingerprint::leaf(node),
+                bytes: fingerprint::bytes(node),
                 raw: node.raw,
             },
         }
@@ -87,7 +97,7 @@ impl NodeRef {
         match self {
             NodeRef::Missing => vec![0],
             NodeRef::Dir(t) => [&[1u8][..], &t.0.0].concat(),
-            NodeRef::Leaf { fp, raw } => [&[2u8][..], fp, &raw.0].concat(),
+            NodeRef::Leaf { fp, bytes, raw } => [&[2u8][..], fp, bytes, &raw.0].concat(),
         }
     }
 
@@ -96,9 +106,11 @@ impl NodeRef {
         match b.first()? {
             0 => Some(NodeRef::Missing),
             1 => Some(NodeRef::Dir(TreeId(Id(id(b.get(1..33)?)?)))),
+            // Entries from before `bytes` are 65 bytes: computed again.
             2 => Some(NodeRef::Leaf {
                 fp: id(b.get(1..33)?)?,
-                raw: Id(id(b.get(33..65)?)?),
+                bytes: id(b.get(33..65)?)?,
+                raw: Id(id(b.get(65..97)?)?),
             }),
             _ => None,
         }
@@ -152,6 +164,7 @@ impl Index {
     pub fn mode(&self) -> Mode {
         match self.mode.load(Ordering::Relaxed) {
             1 => Mode::Strict,
+            2 => Mode::Bytes,
             _ => Mode::Content,
         }
     }

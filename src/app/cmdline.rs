@@ -159,7 +159,8 @@ impl App {
                 self.set_filter(f);
             }
             ("set", "strict") => self.set_mode(Mode::Strict),
-            ("set", "nostrict") => self.set_mode(Mode::Content),
+            ("set", "bytes") => self.set_mode(Mode::Bytes),
+            ("set", "nostrict" | "nobytes") => self.set_mode(Mode::Content),
             _ => match parse_day(&lower, self.today()) {
                 Some(day) => self.go_day(day),
                 None => {

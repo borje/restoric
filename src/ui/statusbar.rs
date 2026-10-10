@@ -7,6 +7,7 @@ use super::timeline::Axis;
 use super::{Grid, fmt};
 use crate::app::cmdline::InputKind;
 use crate::app::{Action, App, Restoring, View};
+use crate::index::Mode;
 use crate::index::folder::Counts;
 use crate::repo::RestoreStep;
 
@@ -197,8 +198,10 @@ pub fn draw(app: &App, g: &mut Grid) {
     if !app.name_filter.is_empty() {
         mid.push((format!("  filter \"{}\"", app.name_filter), t.accent));
     }
-    if app.strict {
-        mid.push(("  strict".to_string(), t.dim));
+    match app.mode {
+        Mode::Strict => mid.push(("  strict".to_string(), t.dim)),
+        Mode::Bytes => mid.push(("  bytes only".to_string(), t.dim)),
+        Mode::Content => {}
     }
     if let Some(y) = &app.yanked {
         mid.push((format!("  {} yanked", y.len()), t.accent));

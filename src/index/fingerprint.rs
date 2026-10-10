@@ -15,6 +15,16 @@ use crate::repo::{Node, NodeKind};
 pub type Fp = [u8; 32];
 
 pub fn leaf(node: &Node) -> Fp {
+    of(node, true)
+}
+
+/// As [`leaf`] without mode, owner and group: only what's in the file, or
+/// where the link points (`--bytes-only`).
+pub fn bytes(node: &Node) -> Fp {
+    of(node, false)
+}
+
+fn of(node: &Node, meta: bool) -> Fp {
     let mut h = Sha256::new();
     match &node.kind {
         NodeKind::Symlink { target } => {
@@ -29,9 +39,11 @@ pub fn leaf(node: &Node) -> Fp {
             }
             h.update([0]);
             h.update(node.size.to_le_bytes());
-            h.update(node.mode.unwrap_or(0).to_le_bytes());
-            h.update(node.uid.unwrap_or(0).to_le_bytes());
-            h.update(node.gid.unwrap_or(0).to_le_bytes());
+            if meta {
+                h.update(node.mode.unwrap_or(0).to_le_bytes());
+                h.update(node.uid.unwrap_or(0).to_le_bytes());
+                h.update(node.gid.unwrap_or(0).to_le_bytes());
+            }
             for c in &node.content {
                 h.update(c.0.0);
             }
@@ -90,5 +102,22 @@ mod tests {
         let mut b = file();
         b.gid = Some(0);
         assert_ne!(base, leaf(&b));
+    }
+
+    #[test]
+    fn bytes_ignores_mode_and_owner() {
+        let base = bytes(&file());
+        let mut b = file();
+        b.mode = Some(0o600);
+        b.uid = Some(99);
+        b.gid = Some(99);
+        assert_eq!(base, bytes(&b));
+        b.content = vec![BlobId(Id([8; 32]))];
+        assert_ne!(base, bytes(&b));
+        let link = |t: &str| Node {
+            kind: NodeKind::Symlink { target: t.into() },
+            ..file()
+        };
+        assert_ne!(bytes(&link("a")), bytes(&link("b")));
     }
 }

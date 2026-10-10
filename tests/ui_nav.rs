@@ -211,3 +211,32 @@ fn decomposed_names() {
     h.keys("sh\u{e4}lsa").key(KeyCode::Enter);
     assert!(h.screen(100, 12).contains("ha\u{308}lsa.pdf"));
 }
+
+/// `:set bytes` counts only content: a version that changed only the mode
+/// and owner folds into the one before, and a chmod on disk isn't a
+/// change. `:set nobytes` counts them again.
+#[test]
+fn bytes_only() {
+    let dsl = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write run.sh echo hi\\n
+snapshot 2026-07-02 10:00
+  chmod run.sh 755
+  chown run.sh 0:0
+snapshot 2026-07-03 10:00
+  write run.sh echo bye\\n
+disk
+  chmod run.sh 700
+";
+    let mut h = Harness::with(dsl, "/home/bege/data");
+    let versions = |h: &Harness| h.app.state().unwrap().versions().len();
+    let on_disk = |h: &Harness| h.app.live.get(&h.app.folder).map(|c| c.changed);
+    assert_eq!((versions(&h), on_disk(&h)), (3, Some(1)));
+    command(&mut h, "set bytes");
+    assert_eq!((versions(&h), on_disk(&h)), (2, Some(0)));
+    assert!(h.screen(100, 10).contains("bytes only"));
+    command(&mut h, "set nobytes");
+    assert_eq!((versions(&h), on_disk(&h)), (3, Some(1)));
+}

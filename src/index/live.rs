@@ -10,7 +10,7 @@ use anyhow::Result;
 
 use super::folder::Counts;
 use super::listing::{self, Delta, Entry};
-use super::{Index, NodeRef};
+use super::{Index, Mode, NodeRef};
 use crate::disk::{Disk, DiskEntry, DiskKind};
 use crate::repo::{Id, Node, NodeKind, SnapshotInfo, Tree, TreeId};
 
@@ -41,7 +41,7 @@ impl Index {
             },
             (NodeRef::Leaf { .. }, Some(d)) => {
                 let node = self.node_at(snap, path)?;
-                let changed = node.is_none_or(|n| d.differs_from(&n));
+                let changed = node.is_none_or(|n| d.differs_from(&n, self.mode() != Mode::Bytes));
                 Counts {
                     changed: u64::from(changed),
                     ..Counts::default()
@@ -113,7 +113,7 @@ impl Index {
                     total.added += 1;
                     Delta::Added
                 }
-                (Some(b), false) if d.differs_from(b) => {
+                (Some(b), false) if d.differs_from(b, self.mode() != Mode::Bytes) => {
                     total.changed += 1;
                     Delta::Changed
                 }
@@ -176,7 +176,9 @@ impl Index {
                 None => c.added += disk_items(disk, &child),
                 Some(n) => match (n.is_dir(), d.kind == DiskKind::Dir, n.subtree) {
                     (true, true, Some(t)) => c += self.live_tree(disk, t, &child)?,
-                    (false, false, _) => c.changed += u64::from(d.differs_from(n)),
+                    (false, false, _) => {
+                        c.changed += u64::from(d.differs_from(n, self.mode() != Mode::Bytes))
+                    }
                     _ => {
                         c.deleted += self.node_items(n)?;
                         c.added += disk_items(disk, &child);

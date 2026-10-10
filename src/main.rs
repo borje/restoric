@@ -87,6 +87,9 @@ struct ViewArgs {
     /// Count any metadata change, not only content, mode and owner
     #[arg(long, global = true)]
     strict: bool,
+    /// Count only content changes, not mode or owner
+    #[arg(long, global = true, conflicts_with = "strict")]
+    bytes_only: bool,
     /// Plain icons instead of Nerd Font glyphs
     #[arg(long, global = true)]
     no_icons: bool,
@@ -336,10 +339,10 @@ fn index_for(repo: RusticRepo, view: &ViewArgs, config: &Config) -> Index {
         }),
         None => Cache::in_memory(),
     };
-    let mode = if view.strict {
-        Mode::Strict
-    } else {
-        Mode::Content
+    let mode = match (view.strict, view.bytes_only) {
+        (true, _) => Mode::Strict,
+        (_, true) => Mode::Bytes,
+        _ => Mode::Content,
     };
     Index::new(Arc::new(repo), cache, mode, config.memory_cache())
 }
@@ -373,7 +376,7 @@ fn tui(
 ) -> Result<bool> {
     let mut app = app;
     app.mode_switch = Some(index.mode_switch());
-    app.strict = index.mode() == Mode::Strict;
+    app.mode = index.mode();
     app.icons = !view.no_icons && config.icons.unwrap_or(true);
     app.diff_limit = config.diff_limit();
     app.keymap = config.keymap()?;

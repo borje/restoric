@@ -360,9 +360,10 @@ pub struct App {
     pub(crate) pending_targets: Option<Vec<Target>>,
     /// The snapshots that pass the filter.
     all: Vec<SnapshotInfo>,
-    /// Switches the worker's change detection (`:set strict`).
+    /// Switches the worker's change detection (`:set strict`, `:set bytes`).
     pub mode_switch: Option<ModeSwitch>,
-    pub strict: bool,
+    /// What counts as a change.
+    pub mode: Mode,
     /// "Today", for `:yesterday`; the clock when `None` (tests set it).
     pub now: Option<jiff::Timestamp>,
     /// `/`: matches are highlighted, `n` `N` step through them.
@@ -497,7 +498,7 @@ impl App {
             pending_targets: None,
             all,
             mode_switch: None,
-            strict: false,
+            mode: Mode::Content,
             now: None,
             search: String::new(),
             name_filter: String::new(),
@@ -2534,23 +2535,24 @@ impl App {
         self.tracks.clear();
         self.listings.clear();
         self.deleted.clear();
+        self.live.clear();
         self.nodes.clear();
         self.pending.clear();
     }
 
-    /// `:set strict` / `:set nostrict`.
+    /// `:set strict` / `:set bytes` / `:set nostrict` / `:set nobytes`.
     fn set_mode(&mut self, mode: Mode) {
-        self.strict = mode == Mode::Strict;
+        self.mode = mode;
         if let Some(m) = &self.mode_switch {
             m.set(mode);
         }
         self.forget_history();
         self.moved_on();
         self.message = Some(
-            if self.strict {
-                "Counting every change restic stored (strict)."
-            } else {
-                "Counting changes to content, permissions and owner."
+            match mode {
+                Mode::Strict => "Counting every change restic stored (strict).",
+                Mode::Bytes => "Counting changes to content only, not permissions or owner.",
+                Mode::Content => "Counting changes to content, permissions and owner.",
             }
             .into(),
         );

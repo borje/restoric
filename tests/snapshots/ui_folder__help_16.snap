@@ -28,11 +28,11 @@ expression: "h.screen(100, 34)"
  Aug 10 15:44│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
  Aug 07 08:15│  :find NAME   s         search every snapshot for a name               │
  Aug 03 16:19│  :latest :oldest :undo                                                 │
-   ┄ 1 unchan│                                                                        │
- Jul 28 15:59│  Diff  ]c [c or n N changes · c vs disk · p vs previous · b vs base    │
- Jul 26 11:57│  Press any key to close                                                │
- Jul 24 12:16╰────────────────────────────────────────────────────────────────────────╯
-   ┄ 2 unchanged ┄    │                                        │
+   ┄ 1 unchan│  :set strict / bytes    count every change / only content              │
+ Jul 28 15:59│                                                                        │
+ Jul 26 11:57│  Diff  ]c [c or n N changes · c vs disk · p vs previous · b vs base    │
+ Jul 24 12:16│  Press any key to close                                                │
+   ┄ 2 unchan╰────────────────────────────────────────────────────────────────────────╯
  Jul 14 09:00 +7      │                                        │
                       │   2 deleted · . to show                │
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help

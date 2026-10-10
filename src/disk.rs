@@ -28,8 +28,9 @@ pub struct DiskEntry {
 
 impl DiskEntry {
     /// Whether the file on disk differs from `node`, the way restic decides
-    /// whether to read a file again: kind, size, modification time and mode.
-    pub fn differs_from(&self, node: &Node) -> bool {
+    /// whether to read a file again: kind, size, modification time and,
+    /// unless `--bytes-only`, mode.
+    pub fn differs_from(&self, node: &Node, with_mode: bool) -> bool {
         let kind = match node.kind {
             NodeKind::File => DiskKind::File,
             NodeKind::Dir => DiskKind::Dir,
@@ -43,7 +44,7 @@ impl DiskEntry {
             return false;
         }
         let same_mode = match (self.mode, node.mode) {
-            (Some(a), Some(b)) => a & 0o777 == b & 0o777,
+            (Some(a), Some(b)) if with_mode => a & 0o777 == b & 0o777,
             _ => true,
         };
         let same_time = match (self.mtime, node.mtime) {
