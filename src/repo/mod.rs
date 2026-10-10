@@ -177,6 +177,8 @@ pub struct FileBytes {
     pub data: Vec<u8>,
     /// The whole file's size; more than `data.len()` when cut at the limit.
     pub size: u64,
+    /// A file on disk's permission bits; from the repository, the node has them.
+    pub mode: Option<u32>,
 }
 
 impl FileBytes {
@@ -215,6 +217,7 @@ pub trait Repo: Send + Sync {
         Ok(FileBytes {
             data: self.read_at(node, 0, limit.min(node.size))?,
             size: node.size,
+            mode: None,
         })
     }
 }

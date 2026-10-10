@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 
 use imara_diff::{Algorithm, Diff, InternedInput};
 
+use crate::repo::Node;
+
 /// Bytes as text, or `None` for binary (a NUL in the first 8 KiB).
 pub fn text(bytes: &[u8]) -> Option<String> {
     if bytes.iter().take(8192).any(|&b| b == 0) {
@@ -205,6 +207,27 @@ impl FileDiff {
             new: lines(new).into_iter().map(str::to_string).collect(),
         }
     }
+}
+
+/// What changed besides the bytes, of what counts as a change: mode,
+/// owner and group. Only what both sides know is compared (disk has no owner).
+pub fn meta(old: &Node, new: &Node) -> Vec<String> {
+    let mut out = Vec::new();
+    // restic stores Go's file mode: the permissions are its low 9 bits.
+    let mode = |n: &Node| n.mode.map(|m| m & 0o777);
+    if let (Some(a), Some(b)) = (mode(old), mode(new))
+        && a != b
+    {
+        out.push(format!("mode {a:o} → {b:o}"));
+    }
+    for (what, a, b) in [("owner", old.uid, new.uid), ("group", old.gid, new.gid)] {
+        if let (Some(a), Some(b)) = (a, b)
+            && a != b
+        {
+            out.push(format!("{what} {a} → {b}"));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

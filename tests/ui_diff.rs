@@ -130,6 +130,31 @@ fn identical() {
     insta::assert_snapshot!(h.screen(100, 10));
 }
 
+const META: &str = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write run.sh echo hi\\n
+snapshot 2026-07-02 10:00
+  chmod run.sh 755
+  chown run.sh 0:0
+disk
+  chmod run.sh 700
+";
+
+/// A version that only changed the mode and owner says so instead of
+/// \"identical\", against the version before and against disk.
+#[test]
+fn metadata_only_change() {
+    let mut h = Harness::with(META, "/home/bege/data");
+    h.select("run.sh").keys("lp");
+    insta::assert_snapshot!("metadata_previous", h.screen(100, 10));
+    h.keys("99L");
+    assert!(diff_view(&h).disk);
+    h.app.message = None;
+    insta::assert_snapshot!("metadata_disk", h.screen(100, 10));
+}
+
 /// `q` goes back one level: diff, versions, folder, then out.
 #[test]
 fn q_goes_back_one_level() {

@@ -1,0 +1,14 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  run.sh  Jul 01 10:00  →  Jul 02 10:00                                              +0 −0
+ what this version changed  ·  mode 644 → 755 · owner 1000 → 0 · group 1000 → 0
+
+
+
+
+
+                           Same content. Only the mode or owner changed.
+
+ DIFF  vs previous (p)  ]c [c changes · H L versions                                    0/0  ? help

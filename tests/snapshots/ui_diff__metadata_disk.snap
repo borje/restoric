@@ -1,0 +1,14 @@
+---
+source: tests/ui_diff.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  run.sh  Jul 02 10:00  →  on disk                                                   +0 −0
+ what changed on disk since this version  ·  mode 755 → 700
+
+
+
+
+
+                           Same content. Only the mode or owner changed.
+
+ DIFF  vs previous (p)  ]c [c changes · H L versions                                    0/0  ? help

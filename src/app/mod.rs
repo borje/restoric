@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 
-use crate::diff::{DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, SideKey};
+use crate::diff::{self, DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, SideKey};
 use crate::index::NodeRef;
 use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
@@ -1039,6 +1039,27 @@ impl App {
         Some((key, os, ns, ol, nl))
     }
 
+    /// The mode, owner and group changes between a diff's two sides. The
+    /// disk side has only its mode, once read.
+    pub fn diff_meta(&self, old: &Side, new: &Side) -> Vec<String> {
+        match (old, new) {
+            (Side::Repo(a), Side::Repo(b)) => diff::meta(a, b),
+            (Side::Repo(a), Side::Disk(p)) => {
+                let mode = self.disk_files.get(p).and_then(|b| b.as_ref()?.mode);
+                diff::meta(
+                    a,
+                    &Node {
+                        mode,
+                        uid: None,
+                        gid: None,
+                        ..a.clone()
+                    },
+                )
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn ensure_diff(&mut self, d: &DiffView) {
         let path = d.path.clone();
         self.want_track(&path, false);
@@ -1058,6 +1079,9 @@ impl App {
         }
         for s in wanted {
             self.want_node(&path, s);
+        }
+        if d.disk || d.mode == DiffMode::Disk {
+            self.want_disk(&path);
         }
         if let Some((key, old, new, _, _)) = self.diff_sides(d)
             && !self.diffs.contains_key(&key)

@@ -15,7 +15,7 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
         .unwrap_or_default();
     let mut c = g.put(1, 0, "restoric", t.accent.patch(t.bold)) + 2;
     c = g.put(c, 0, &format!("{name}  "), t.bold);
-    g.put(
+    let sc = g.put(
         1,
         1,
         match d.mode {
@@ -25,10 +25,20 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
         },
         t.dim,
     );
-    let Some((key, _, _, old_label, new_label)) = app.diff_sides(d) else {
+    let Some((key, old_side, new_side, old_label, new_label)) = app.diff_sides(d) else {
         g.put(1, 3, "loading…", t.dim);
         return;
     };
+    let meta = app.diff_meta(&old_side, &new_side);
+    if !meta.is_empty() {
+        g.put_to(
+            sc,
+            1,
+            &format!("  ·  {}", meta.join(" · ")),
+            t.changed,
+            cols,
+        );
+    }
     c = g.put(c, 0, &old_label, t.deleted);
     c = g.put(c, 0, "  →  ", t.dim);
     g.put(c, 0, &new_label, t.added);
@@ -67,8 +77,13 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
             let x = g.put(x, 0, &format!("+{added}"), t.added) + 1;
             g.put(x, 0, &format!("−{removed}"), t.deleted);
             if lines.is_empty() {
-                let msg = "No differences. The two versions are identical.";
-                g.put((cols / 2).saturating_sub(24), top + 5, msg, t.dim);
+                let msg = if meta.is_empty() {
+                    "No differences. The two versions are identical."
+                } else {
+                    "Same content. Only the mode or owner changed."
+                };
+                let x = cols.saturating_sub(fmt::width(msg) as u16) / 2;
+                g.put(x, top + 5, msg, t.dim);
                 return;
             }
             let off = d.scroll.min(lines.len().saturating_sub(height));

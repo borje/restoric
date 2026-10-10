@@ -352,11 +352,12 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 });
             }
             Request::ReadDisk { path } => {
-                let size = ctx.disk.stat(&path).map_or(0, |d| d.size);
+                let stat = ctx.disk.stat(&path);
+                let (size, mode) = stat.map_or((0, None), |d| (d.size, d.mode));
                 let bytes = ctx
                     .disk
                     .read(&path, ctx.preview_limit)
-                    .map(|data| Arc::new(FileBytes { data, size }));
+                    .map(|data| Arc::new(FileBytes { data, size, mode }));
                 send(Response::DiskFile { path, bytes });
             }
             Request::Nodes { set, path, snaps } => {
