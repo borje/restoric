@@ -267,7 +267,7 @@ impl App {
     pub(super) fn yank(&mut self) -> bool {
         match self.targets() {
             Ok(t) => {
-                let when = fmt::time(t[0].snapshot.time, &self.tz);
+                let when = fmt::time(t[0].snapshot.time, &self.tz, self.clock());
                 self.message = Some(format!(
                     "Yanked {} from {when}. p restores next to the original, P overwrites.",
                     describe(&t)
@@ -309,7 +309,7 @@ impl App {
             return true;
         }
         if over {
-            let when = fmt::time(targets[0].snapshot.time, &self.tz);
+            let when = fmt::time(targets[0].snapshot.time, &self.tz, self.clock());
             self.confirm = Some(Confirm::Overwrite {
                 text: format!(
                     "Replace {} on disk with the version from {when}? The current version is kept for :undo.",

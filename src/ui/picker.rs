@@ -154,7 +154,7 @@ fn groups(p: &Picker, g: &mut Grid, y: u16, bottom: u16) {
         let path = fmt::path(&r.path, p.home.as_deref());
         g.put(px, row, &fmt::fit(&path, pw), style(t.text));
         g.put(sx, row, &format!("{:>9}", r.snapshots), style(t.text));
-        g.put(lx, row, &fmt::time(r.latest, &p.tz), style(t.dim));
+        g.put(lx, row, &fmt::time(r.latest, &p.tz, p.now), style(t.dim));
     }
 }
 

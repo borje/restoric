@@ -120,7 +120,7 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             g.put(0, y, "▶", t.accent);
         }
         g.hit(0, l1 + 1, y, Action::ClickVersion(k));
-        let date = fmt::time(track.set[run.from].time, &app.tz);
+        let date = fmt::time(track.set[run.from].time, &app.tz, app.clock());
         g.put(1, y, &date, if here { t.bold } else { t.text });
         let n = run.snapshots();
         let snaps = format!("{n} snap{}", if n > 1 { "s" } else { "" });
@@ -162,7 +162,7 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             (_, None) => ("not in any backup".to_string(), t.live),
             (Some(Some(_)), Some(r)) => {
                 // Since the last backup that had the version, as the folder view.
-                let since = |i: usize| fmt::time(track.set[i].time, &app.tz);
+                let since = |i: usize| fmt::time(track.set[i].time, &app.tz, app.clock());
                 let node = app.nodes.get(&(v.path.clone(), r.from));
                 match node.and_then(|n| vs_disk(app, n.as_ref()?, v)) {
                     Some(Some((0, 0))) => (format!("unchanged since {}", since(r.from)), t.dim),
@@ -215,7 +215,10 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         app,
         g,
         (x0, x1, top),
-        &format!("{name} · {}", fmt::time(snapshot.time, &app.tz)),
+        &format!(
+            "{name} · {}",
+            fmt::time(snapshot.time, &app.tz, app.clock())
+        ),
         t.bold,
         Some((&sub, t.dim)),
     );

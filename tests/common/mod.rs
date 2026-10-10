@@ -116,7 +116,7 @@ impl Harness {
         let set = self.app.set();
         let i = set
             .iter()
-            .position(|s| ui::fmt::time(s.time, &TimeZone::UTC) == fmt_like(when))
+            .position(|s| ui::fmt::time(s.time, &TimeZone::UTC, s.time) == fmt_like(when))
             .unwrap_or_else(|| panic!("no snapshot at {when}"));
         self.act(Action::GoSnapshot(i))
     }
@@ -150,10 +150,8 @@ impl Harness {
 /// `2026-09-06 18:03` → `Sep 06 18:03`
 pub fn fmt_like(when: &str) -> String {
     let dt: jiff::civil::DateTime = when.replace(' ', "T").parse().unwrap();
-    ui::fmt::time(
-        dt.to_zoned(TimeZone::UTC).unwrap().timestamp(),
-        &TimeZone::UTC,
-    )
+    let t = dt.to_zoned(TimeZone::UTC).unwrap().timestamp();
+    ui::fmt::time(t, &TimeZone::UTC, t)
 }
 
 /// The sample project with more drift on disk, for the `on disk` version:

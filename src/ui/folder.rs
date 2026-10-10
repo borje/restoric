@@ -130,7 +130,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                                 g.fill(y, v0, v1, t.selected);
                                 g.put(v0, y, "▶", t.accent);
                             }
-                            let date = fmt::time(s.set[*v].time, &app.tz);
+                            let date = fmt::time(s.set[*v].time, &app.tz, app.clock());
                             g.put(v0 + 1, y, &date, if here { t.bold } else { t.text });
                             if let Some(c) = s.counts.get(v) {
                                 put_counts(g, v0 + 14, y, c, "", v1 + 1);

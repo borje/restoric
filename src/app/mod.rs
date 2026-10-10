@@ -1159,7 +1159,7 @@ impl App {
         let runs: Vec<Run> = t.runs.iter().rev().copied().collect();
         let r0 = runs.get(d.run)?;
         let node = |r: &Run| -> Option<Node> { self.nodes.get(&(d.path.clone(), r.from))?.clone() };
-        let label = |r: &Run| fmt::time(t.set[r.from].time, &self.tz);
+        let label = |r: &Run| fmt::time(t.set[r.from].time, &self.tz, self.clock());
         let repo_side = |n: Node| (SideKey::Content(fingerprint::content(&n)), Side::Repo(n));
         // On the disk version it's the newest version → the file on disk,
         // whatever the mode.
@@ -1181,7 +1181,10 @@ impl App {
                         (
                             k,
                             s,
-                            format!("base {}", fmt::time(t.set[at?].time, &self.tz)),
+                            format!(
+                                "base {}",
+                                fmt::time(t.set[at?].time, &self.tz, self.clock())
+                            ),
                         )
                     }
                     None => (SideKey::Nothing, Side::Nothing, "(nothing)".to_string()),
@@ -1683,7 +1686,7 @@ impl App {
     }
 
     fn time(&self, i: usize) -> String {
-        fmt::time(self.set()[i].time, &self.tz)
+        fmt::time(self.set()[i].time, &self.tz, self.clock())
     }
 
     /// Whether the snapshots shown are another machine's.
@@ -2667,7 +2670,7 @@ impl App {
         } else {
             format!(
                 "Jumped to {}, the last snapshot that has {shown}",
-                fmt::time(snap.time, &self.tz)
+                fmt::time(snap.time, &self.tz, self.clock())
             )
         });
     }

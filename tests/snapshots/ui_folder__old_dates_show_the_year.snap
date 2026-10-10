@@ -1,0 +1,14 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  ~/data
+  Jan 2025     May    Jul    Sep    Nov     Jan    Mar    May    Jul           on disk
+  ●                                                                        ●  ┊ · a.txt  ○ data/
+  ▲                                                                                        − 1× +
+
+ on disk  = latest    │ ≡ a.txt                         4 B  + │ a.txt · v1/2 · 4 B      ⇥ content
+ Sep 20 10:00 ~1      │                                        │ new in this snapshot
+▶Jan 15  2025 +1      │                                        │
+                      │                                        │   1  one
+ NOR  Jan 15  2025  445a0e7e  data/ +1                                    Jan 15  2025  1/1  ? help

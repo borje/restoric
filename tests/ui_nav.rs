@@ -9,7 +9,8 @@ use restoric::app::View;
 use restoric::ui;
 
 fn when(h: &Harness) -> String {
-    ui::fmt::time(h.app.set()[h.app.idx()].time, &jiff::tz::TimeZone::UTC)
+    let t = h.app.set()[h.app.idx()].time;
+    ui::fmt::time(t, &jiff::tz::TimeZone::UTC, t)
 }
 
 fn command(h: &mut Harness, cmd: &str) {

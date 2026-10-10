@@ -7,7 +7,7 @@ expression: "screen(&p, 100, 34)"
    host         path                                                        snapshots  latest
  ▶ bege-laptop  ~/dev/project                                                       2  Sep 06 18:03
    dev-vm       /srv/data                                                           2  Sep 01 10:00
-   old-laptop   ~                                                                   1  Mar 01 10:00
+   old-laptop   ~                                                                   1  Mar 01  2026
 
 
 

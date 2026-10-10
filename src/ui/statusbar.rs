@@ -112,7 +112,7 @@ pub fn draw(app: &App, g: &mut Grid) {
     };
     // What the listing compares with, when it's a pinned base (`b`).
     let base = app.base.and_then(|b| app.snapshot(b)).map(|b| {
-        let vs = format!("vs {} (base)", fmt::time(b.time, &app.tz));
+        let vs = format!("vs {} (base)", fmt::time(b.time, &app.tz, app.clock()));
         (vs, t.accent)
     });
     if app.on_disk() && base.is_some() {
@@ -124,7 +124,10 @@ pub fn draw(app: &App, g: &mut Grid) {
         mid.push(("on disk".into(), t.live.patch(t.bold)));
         mid.push(("  ".into(), t.text));
         if let Some(s) = set.last() {
-            mid.push((format!("vs {}", fmt::day(s.time, &app.tz)), t.dim));
+            mid.push((
+                format!("vs {}", fmt::day(s.time, &app.tz, app.clock())),
+                t.dim,
+            ));
             mid.push(("  ".into(), t.text));
         }
         match (app.live.get(&app.folder), set.last()) {
@@ -134,7 +137,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             }
             (Some(_), Some(s)) => {
                 mid.push((
-                    format!("unchanged since {}", fmt::day(s.time, &app.tz)),
+                    format!("unchanged since {}", fmt::day(s.time, &app.tz, app.clock())),
                     t.dim,
                 ));
             }
@@ -142,7 +145,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         }
     } else {
         if let Some(s) = set.get(i) {
-            mid.push((fmt::time(s.time, &app.tz), t.bold));
+            mid.push((fmt::time(s.time, &app.tz, app.clock()), t.bold));
             mid.push(("  ".into(), t.text));
             mid.push((s.id.0.short(), t.accent));
             mid.push(("  ".into(), t.text));
@@ -166,7 +169,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                 }
             } else if let Some(v) = state.version_at(i) {
                 mid.push((
-                    format!("unchanged since {}", fmt::day(state.set[v].time, &app.tz)),
+                    format!(
+                        "unchanged since {}",
+                        fmt::day(state.set[v].time, &app.tz, app.clock())
+                    ),
                     t.dim,
                 ));
             }
@@ -203,7 +209,11 @@ pub fn draw(app: &App, g: &mut Grid) {
         && !e.is_deleted()
         && let Some(m) = e.node.mtime
     {
-        right.push((format!("{}  ", fmt::time(m, &app.tz)), t.dim, None));
+        right.push((
+            format!("{}  ", fmt::time(m, &app.tz, app.clock())),
+            t.dim,
+            None,
+        ));
     }
     let rows = app.rows().len();
     let below_root = app.folder != app.root;

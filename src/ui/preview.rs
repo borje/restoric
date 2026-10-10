@@ -256,7 +256,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
         );
         if e.is_gone() {
             g.put(x1 - 10, y0, "deleted", t.deleted);
-            let last = format!("last seen {}", fmt::time(snap.time, &app.tz));
+            let last = format!("last seen {}", fmt::time(snap.time, &app.tz, app.clock()));
             g.put(x0, y0 + 1, &last, t.deleted);
         }
         let at = if app.on_disk() && !e.is_gone() {
@@ -313,14 +313,17 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
             (Delta::Added, Some(Some(_))) => ("not in the latest snapshot".to_string(), t.live),
             (Delta::Added, None) => (String::new(), t.dim),
             (Delta::Changed, _) => (
-                format!("changed since {}", fmt::time(snap.time, &app.tz)),
+                format!(
+                    "changed since {}",
+                    fmt::time(snap.time, &app.tz, app.clock())
+                ),
                 t.changed,
             ),
             _ => match run.zip(track) {
                 Some(((_, r), tr)) => (
                     format!(
                         "unchanged since {}",
-                        fmt::time(tr.set[r.from].time, &app.tz)
+                        fmt::time(tr.set[r.from].time, &app.tz, app.clock())
                     ),
                     t.dim,
                 ),
@@ -351,12 +354,15 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
         let sub = match (from, set.get(gone_at)) {
             (Some(f), Some(gone)) => format!(
                 "last version {}, gone {}",
-                fmt::day(f.time, &app.tz),
-                fmt::day(gone.time, &app.tz)
+                fmt::day(f.time, &app.tz, app.clock()),
+                fmt::day(gone.time, &app.tz, app.clock())
             ),
             // Deleted on disk: in the newest snapshot, not on disk.
             (Some(f), None) if app.on_disk() => {
-                format!("last version {}, not on disk", fmt::day(f.time, &app.tz))
+                format!(
+                    "last version {}, not on disk",
+                    fmt::day(f.time, &app.tz, app.clock())
+                )
             }
             _ => String::new(),
         };
@@ -383,7 +389,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
                 } else {
                     format!(
                         "unchanged since {}",
-                        fmt::time(tr.set[r.from].time, &app.tz)
+                        fmt::time(tr.set[r.from].time, &app.tz, app.clock())
                     )
                 };
                 let sub_style = if here { t.changed } else { t.dim };

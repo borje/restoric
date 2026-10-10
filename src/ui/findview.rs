@@ -78,15 +78,25 @@ pub fn draw(app: &App, g: &mut Grid, f: &FindView) {
             t.deleted
         };
         g.put_to(c, y, &name, style, fx - 1);
-        g.put(fx, y, &fmt::time(f.set[found.first].time, &app.tz), t.text);
-        g.put(lx, y, &fmt::time(f.set[found.last].time, &app.tz), t.text);
+        g.put(
+            fx,
+            y,
+            &fmt::time(f.set[found.first].time, &app.tz, app.clock()),
+            t.text,
+        );
+        g.put(
+            lx,
+            y,
+            &fmt::time(f.set[found.last].time, &app.tz, app.clock()),
+            t.text,
+        );
         if *on_disk {
             g.put(sx, y, "on disk", t.added);
         } else if let Some(next) = f.set.get(found.last + 1) {
             g.put(
                 sx,
                 y,
-                &format!("gone {}", fmt::day(next.time, &app.tz)),
+                &format!("gone {}", fmt::day(next.time, &app.tz, app.clock())),
                 t.deleted,
             );
         } else {

@@ -209,7 +209,7 @@ pub fn draw(
     let first = if zoom == 1 {
         za.strftime("%b %Y").to_string()
     } else {
-        fmt::day(a, tz)
+        za.strftime("%b %d").to_string()
     };
     let mut end = g.put(x0, r, &first, t.dim) + 1;
     if let Ok(mut d) = za.start_of_day() {

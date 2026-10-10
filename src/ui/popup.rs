@@ -178,7 +178,7 @@ fn info_rows(app: &App, s: &SnapshotInfo, vw: usize) -> Vec<(&'static str, Strin
     if let Some(p) = s.parent {
         let when = app
             .snapshot(p)
-            .map(|p| format!("  {}", fmt::time(p.time, &app.tz)))
+            .map(|p| format!("  {}", fmt::time(p.time, &app.tz, app.clock())))
             .unwrap_or_default();
         rows.push(("parent", format!("{}{when}", p.0.short())));
     }
@@ -269,7 +269,10 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
     let c = g.put(
         c,
         y + 2,
-        &format!("  @ {}  ", fmt::time(tg.snapshot.time, &app.tz)),
+        &format!(
+            "  @ {}  ",
+            fmt::time(tg.snapshot.time, &app.tz, app.clock())
+        ),
         t.text,
     );
     g.put(c, y + 2, &tg.snapshot.id.0.short(), t.accent);

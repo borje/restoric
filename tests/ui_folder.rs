@@ -192,7 +192,7 @@ fn item_changes_and_versions_keys() {
     h.at("2026-09-06 18:03").select("main.go");
     h.keys("{");
     let t = h.app.set()[h.app.idx()].time;
-    assert_eq!(ui::fmt::time(t, &TimeZone::UTC), "Sep 02 20:16");
+    assert_eq!(ui::fmt::time(t, &TimeZone::UTC, t), "Sep 02 20:16");
     h.keys("99{");
     assert_eq!(
         h.app.message.as_deref(),
@@ -439,4 +439,21 @@ fn base_snapshot() {
         h.app.message.as_deref(),
         Some("Pin a snapshot as the base, not the files on disk.")
     );
+}
+
+/// A date more than about six months back shows its year instead of the
+/// time of day, as `ls -l` does, in the same 12 columns.
+#[test]
+fn old_dates_show_the_year() {
+    let dsl = "
+host bege-laptop
+root /home/bege/data
+snapshot 2025-01-15 10:00
+  write a.txt one\\n
+snapshot 2026-09-20 10:00
+  write a.txt two\\n
+";
+    let mut h = Harness::with(dsl, "/home/bege/data");
+    h.keys("H");
+    insta::assert_snapshot!(h.screen(100, 10));
 }

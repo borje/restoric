@@ -6,14 +6,28 @@ use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use unicode_width::UnicodeWidthStr;
 
-/// `Sep 06 18:03`, in local time.
-pub fn time(t: Timestamp, tz: &TimeZone) -> String {
-    t.to_zoned(tz.clone()).strftime("%b %d %H:%M").to_string()
+/// Within about six months of `now`, where a date without its year is
+/// unambiguous; `ls -l` draws the same line.
+fn recent(t: Timestamp, now: Timestamp) -> bool {
+    now.duration_since(t).abs() < SignedDuration::from_hours(24 * 182)
 }
 
-/// `Sep 06`
-pub fn day(t: Timestamp, tz: &TimeZone) -> String {
-    t.to_zoned(tz.clone()).strftime("%b %d").to_string()
+/// `Sep 06 18:03` in local time, or `Sep 06  2024` when it isn't recent:
+/// the year instead of the time of day, as `ls -l` does. Both are 12
+/// columns wide.
+pub fn time(t: Timestamp, tz: &TimeZone, now: Timestamp) -> String {
+    let f = if recent(t, now) {
+        "%b %d %H:%M"
+    } else {
+        "%b %d  %Y"
+    };
+    t.to_zoned(tz.clone()).strftime(f).to_string()
+}
+
+/// `Sep 06`, or `Sep 06 2024` when it isn't recent.
+pub fn day(t: Timestamp, tz: &TimeZone, now: Timestamp) -> String {
+    let f = if recent(t, now) { "%b %d" } else { "%b %d %Y" };
+    t.to_zoned(tz.clone()).strftime(f).to_string()
 }
 
 /// `737 B`, `1.3K`, `4.0M`, `2.1G`

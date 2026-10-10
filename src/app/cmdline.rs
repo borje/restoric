@@ -78,11 +78,13 @@ pub fn parse_day(t: &str, today: Date) -> Option<Date> {
 }
 
 impl App {
+    /// Now, or the time the tests pin.
+    pub fn clock(&self) -> Timestamp {
+        self.now.unwrap_or_else(Timestamp::now)
+    }
+
     fn today(&self) -> Date {
-        self.now
-            .unwrap_or_else(Timestamp::now)
-            .to_zoned(self.tz.clone())
-            .date()
+        self.clock().to_zoned(self.tz.clone()).date()
     }
 
     /// Goes to snapshot `i` of the folder's set, with a message.
@@ -181,13 +183,15 @@ impl App {
             Some(i) => {
                 let why = format!(
                     "Jumped to {}, the last snapshot on or before {}.",
-                    fmt::time(set[i].time, &self.tz),
+                    fmt::time(set[i].time, &self.tz, self.clock()),
                     day.strftime("%b %d")
                 );
                 self.jump(i, why);
             }
             None => {
-                let oldest = set.first().map(|s| fmt::time(s.time, &self.tz));
+                let oldest = set
+                    .first()
+                    .map(|s| fmt::time(s.time, &self.tz, self.clock()));
                 self.message = Some(format!(
                     "No snapshots that early. The oldest is from {}.",
                     oldest.unwrap_or_default()
