@@ -48,3 +48,62 @@ jobs:
       - run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  # Point the formula in borje/homebrew-tap at this release's binaries.
+  # HOMEBREW_TAP_KEY is the private half of a write deploy key on that repo.
+  homebrew:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: borje/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_KEY }}
+      - name: Update the formula
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          dir=$RUNNER_TEMP/release
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*.tar.gz' -D "$dir"
+          asset() {
+            echo "      url \"https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/restoric-$TAG-$1.tar.gz\""
+            echo "      sha256 \"$(sha256sum "$dir/restoric-$TAG-$1.tar.gz" | cut -d' ' -f1)\""
+          }
+          cat > Formula/restoric.rb <<EOF
+          class Restoric < Formula
+            desc "Browse and restore a restic repository by time, anchored on a folder"
+            homepage "https://borje.github.io/restoric/"
+            license "AGPL-3.0-or-later"
+
+            on_macos do
+              on_arm do
+          $(asset aarch64-apple-darwin)
+              end
+              on_intel do
+          $(asset x86_64-apple-darwin)
+              end
+            end
+
+            on_linux do
+              on_arm do
+          $(asset aarch64-unknown-linux-gnu)
+              end
+              on_intel do
+          $(asset x86_64-unknown-linux-gnu)
+              end
+            end
+
+            def install
+              bin.install "restoric"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/restoric --version")
+            end
+          end
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "restoric ${TAG#v}"
+          git push
