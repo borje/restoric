@@ -78,6 +78,10 @@ pub fn content(
     disk_path: &Path,
 ) {
     let t = g.theme.clone();
+    // A terminal a few rows tall leaves no room under the preview's header.
+    if y1 < top {
+        return;
+    }
     let w = (x1 - x0 + 1) as usize;
     let h = (y1 - top + 1) as usize;
     let bytes: Arc<FileBytes> = match cur {
