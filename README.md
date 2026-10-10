@@ -9,7 +9,7 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 - The row of dots marks the snapshots where the selected file changed (`●`) and where only its folder did (`○`).
 - A change means the content, permissions or owner changed. A file that was only touched, or whose access time moved, doesn't count (`--strict` counts everything restic stored; `--bytes-only` only the content, for drives whose permissions or owner change wholesale, like a macOS external drive set to ignore ownership).
 - Only this machine's snapshots are shown, picked by hostname as `restic snapshots --host` does. `--browse` (or a folder that isn't in your backups) opens a picker of the other hosts and backup paths in the repository, for a renamed machine or a server's backups.
-- Restoring works like copy and paste: `y` yanks, `p` puts the old version next to the original, `P` overwrites it after asking. `:undo` puts back what was overwritten.
+- Restoring works like copy and paste: `y` yanks, `p` puts the old version next to the original, `P` overwrites it after asking, and says first what differs on disk and how much it writes. `:undo` puts back what was overwritten.
 - restoric never writes to the repository, and needs no FUSE or mount.
 
 ## Install

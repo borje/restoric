@@ -26,7 +26,7 @@ use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
 use crate::index::{Mode, ModeSwitch, Version, fold};
 use crate::repo::{FileBytes, Node, NodeKind, SnapshotId, SnapshotInfo, TreeId};
-use crate::restore::{How, Places, Target};
+use crate::restore::{How, Places, Plan, PlanFor, Target};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request, Response, Side};
 use cmdline::{Input, InputKind};
@@ -415,6 +415,9 @@ pub struct App {
     pub base: Option<SnapshotId>,
     /// What's under folder trees, once asked for with `S`.
     pub tree_sizes: HashMap<TreeId, Size>,
+    /// What the overwrite being confirmed would change: for which
+    /// targets, and the plan once the worker has it.
+    pub plan: Option<(PlanFor, Option<Plan>)>,
     /// Bytes in files new or changed in a folder at a snapshot, against
     /// the base (`b`) or the snapshot before.
     pub added: HashMap<(SnapshotId, Option<SnapshotId>, PathBuf), u64>,
@@ -524,6 +527,7 @@ impl App {
             hide_new: false,
             changes_only: false,
             sizes: false,
+            plan: None,
             base: None,
             tree_sizes: HashMap::new(),
             added: HashMap::new(),
@@ -1432,6 +1436,13 @@ impl App {
                 self.pending.remove(&Pending::Disk(path.clone()));
                 self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
                 self.disk_files.insert(path, bytes);
+            }
+            Response::Plan { targets, plan } => {
+                if let Some((t, p)) = &mut self.plan
+                    && *t == targets
+                {
+                    *p = Some(plan);
+                }
             }
             Response::Size { tree, size } => {
                 self.pending.remove(&Pending::Size(tree));

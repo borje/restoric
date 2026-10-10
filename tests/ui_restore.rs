@@ -343,3 +343,28 @@ fn quitting_during_a_restore_asks_and_waits() {
         Some("Stopped · nothing was overwritten")
     );
 }
+
+const DRIFT: &str = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write photos/a.jpg aaaa
+  write photos/b.jpg bbbb
+  write photos/c.jpg cccc
+disk
+  append photos/a.jpg more
+  rm photos/b.jpg
+  write photos/new.jpg nnnn
+";
+
+/// Before an overwrite, the confirmation says what differs on disk and
+/// what the restore writes, for `P` and for the dialog's overwrite.
+#[test]
+fn overwrite_plan() {
+    let mut h = Harness::with(DRIFT, "/home/bege/data");
+    h.at("2026-07-01 10:00").select("photos").keys("yP");
+    insta::assert_snapshot!("overwrite_plan_confirm", h.screen(100, 16));
+    h.keys("n").keys("r1").key(KeyCode::Enter);
+    assert!(h.app.dialog.as_ref().is_some_and(|d| d.confirm));
+    insta::assert_snapshot!("overwrite_plan_dialog", h.screen(100, 20));
+}

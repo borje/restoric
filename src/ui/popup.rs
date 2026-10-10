@@ -251,13 +251,28 @@ pub fn info(app: &App, g: &mut Grid) {
     g.put_to(x + 3, y + h - 2, hint, t.dim, end);
 }
 
+/// What the overwrite being confirmed would change, or that it's being
+/// worked out.
+fn plan_text(app: &App) -> String {
+    app.plan()
+        .map_or("Checking what differs on disk…".into(), |p| p.describe())
+}
+
 /// The restore dialog.
 pub fn restore_dialog(app: &App, g: &mut Grid) {
     let Some(d) = &app.dialog else { return };
     let t = g.theme.clone();
     let (cols, rows) = (g.cols(), g.rows());
     let w = 78.min(cols.saturating_sub(2));
-    let h = if d.confirm { 15 } else { 14 };
+    let plan = match d.confirm {
+        true => fmt::wrap(&plan_text(app), w.saturating_sub(6) as usize),
+        false => Vec::new(),
+    };
+    let h = if d.confirm {
+        14 + plan.len().max(1) as u16
+    } else {
+        14
+    };
     let x = (cols - w) / 2;
     let y = ((rows.saturating_sub(h)) / 2).saturating_sub(1);
     g.rbox(x, y, w, h, "Restore", t.bold);
@@ -297,6 +312,9 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
     if d.confirm {
         let msg = "This replaces what is on disk now. Press ⏎ again to confirm.";
         g.put_to(x + 3, y + 10, msg, t.warn, x + w - 1);
+        for (k, l) in plan.iter().enumerate() {
+            g.put_to(x + 3, y + 11 + k as u16, l, t.text, x + w - 1);
+        }
     }
     let by = y + h - 2;
     g.put_act(
@@ -338,7 +356,11 @@ pub fn confirm(app: &App, g: &mut Grid) {
             "[n] Keep going",
         ),
     };
-    let lines = fmt::wrap(&text, 50);
+    let mut lines = fmt::wrap(&text, 50);
+    if matches!(c, Confirm::Overwrite { .. }) {
+        lines.push(String::new());
+        lines.extend(fmt::wrap(&plan_text(app), 50));
+    }
     let w = 56.min(g.cols());
     let h = lines.len() as u16 + 5;
     let x = (g.cols() - w) / 2;

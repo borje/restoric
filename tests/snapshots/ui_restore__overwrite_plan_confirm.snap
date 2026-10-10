@@ -1,0 +1,20 @@
+---
+source: tests/ui_restore.rs
+expression: "h.screen(100, 16)"
+---
+ restoric  ~/data
+  Jul 2026            ╭─ Overwrite? ─────────────────────────────────────────╮ on disk
+  ●                   │                                                      │┊ ● photos/  ○ data/
+  ▲                   │  Replace photos/ on disk with the version from Jul   │             − 1× +
+                      │  01 10:00? The current version is kept for :undo.    │
+ on disk  +1~1−1      │                                                      │
+▶Jul 01 10:00 +3      │  On disk: 1 changed, 1 missing come back, 1 not in   │
+                      │  that version go to :undo. Writes 3 files, 12 B.     │                    +
+                      │                                                      │                    +
+                      │  [y] Overwrite   [n] Cancel                          │                    +
+                      ╰──────────────────────────────────────────────────────╯
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+ NOR  Jul 01 10:00  7b6189b9  data/ +3  1 yanked                                        1/1  ? help

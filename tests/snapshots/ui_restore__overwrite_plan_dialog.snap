@@ -1,0 +1,24 @@
+---
+source: tests/ui_restore.rs
+expression: "h.screen(100, 20)"
+---
+ restoric  ~/data
+  Jul 2026 ╭─ Restore ──────────────────────────────────────────────────────────────────╮
+  ●        │                                                                            │  ○ data/
+  ▲        │  photos/  @ Jul 01 10:00  7b6189b9                                         │  − 1× +
+           │  from /home/bege/data/photos                                               │
+ on disk  +│                                                                            │
+▶Jul 01 10:│  1 (•) Overwrite original             ~/data/photos                        │
+           │  2 ( ) Restore next to it             → photos.2026-07-01_1000/            │         +
+           │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-07-01_1000/photo…  │         +
+           │  4 ( ) Write a tar archive            → photos-2026-07-01_1000.tar         │         +
+           │                                                                            │
+           │  This replaces what is on disk now. Press ⏎ again to confirm.              │
+           │  On disk: 1 changed, 1 missing come back, 1 not in that version go to      │
+           │  :undo. Writes 3 files, 12 B.                                              │
+           │                                                                            │
+           │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
+           ╰────────────────────────────────────────────────────────────────────────────╯
+                      │                                        │
+                      │                                        │
+ RST  choose where the restored copy goes                                                    ? help

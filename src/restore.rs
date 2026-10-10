@@ -12,7 +12,10 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 
-use crate::repo::{Node, NodeKind, Repo, RestoreStep, SnapshotInfo, Stopped, is_stopped};
+use crate::index::folder::Counts;
+use crate::repo::{
+    Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, is_stopped,
+};
 use crate::worker::Cancel;
 
 /// Something to restore: what was at `path` in `snapshot`.
@@ -22,6 +25,47 @@ pub struct Target {
     /// The absolute path, in the snapshot and on disk.
     pub path: PathBuf,
     pub node: Node,
+}
+
+/// Which targets a [`Plan`] is for: their snapshots and paths.
+pub type PlanFor = Vec<(SnapshotId, PathBuf)>;
+
+/// What an overwrite would change, worked out before it's confirmed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Plan {
+    /// Disk against the versions restored, by size and time as the on
+    /// disk version compares: `added` is only on disk and goes to `:undo`,
+    /// `deleted` is only in the versions and comes back.
+    pub differs: Counts,
+    /// What the restore writes.
+    pub files: u64,
+    pub bytes: u64,
+}
+
+impl Plan {
+    /// `On disk: 3 changed, 2 missing come back, 1 not in that version
+    /// goes to :undo. Writes 4812 files, 1.2G.`
+    pub fn describe(&self) -> String {
+        let c = self.differs;
+        let mut parts = Vec::new();
+        if c.changed > 0 {
+            parts.push(format!("{} changed", c.changed));
+        }
+        if c.deleted > 0 {
+            parts.push(format!("{} missing come back", c.deleted));
+        }
+        if c.added > 0 {
+            parts.push(format!("{} not in that version go to :undo", c.added));
+        }
+        let differs = if parts.is_empty() {
+            "Nothing on disk differs from it, by size and time.".to_string()
+        } else {
+            format!("On disk: {}.", parts.join(", "))
+        };
+        let s = if self.files == 1 { "" } else { "s" };
+        let size = crate::ui::fmt::size(self.bytes);
+        format!("{differs} Writes {} file{s}, {size}.", self.files)
+    }
 }
 
 impl Target {

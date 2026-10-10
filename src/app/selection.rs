@@ -8,7 +8,7 @@ use crate::index::listing::Entry;
 use crate::index::versions::Run;
 use crate::repo::NodeKind;
 use crate::repo::RestoreStep;
-use crate::restore::{How, Progress, Target, planned};
+use crate::restore::{How, Plan, Progress, Target, planned};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request};
 
@@ -309,6 +309,7 @@ impl App {
             return true;
         }
         if over {
+            self.want_plan(&targets);
             let when = fmt::time(targets[0].snapshot.time, &self.tz, self.clock());
             self.confirm = Some(Confirm::Overwrite {
                 text: format!(
@@ -321,6 +322,20 @@ impl App {
             self.start_restore(targets, How::NextTo);
         }
         true
+    }
+
+    /// Asks what overwriting `targets` would change, for the confirmation.
+    fn want_plan(&mut self, targets: &[Target]) {
+        let keys = targets.iter().map(|t| (t.snapshot.id, t.path.clone()));
+        self.plan = Some((keys.collect(), None));
+        self.outbox.push(Request::Plan {
+            targets: targets.to_vec(),
+        });
+    }
+
+    /// The plan for the overwrite being confirmed, once known.
+    pub fn plan(&self) -> Option<&Plan> {
+        self.plan.as_ref()?.1.as_ref()
     }
 
     /// Sends a restore to the worker and shows its progress.
@@ -535,6 +550,7 @@ impl App {
         let t = d.target.clone();
         match d.sel {
             0 if self.exists_on_disk(&t) && !d.confirm => {
+                self.want_plan(std::slice::from_ref(&t));
                 self.dialog = Some(Dialog { confirm: true, ..d });
                 return;
             }

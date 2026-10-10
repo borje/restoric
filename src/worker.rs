@@ -21,7 +21,7 @@ use crate::index::timeline::ChangePoint;
 use crate::index::versions::Run;
 use crate::index::{Index, NodeRef, Version};
 use crate::repo::{FileBytes, Node, SnapshotId, SnapshotInfo, TreeId};
-use crate::restore::{self, Done, How, Places, Target};
+use crate::restore::{self, Done, How, Places, Plan, PlanFor, Target};
 
 /// Most of a file the preview reads.
 pub const PREVIEW_LIMIT: u64 = 64 * 1024;
@@ -93,6 +93,8 @@ pub enum Request {
     ReadFile { node: Node },
     /// The start of a file on disk.
     ReadDisk { path: PathBuf },
+    /// What overwriting these targets would change on disk.
+    Plan { targets: Vec<Target> },
     /// What's under a folder tree (`S`).
     Size { tree: TreeId },
     /// Bytes in files new or changed in `folder` at `set[snap]` against
@@ -237,6 +239,10 @@ pub enum Response {
     Nodes {
         path: PathBuf,
         nodes: Vec<(usize, Option<Node>)>,
+    },
+    Plan {
+        targets: PlanFor,
+        plan: Plan,
     },
     Size {
         tree: TreeId,
@@ -411,6 +417,26 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     nodes.push((i, index.node_at(&set[i], &path)?));
                 }
                 send(Response::Nodes { path, nodes });
+            }
+            Request::Plan { targets } => {
+                let mut plan = Plan::default();
+                for t in &targets {
+                    plan.differs += index.live(ctx.disk.as_ref(), &t.snapshot, &t.path)?;
+                    let size = match index.node_ref(&t.snapshot, &t.path)? {
+                        NodeRef::Dir(tree) => index.tree_size(tree)?,
+                        _ => Size {
+                            bytes: t.node.size,
+                            files: 1,
+                        },
+                    };
+                    plan.files += size.files;
+                    plan.bytes += size.bytes;
+                }
+                let targets = targets.iter().map(|t| (t.snapshot.id, t.path.clone()));
+                send(Response::Plan {
+                    targets: targets.collect(),
+                    plan,
+                });
             }
             Request::Size { tree } => {
                 let size = index.tree_size(tree)?;
