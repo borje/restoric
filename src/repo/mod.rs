@@ -6,7 +6,7 @@ pub mod rustic;
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -148,7 +148,35 @@ pub struct Tree {
     pub nodes: Vec<Node>,
 }
 
+/// Whether `name` is one plain path component, safe to join onto a folder:
+/// not empty, `.` or `..`, and without a separator, root, prefix or NUL.
+/// A file system never makes anything else; a crafted repository can, and
+/// joining such a name would reach outside the folder.
+pub fn is_plain_name(name: &OsStr) -> bool {
+    let mut parts = Path::new(name).components();
+    matches!(parts.next(), Some(Component::Normal(n)) if n == name)
+        && parts.next().is_none()
+        && !name.as_encoded_bytes().contains(&0)
+}
+
 impl Tree {
+    /// A tree as a repository stored it, without the entries whose name
+    /// isn't [plain](is_plain_name): they're logged and never shown,
+    /// previewed or restored.
+    pub fn from_stored(nodes: Vec<Node>) -> Self {
+        let nodes = nodes
+            .into_iter()
+            .filter(|n| {
+                let plain = is_plain_name(&n.name);
+                if !plain {
+                    tracing::warn!("leaving out a tree entry named {:?}", n.name);
+                }
+                plain
+            })
+            .collect();
+        Self { nodes }
+    }
+
     pub fn get(&self, name: &OsStr) -> Option<&Node> {
         match self
             .nodes
@@ -257,5 +285,66 @@ pub fn is_root() -> bool {
     #[cfg(not(unix))]
     {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(name: &[u8]) -> Node {
+        #[cfg(unix)]
+        let name = {
+            use std::os::unix::ffi::OsStrExt;
+            OsStr::from_bytes(name).to_os_string()
+        };
+        #[cfg(not(unix))]
+        let name = OsString::from(String::from_utf8_lossy(name).into_owned());
+        Node {
+            name,
+            kind: NodeKind::File,
+            size: 0,
+            mode: None,
+            uid: None,
+            gid: None,
+            mtime: None,
+            content: Vec::new(),
+            subtree: None,
+            raw: Id::default(),
+        }
+    }
+
+    #[test]
+    fn plain_names_only() {
+        let plain = |s: &str| is_plain_name(OsStr::new(s));
+        for ok in ["main.go", ".bashrc", "...", "a b", "x."] {
+            assert!(plain(ok), "{ok:?} is plain");
+        }
+        // A backslash is a separator only on Windows.
+        assert_eq!(plain("back\\slash"), cfg!(unix));
+        for bad in [
+            "", ".", "..", "/", "/etc", "a/b", "../x", "a/", "x/..", "a\0b",
+        ] {
+            assert!(!plain(bad), "{bad:?} isn't plain");
+        }
+    }
+
+    #[test]
+    fn a_stored_tree_leaves_out_names_that_reach_outside() {
+        let t = Tree::from_stored(
+            [
+                &b"a"[..],
+                b"..",
+                b"../../.bashrc",
+                b"/etc/passwd",
+                b"b",
+                b"c/d",
+            ]
+            .into_iter()
+            .map(node)
+            .collect(),
+        );
+        let names: Vec<&OsStr> = t.nodes.iter().map(|n| n.name.as_os_str()).collect();
+        assert_eq!(names, ["a", "b"]);
     }
 }

@@ -9,9 +9,10 @@ use anyhow::{Context, Result, anyhow, bail};
 use rustic_backend::BackendOptions;
 use rustic_core::repofile::{Node as RNode, NodeType, SnapshotFile};
 use rustic_core::{
-    CommandInput, CredentialOptions, Credentials, IndexedFullStatus, IndexedIdsStatus,
+    CommandInput, CredentialOptions, Credentials, ErrorKind, IndexedFullStatus, IndexedIdsStatus,
     LocalDestination, LsOptions, OpenStatus, Progress, ProgressBars, ProgressType, Repository,
-    RepositoryBackends, RepositoryOptions, RestoreOptions, RusticProgress,
+    RepositoryBackends, RepositoryOptions, RestoreOptions, RusticError, RusticProgress,
+    RusticResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -307,9 +308,9 @@ impl Repo for RusticRepo {
     fn tree(&self, id: &TreeId) -> Result<Arc<Tree>> {
         let rid = rustic_core::TreeId::from(rustic_core::Id::new(id.0.0));
         let t = self.trees.get_tree(&rid).map_err(|e| anyhow!("{e}"))?;
-        Ok(Arc::new(Tree {
-            nodes: t.nodes.iter().map(node_from).collect(),
-        }))
+        Ok(Arc::new(Tree::from_stored(
+            t.nodes.iter().map(node_from).collect(),
+        )))
     }
 
     fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>> {
@@ -413,12 +414,60 @@ fn restore_with(
         .ls(&node, &LsOptions::default())
         .map_err(|e| anyhow!("{e}"))?;
     let plan = repo
-        .prepare_restore(&opts, ls.clone(), &dest, false)
+        .prepare_restore(&opts, plain_names(ls.clone()), &dest, false)
         .map_err(|e| anyhow!("{e}"))?;
     if stop.load(Ordering::Relaxed) {
         return Err(Stopped.into());
     }
-    repo.restore(plan, &opts, ls, &dest)
+    repo.restore(plan, &opts, plain_names(ls), &dest)
         .map_err(|e| anyhow!("{e}"))?;
     Ok(())
+}
+
+/// rustic's walk of what to restore, failing at an entry whose name isn't
+/// [plain](super::is_plain_name): rustic joins names onto the destination,
+/// and such a name would write outside it. Both of rustic's passes stop at
+/// the first error, and the planning pass sees every entry before any
+/// content is written.
+fn plain_names(
+    ls: impl Iterator<Item = RusticResult<(PathBuf, RNode)>>,
+) -> impl Iterator<Item = RusticResult<(PathBuf, RNode)>> {
+    ls.map(|item| {
+        let (path, node) = item?;
+        if super::is_plain_name(&node.name()) {
+            return Ok((path, node));
+        }
+        Err(RusticError::new(
+            ErrorKind::InvalidInput,
+            "The snapshot holds an entry named `{name}` in `{path}`, which would restore outside the destination.",
+        )
+        .attach_context("name", format!("{:?}", node.name()))
+        .attach_context("path", path.parent().unwrap_or(&path).display().to_string()))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustic_core::repofile::Metadata;
+    use std::ffi::OsStr;
+
+    fn entry(name: &str) -> RusticResult<(PathBuf, RNode)> {
+        let node = RNode::new_node(OsStr::new(name), NodeType::File, Metadata::default());
+        Ok((PathBuf::from("src").join(name), node))
+    }
+
+    #[test]
+    fn a_restore_stops_at_a_name_that_reaches_outside() {
+        let names = |ns: &[&str]| -> Vec<RusticResult<(PathBuf, RNode)>> {
+            plain_names(ns.iter().map(|n| entry(n)).collect::<Vec<_>>().into_iter()).collect()
+        };
+        assert!(names(&["a", ".b", "c"]).iter().all(Result::is_ok));
+        for bad in ["..", "../../.bashrc", "/etc/cron.d/x", "a/b", ""] {
+            let out = names(&["a", bad, "c"]);
+            assert!(out[0].is_ok());
+            let err = out[1].as_ref().expect_err(bad).to_string();
+            assert!(err.contains("outside the destination"), "{err}");
+        }
+    }
 }
