@@ -1,11 +1,12 @@
 # The README's demo, recorded with vhs (https://github.com/charmbracelet/vhs).
-# Regenerate from the repository root:
+# Install restoric first (cargo install --locked --path .), then regenerate
+# from the repository root:
 #
 #     vhs docs/demo.tape
 #
-# It builds the release binary first and drives `restoric demo`, which runs
-# against the sample project in tests/fixtures/project.dsl, so the result
-# depends only on the source, not on any repository or clock.
+# It drives `restoric demo`, which runs against the sample project in
+# tests/fixtures/project.dsl, so the result depends only on the installed
+# binary, not on any repository or clock.
 
 Output docs/demo.gif
 
@@ -19,12 +20,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
 Env TZ UTC
 
-Hide
-Type "cargo build --release --quiet && clear" Enter
-Wait+Line@120s
-Show
-
-Type "target/release/restoric demo --no-icons" Sleep 400ms Enter
+Type "restoric demo --no-icons" Sleep 400ms Enter
 Sleep 2.5s
 
 # Move to main.go and step through the snapshots where it changed.
@@ -38,11 +34,15 @@ Tab Sleep 2.5s
 
 # A file opens its versions.
 Enter Sleep 2.5s
-Type "j" Sleep 1s
-Type "j" Sleep 1.5s
 Escape Sleep 1s
 
 # Yank a version and put it next to the original.
+Type "y" Sleep 1.5s
+Type "p" Sleep 2.5s
+
+# Find a file deleted weeks ago in every snapshot, and bring it back.
+Type ":find feature" Sleep 500ms Enter Sleep 2.5s
+Enter Sleep 2s
 Type "y" Sleep 1.5s
 Type "p" Sleep 2.5s
 
