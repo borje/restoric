@@ -14,13 +14,15 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 
 ## Install
 
-From a checkout (Rust 1.91 or newer):
+With Rust 1.91 or newer:
 
 ```sh
-cargo install --locked --path .
+cargo install --locked restoric
 ```
 
-Release binaries for Linux (x86_64, aarch64) and macOS are built for each tag. A [Nerd Font](https://www.nerdfonts.com) gives file-type icons; without one, use `--no-icons` or `icons = false`.
+Or download a binary for Linux (x86_64, aarch64) or macOS (Apple silicon, Intel) from [Releases](https://github.com/borje/restoric/releases), unpack it and put `restoric` on your `PATH`. On macOS, if a binary downloaded in a browser won't open, run `xattr -d com.apple.quarantine restoric`.
+
+A [Nerd Font](https://www.nerdfonts.com) gives file-type icons; without one, use `--no-icons` or `icons = false`.
 
 Try it without a repository:
 
@@ -115,4 +117,4 @@ Colours follow your terminal's 16-colour theme, and `NO_COLOR` turns them off. r
 
 ## Status
 
-Work in progress. Licensed under the [GNU AGPL v3](LICENSE) or later.
+Early (0.x), expect changes. Report bugs in [issues](https://github.com/borje/restoric/issues). Licensed under the [GNU AGPL v3](LICENSE) or later.
