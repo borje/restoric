@@ -14,6 +14,12 @@ You open a folder and scrub through time. restoric only stops at the snapshots w
 
 ## Install
 
+With Homebrew (macOS or Linux):
+
+```sh
+brew install borje/tap/restoric
+```
+
 With Rust 1.91 or newer:
 
 ```sh
