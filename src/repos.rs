@@ -32,10 +32,43 @@ struct Seen {
     roots: BTreeSet<Root>,
 }
 
-/// The snapshot roots seen in each repository, by its location.
+/// The snapshot roots seen in each repository, by a hash of its location:
+/// a location may hold a password (`rest:https://me:pw@host/`), and the
+/// file shouldn't.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProbeCache {
     repos: BTreeMap<String, Seen>,
+}
+
+/// The cache's key for a location.
+fn key(repo: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(repo.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// `location` with the password in a URL's user info hidden
+/// (`rest:https://me:***@host/`), for logs, messages and the screen.
+pub fn redact(location: &str) -> String {
+    let Some(start) = location.find("://").map(|i| i + 3) else {
+        return location.to_string();
+    };
+    let rest = &location[start..];
+    let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+    let Some(at) = authority.rfind('@') else {
+        return location.to_string();
+    };
+    let Some(colon) = authority[..at].find(':') else {
+        return location.to_string();
+    };
+    format!(
+        "{}{}:***{}",
+        &location[..start],
+        &rest[..colon],
+        &rest[at..]
+    )
 }
 
 impl ProbeCache {
@@ -44,17 +77,21 @@ impl ProbeCache {
     }
 
     /// The file at `p`, or an empty cache if it's missing or unreadable:
-    /// everything in it can be read again.
+    /// everything in it can be read again. Entries keyed by the location
+    /// itself, from before keys were hashed, are dropped.
     pub fn load(p: &Path) -> Self {
-        std::fs::read(p)
+        let mut c: Self = std::fs::read(p)
             .ok()
             .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        c.repos
+            .retain(|k, _| k.len() == 64 && k.bytes().all(|b| b.is_ascii_hexdigit()));
+        c
     }
 
     pub fn save(&self, p: &Path) -> Result<()> {
         if let Some(dir) = p.parent() {
-            std::fs::create_dir_all(dir)?;
+            crate::dirs::create_private(dir)?;
         }
         std::fs::write(p, serde_json::to_vec(self)?)
             .with_context(|| format!("writing {}", p.display()))
@@ -71,7 +108,7 @@ impl ProbeCache {
             })
             .collect();
         self.repos.insert(
-            repo.to_string(),
+            key(repo),
             Seen {
                 checked: now.as_second(),
                 roots,
@@ -81,7 +118,7 @@ impl ProbeCache {
 
     /// What the cache remembers of `repo`, for the picker's repo level.
     pub fn seen(&self, repo: &str) -> Option<SeenRepo> {
-        let s = self.repos.get(repo)?;
+        let s = self.repos.get(&key(repo))?;
         let mut hosts: Vec<String> = s.roots.iter().map(|r| r.host.clone()).collect();
         hosts.dedup();
         Some(SeenRepo {
@@ -93,14 +130,14 @@ impl ProbeCache {
 
     fn fresh(&self, repo: &str, now: Timestamp) -> bool {
         self.repos
-            .get(repo)
+            .get(&key(repo))
             .is_some_and(|s| now.as_second() - s.checked < RECHECK.as_secs())
     }
 
     /// How closely `c`'s remembered snapshots of ours hold `folder`.
     fn fit(&self, c: &Candidate, folder: &Path) -> Option<Fit> {
         self.repos
-            .get(&c.repo)?
+            .get(&key(&c.repo))?
             .roots
             .iter()
             .filter(|r| c.filter.accepts(&r.host, &r.tags))
@@ -417,6 +454,28 @@ mod tests {
     }
 
     #[test]
+    fn redacts_the_password_in_a_url() {
+        let r = |s| redact(s);
+        assert_eq!(
+            r("rest:https://me:pw@host:8000/x"),
+            "rest:https://me:***@host:8000/x"
+        );
+        assert_eq!(r("rest:http://me:p@ss:w@host/"), "rest:http://me:***@host/");
+        assert_eq!(
+            r("s3:https://host/bucket?a=b@c"),
+            "s3:https://host/bucket?a=b@c"
+        );
+        for same in [
+            "rest:http://me@host/",
+            "sftp:me@nas:/backup",
+            "/mnt/b",
+            "rclone:r:p",
+        ] {
+            assert_eq!(r(same), same);
+        }
+    }
+
+    #[test]
     fn the_cache_survives_a_round_trip() {
         let dir = std::env::temp_dir().join(format!("restoric-repos-{}", std::process::id()));
         let p = dir.join("repos.json");
@@ -424,8 +483,8 @@ mod tests {
         cache.record("a", &[snap("me", "t", "/x")], at(5));
         cache.save(&p).unwrap();
         let back = ProbeCache::load(&p);
-        assert_eq!(back.repos["a"].checked, 5);
-        assert_eq!(back.repos["a"].roots.len(), 1);
+        assert_eq!(back.repos[&key("a")].checked, 5);
+        assert_eq!(back.repos[&key("a")].roots.len(), 1);
         let seen = back.seen("a").unwrap();
         assert_eq!(seen.checked, at(5));
         assert_eq!(seen.hosts, ["me"]);
@@ -437,6 +496,18 @@ mod tests {
             tag: None
         }));
         assert_eq!(back.seen("b"), None);
+        // Locations never reach the file, and old entries keyed by one go.
+        let pw = "rest:https://me:hunter2@host/";
+        cache.record(pw, &[snap("me", "", "/x")], at(5));
+        cache.save(&p).unwrap();
+        let text = std::fs::read_to_string(&p).unwrap();
+        assert!(
+            !text.contains("hunter2") && !text.contains("\"a\""),
+            "{text}"
+        );
+        assert!(ProbeCache::load(&p).seen(pw).is_some());
+        std::fs::write(&p, r#"{"repos":{"/old":{"checked":1,"roots":[]}}}"#).unwrap();
+        assert!(ProbeCache::load(&p).repos.is_empty());
         std::fs::write(&p, "not json").unwrap();
         assert!(ProbeCache::load(&p).repos.is_empty());
         let _ = std::fs::remove_dir_all(dir);

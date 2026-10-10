@@ -32,7 +32,7 @@ fn setup() -> Setup {
     let snap = repo.snapshots().unwrap().remove(0);
     let places = Places {
         restore_dir: dir.path().join("Restored"),
-        undo_dir: dir.path().join("undo"),
+        undo_dir: Some(dir.path().join("undo")),
         tz: TimeZone::UTC,
     };
     Setup {
@@ -222,4 +222,28 @@ fn tar_counts_bytes_and_stops_anywhere() {
     .unwrap();
     assert!(o.stopped);
     assert!(names(&s.root).is_empty());
+}
+
+/// Without a folder for undo data, an overwrite refuses before it moves
+/// anything, rather than keeping the old files somewhere shared.
+#[test]
+fn an_overwrite_without_an_undo_folder_touches_nothing() {
+    let mut s = setup();
+    s.places.undo_dir = None;
+    fs::write(s.root.join("a.txt"), "changed\n").unwrap();
+    let err = run(
+        &s.repo,
+        &[s.target("a.txt")],
+        &How::Overwrite,
+        &s.places,
+        &mut |_| {},
+        &Cancel::default(),
+    )
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("XDG_DATA_HOME"), "{err:#}");
+    assert_eq!(
+        fs::read_to_string(s.root.join("a.txt")).unwrap(),
+        "changed\n"
+    );
+    assert!(undo(&s.places).is_err());
 }

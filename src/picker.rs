@@ -18,7 +18,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::index::{Index, fold};
 use crate::repo::SnapshotInfo;
-use crate::repos::{Candidate, ProbeCache, fit};
+use crate::repos::{Candidate, ProbeCache, fit, redact};
 
 /// One (host, backup path) group of snapshots.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -209,7 +209,7 @@ impl Picker {
                 let seen = cache.seen(&c.repo);
                 RepoRow {
                     index,
-                    location: c.repo.clone(),
+                    location: redact(&c.repo),
                     wanted: c.filter.hosts.clone(),
                     hosts: seen.as_ref().map(|s| s.hosts.clone()).unwrap_or_default(),
                     read: seen.as_ref().map(|s| s.checked),

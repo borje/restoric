@@ -106,7 +106,20 @@ struct ViewArgs {
 
 fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
     let dir = restoric::dirs::state()?;
-    std::fs::create_dir_all(&dir).ok()?;
+    restoric::dirs::create_private(&dir).ok()?;
+    // The log names repositories and paths: this user's alone.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let log = dir.join("restoric.log");
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .mode(0o600)
+            .open(&log)
+            .ok()?;
+        std::fs::set_permissions(&log, std::fs::Permissions::from_mode(0o600)).ok()?;
+    }
     let (writer, guard) =
         tracing_appender::non_blocking(tracing_appender::rolling::never(dir, "restoric.log"));
     let filter = tracing_subscriber::EnvFilter::try_from_env("RESTORIC_LOG")
@@ -242,7 +255,7 @@ fn start(
     let flags = args.access();
     let env = env_access();
     let direct = |a: Access| -> Result<Start> {
-        let location = a.repo.clone().unwrap_or_else(|| {
+        let location = a.repo.as_deref().map(repos::redact).unwrap_or_else(|| {
             a.repo_file
                 .as_ref()
                 .map(|f| f.display().to_string())
@@ -273,7 +286,7 @@ fn start(
         return Ok(Start::Repo {
             repo: Box::new(RusticRepo::from_connection(c)?),
             entry: Some(0),
-            location: e.repository.clone(),
+            location: repos::redact(&e.repository),
         });
     }
     if browse {
@@ -288,7 +301,7 @@ fn start(
         |i, probing| {
             let e = &config.repo[i];
             if probing && tty {
-                eprint!("\rchecking {}…\x1b[K", e.repository);
+                eprint!("\rchecking {}…\x1b[K", repos::redact(&e.repository));
             }
             let a = resolve_access(&flags, &env, Some(e), home);
             let c = Connection::open(&open_options(a))?;
@@ -296,7 +309,7 @@ fn start(
             Ok((c, snaps))
         },
         |i, err| {
-            let repo = &config.repo[i].repository;
+            let repo = repos::redact(&config.repo[i].repository);
             tracing::warn!("skipping {repo}: {err:#}");
             if tty {
                 eprint!("\r\x1b[K");
@@ -312,7 +325,7 @@ fn start(
         Some((i, c)) => Ok(Start::Repo {
             repo: Box::new(RusticRepo::from_connection(c)?),
             entry: Some(i),
-            location: config.repo[i].repository.clone(),
+            location: repos::redact(&config.repo[i].repository),
         }),
         None if env.has_repo() => direct(resolve_access(&flags, &env, None, home)),
         None => Ok(Start::Repos),
@@ -321,7 +334,11 @@ fn start(
 
 /// The error for a folder no configured repository holds, without a TUI.
 fn none_holds(config: &Config, folder: &Path) -> anyhow::Error {
-    let names: Vec<&str> = config.repo.iter().map(|e| e.repository.as_str()).collect();
+    let names: Vec<String> = config
+        .repo
+        .iter()
+        .map(|e| repos::redact(&e.repository))
+        .collect();
     anyhow!(
         "none of the repositories in the config has snapshots of {} ({}); \
          use --repo, set RESTIC_REPOSITORY, or pick one with --browse",
@@ -401,10 +418,14 @@ fn tui(
 }
 
 /// `restoric demo`: the sample project, written to a temporary folder so
-/// restores have somewhere real to go.
+/// restores have somewhere real to go. The folder has a random name and is
+/// this user's alone, so nobody else can plant files in it first.
 fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
-    let dir = std::env::temp_dir().join(format!("restoric-demo-{}", std::process::id()));
-    std::fs::create_dir_all(&dir)?;
+    let tmp = tempfile::Builder::new()
+        .prefix("restoric-demo-")
+        .tempdir()
+        .context("creating the demo folder")?;
+    let dir = tmp.path().to_path_buf();
     let root = dir.join("dev/project");
     let dsl = include_str!("../tests/fixtures/project.dsl").replace(
         "root /home/bege/dev/project",
@@ -427,10 +448,10 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
         Some(dir.clone()),
     );
     app.places.restore_dir = dir.join("Restored");
-    app.places.undo_dir = dir.join("undo");
+    app.places.undo_dir = Some(dir.join("undo"));
     let result = Term::new()
         .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, config));
-    let _ = std::fs::remove_dir_all(&dir);
+    drop(tmp);
     result.map(|_| ())
 }
 

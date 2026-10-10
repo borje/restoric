@@ -75,7 +75,8 @@ impl Cache {
             let _ = std::fs::remove_file(path);
         }
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+            crate::dirs::create_private(dir)
+                .with_context(|| format!("creating {}", dir.display()))?;
         }
         let db = match Self::open_matching(path, backend) {
             Ok(Some(db)) => db,

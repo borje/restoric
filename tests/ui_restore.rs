@@ -129,7 +129,7 @@ fn paste_overwrite_and_undo() {
     let mut h = Harness::with(&dsl, root.to_str().unwrap());
     let places = restoric::restore::Places {
         restore_dir: dir.path().join("Restored"),
-        undo_dir: dir.path().join("undo"),
+        undo_dir: Some(dir.path().join("undo")),
         tz: jiff::tz::TimeZone::UTC,
     };
     h.ctx.places = places.clone();

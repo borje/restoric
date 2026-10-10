@@ -98,8 +98,10 @@ pub enum How {
 pub struct Places {
     /// `~/Restored`
     pub restore_dir: PathBuf,
-    /// `~/.local/share/restoric/undo`
-    pub undo_dir: PathBuf,
+    /// `~/.local/share/restoric/undo`; `None` without a home folder or
+    /// `XDG_DATA_HOME`, and then nothing is overwritten. Never the shared
+    /// temporary folder: it would hold the user's overwritten files.
+    pub undo_dir: Option<PathBuf>,
     pub tz: TimeZone,
 }
 
@@ -107,9 +109,7 @@ impl Places {
     pub fn default_for(tz: TimeZone) -> Self {
         Places {
             restore_dir: crate::dirs::home().unwrap_or_default().join("Restored"),
-            undo_dir: crate::dirs::data()
-                .unwrap_or_else(std::env::temp_dir)
-                .join("undo"),
+            undo_dir: crate::dirs::data().map(|d| d.join("undo")),
             tz,
         }
     }
@@ -325,7 +325,7 @@ fn overwrite(
             stopped: true,
         })
     };
-    let session = new_session(&places.undo_dir)?;
+    let session = new_session(places.undo_dir.as_deref())?;
     let mut manifest = Manifest::default();
     let mut done = Vec::new();
     for (i, t) in targets.iter().enumerate() {
@@ -384,8 +384,11 @@ fn overwrite(
     })
 }
 
-fn new_session(undo_dir: &Path) -> Result<PathBuf> {
-    fs::create_dir_all(undo_dir).with_context(|| format!("creating {}", undo_dir.display()))?;
+fn new_session(undo_dir: Option<&Path>) -> Result<PathBuf> {
+    let undo_dir = undo_dir
+        .context("no folder to keep what an overwrite replaces: set HOME or XDG_DATA_HOME")?;
+    crate::dirs::create_private(undo_dir)
+        .with_context(|| format!("creating {}", undo_dir.display()))?;
     let now = Timestamp::now().strftime("%Y%m%dT%H%M%S%.f").to_string();
     let session = free(undo_dir, &now, "");
     fs::create_dir(&session)?;
@@ -399,12 +402,13 @@ fn write_manifest(session: &Path, m: &Manifest) -> Result<()> {
 
 /// Undoes the last overwrite. Returns the paths it put back.
 pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
-    let mut sessions: Vec<PathBuf> = match fs::read_dir(&places.undo_dir) {
-        Ok(rd) => rd
+    let read = places.undo_dir.as_deref().map(fs::read_dir);
+    let mut sessions: Vec<PathBuf> = match read {
+        Some(Ok(rd)) => rd
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.join(MANIFEST).is_file())
             .collect(),
-        Err(_) => Vec::new(),
+        _ => Vec::new(),
     };
     sessions.sort();
     let Some(session) = sessions.pop() else {

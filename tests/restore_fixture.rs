@@ -48,7 +48,7 @@ fn every_option() {
     let src = f.src();
     let places = Places {
         restore_dir: f.root.join("Restored"),
-        undo_dir: f.root.join("undo"),
+        undo_dir: Some(f.root.join("undo")),
         tz: TimeZone::UTC,
     };
     let st0 = stamp(snaps[0].time, &TimeZone::UTC);

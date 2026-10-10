@@ -67,7 +67,7 @@ impl Harness {
                 disk,
                 places: restoric::restore::Places {
                     restore_dir: PathBuf::from("/home/bege/Restored"),
-                    undo_dir: std::env::temp_dir().join("restoric-test-undo"),
+                    undo_dir: Some(std::env::temp_dir().join("restoric-test-undo")),
                     tz: TimeZone::UTC,
                 },
                 preview_limit: restoric::worker::PREVIEW_LIMIT,
