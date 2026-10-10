@@ -3,6 +3,7 @@
 use super::{Grid, TOP, fmt};
 use crate::app::selection::Confirm;
 use crate::app::{Action, App, View};
+use crate::repo::SnapshotInfo;
 
 /// What can follow a prefix key.
 fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Action)] {
@@ -142,13 +143,9 @@ fn took(d: jiff::SignedDuration) -> String {
     }
 }
 
-/// `i`: everything the repository says about a snapshot.
-pub fn info(app: &App, g: &mut Grid) {
-    let Some(s) = &app.info else { return };
-    let t = g.theme.clone();
-    let w = 84.min(g.cols().saturating_sub(4));
-    let vw = w.saturating_sub(20) as usize;
-    let mut rows: Vec<(&str, String)> = vec![
+/// A snapshot's details, as label and value rows `vw` columns wide.
+fn info_rows(app: &App, s: &SnapshotInfo, vw: usize) -> Vec<(&'static str, String)> {
+    let mut rows: Vec<(&'static str, String)> = vec![
         ("snapshot", s.id.to_string()),
         (
             "time",
@@ -213,10 +210,32 @@ pub fn info(app: &App, g: &mut Grid) {
             "No summary: restic before 0.17 didn't record one.".into(),
         )),
     }
+    rows
+}
+
+/// `i`: everything the repository says about the snapshot on screen.
+/// Moves in time keep it open and show the snapshot moved to.
+pub fn info(app: &App, g: &mut Grid) {
+    if !app.info {
+        return;
+    }
+    let t = g.theme.clone();
+    let w = 84.min(g.cols().saturating_sub(4));
+    let vw = w.saturating_sub(20) as usize;
+    let (title, rows) = match app.info_snapshot() {
+        Some((s, n, total)) => (format!("Snapshot {n}/{total}"), info_rows(app, &s, vw)),
+        None => (
+            "Snapshot".to_string(),
+            vec![(
+                "on disk",
+                "not a snapshot: H goes back to the newest".to_string(),
+            )],
+        ),
+    };
     let h = (rows.len() as u16 + 5).min(g.rows());
     let x = (g.cols() - w) / 2;
     let y = (g.rows() - h) / 2;
-    g.rbox(x, y, w, h, "Snapshot", t.bold);
+    g.rbox(x, y, w, h, &title, t.bold);
     let end = x + w - 1;
     for (n, (k, v)) in rows.iter().enumerate() {
         let r = y + 2 + n as u16;
@@ -227,7 +246,8 @@ pub fn info(app: &App, g: &mut Grid) {
         let style = if *k == "snapshot" { t.accent } else { t.text };
         g.put_to(x + 17, r, &fmt::fit(v, vw), style, end);
     }
-    g.put_to(x + 3, y + h - 2, "Press any key to close", t.dim, end);
+    let hint = "H L [ ] move · any other key closes";
+    g.put_to(x + 3, y + h - 2, hint, t.dim, end);
 }
 
 /// The restore dialog.

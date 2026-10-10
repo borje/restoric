@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::KeyCode;
+use ratatui::crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use common::{Harness, PROJECT, SRC};
@@ -277,24 +277,73 @@ snapshot 2026-07-02 10:00 label=pre-migration tags=manual
   write c.txt three\\n
 ";
 
-/// `i` shows the snapshot's details; any key closes them. On disk has none.
+/// `i` shows the snapshot's details. Moves in time keep them open on the
+/// snapshot moved to, the files on disk included; any other key closes them.
 #[test]
 fn snapshot_info() {
     let mut h = Harness::with(LABELLED, "/home/bege/data");
     h.at("2026-07-02 10:00").keys("i");
     insta::assert_snapshot!(h.screen(100, 30));
+    let place = |h: &Harness| h.app.info_snapshot().map(|(_, n, _)| n);
+    h.keys("H");
+    assert!(h.app.info);
+    assert_eq!(place(&h), Some(1));
+    h.keys("]");
+    assert_eq!(place(&h), Some(2));
+    h.keys("L");
+    assert!(h.app.info && place(&h).is_none());
+    insta::assert_snapshot!("snapshot_info_on_disk", h.screen(100, 14));
     h.keys("j");
-    assert!(h.app.info.is_none());
-    h.keys("Li");
-    assert!(h.app.info.is_none());
+    assert!(!h.app.info);
+    h.keys("i");
+    assert!(!h.app.info);
     assert_eq!(
         h.app.message.as_deref(),
         Some("The files on disk aren't a snapshot.")
     );
     // In the versions view, the selected version's snapshot.
-    h.keys("H").select("a.txt").keys("lji");
-    let info = h.app.info.as_ref().expect("details");
-    assert!(info.label.is_empty() && info.parent.is_none());
+    h.keys("H").select("a.txt").keys("li");
+    let label = |h: &Harness| h.app.info_snapshot().map(|(s, ..)| s.label);
+    assert_eq!(label(&h).as_deref(), Some("pre-migration"));
+    h.keys("H");
+    assert_eq!(label(&h).as_deref(), Some(""));
+}
+
+/// A click on a timeline dot keeps the details open on that snapshot;
+/// a click anywhere else closes them.
+#[test]
+fn snapshot_info_follows_clicks() {
+    let mut h = Harness::with(LABELLED, "/home/bege/data");
+    h.at("2026-07-02 10:00").keys("i");
+    let click = |h: &mut Harness, a: Option<Action>| {
+        let area = Rect::new(0, 0, 100, 30);
+        let mut buf = Buffer::empty(area);
+        let hits = ui::draw(&mut h.app, &mut buf, area, &Theme::new(false));
+        let (column, row) = match a {
+            Some(a) => {
+                let (r, _) = hits.areas.iter().find(|(_, b)| *b == a).unwrap();
+                (r.x, r.y)
+            }
+            None => (50, 15),
+        };
+        let kind = MouseEventKind::Down(MouseButton::Left);
+        let modifiers = KeyModifiers::NONE;
+        h.app.mouse(
+            MouseEvent {
+                kind,
+                column,
+                row,
+                modifiers,
+            },
+            &hits,
+        );
+        h.pump();
+    };
+    click(&mut h, Some(Action::GoSnapshot(0)));
+    assert!(h.app.info);
+    assert_eq!(h.app.info_snapshot().map(|(_, n, _)| n), Some(1));
+    click(&mut h, None);
+    assert!(!h.app.info);
 }
 
 const PHOTOS: &str = "

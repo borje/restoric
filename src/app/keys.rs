@@ -153,14 +153,43 @@ impl App {
         }
     }
 
+    /// Whether a key leaves the details popup open: a count, or a move in
+    /// time, after which it shows the snapshot moved to. Prefix keys close
+    /// it, so none is pending here.
+    fn keeps_info(&self, k: &KeyEvent) -> bool {
+        if matches!(k.code, KeyCode::Char('0'..='9')) {
+            return true;
+        }
+        let a = self
+            .keymap
+            .get(&(k.code, k.modifiers & KeyModifiers::CONTROL))
+            .cloned()
+            .or_else(|| action(&self.view, None, k));
+        use Action::*;
+        matches!(
+            a,
+            Some(
+                OlderChange
+                    | NewerChange
+                    | OlderSnapshot
+                    | NewerSnapshot
+                    | OldestChange
+                    | NewestChange
+                    | OlderItemChange
+                    | NewerItemChange
+            )
+        )
+    }
+
     pub fn key(&mut self, k: KeyEvent) {
         if k.kind == KeyEventKind::Release {
             return;
         }
-        // Help, details and messages close on any key.
-        if self.help || self.info.is_some() {
+        // Help and messages close on any key; details on any key that
+        // doesn't move in time.
+        if self.help || (self.info && !self.keeps_info(&k)) {
             self.help = false;
-            self.info = None;
+            self.info = false;
             return;
         }
         self.message = None;
@@ -245,13 +274,15 @@ impl App {
         };
         match m.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if self.help || self.info.is_some() {
+                let a = hits.at(m.column, m.row);
+                let moves = matches!(a, Some(Action::GoSnapshot(_) | Action::GoDisk));
+                if self.help || (self.info && !moves) {
                     self.help = false;
-                    self.info = None;
+                    self.info = false;
                     return;
                 }
                 self.message = None;
-                if let Some(a) = hits.at(m.column, m.row) {
+                if let Some(a) = a {
                     self.prefix = None;
                     self.act(a);
                 }

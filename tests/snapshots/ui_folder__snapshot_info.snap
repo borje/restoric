@@ -8,7 +8,7 @@ expression: "h.screen(100, 30)"
                                                                            ▲               − 1× +
 
  on disk  = latest    │ ≡ a.txt                         9 B  ~ │ a.txt · v2/2 · 9 B      ⇥ content
-▶Jul 02 ╭─ Snapshot ───────────────────────────────────────────────────────────────────────╮ − remo…
+▶Jul 02 ╭─ Snapshot 2/2 ───────────────────────────────────────────────────────────────────╮ − remo…
  Jul 01 │                                                                                  │
         │  snapshot      dbe858b51dcad828252dcf75dabdabd89b370d460a26651c7e77d5523983f9be  │
         │  time          2026-07-02 10:00:00 UTC                                           │
@@ -24,7 +24,7 @@ expression: "h.screen(100, 30)"
         │  added         15 B                                                              │
         │  read          3 files, 19 B                                                     │
         │                                                                                  │
-        │  Press any key to close                                                          │
+        │  H L [ ] move · any other key closes                                             │
         ╰──────────────────────────────────────────────────────────────────────────────────╯
                       │                                        │
                       │                                        │

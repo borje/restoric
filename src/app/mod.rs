@@ -431,8 +431,8 @@ pub struct App {
     /// A prefix key waiting for the next key (`g`, `z`).
     pub prefix: Option<char>,
     pub help: bool,
-    /// `i`: the snapshot shown in the details popup.
-    pub info: Option<SnapshotInfo>,
+    /// `i`: the details popup, of whichever snapshot is on screen.
+    pub info: bool,
     pub message: Option<String>,
     pub zoom: u32,
     /// Set once the user moves in time, so the start-up jump doesn't override it.
@@ -535,7 +535,7 @@ impl App {
             count: String::new(),
             prefix: None,
             help: false,
-            info: None,
+            info: false,
             message: None,
             zoom: 1,
             moved: false,
@@ -769,21 +769,35 @@ impl App {
         self.everything.iter().find(|s| s.id == id)
     }
 
-    /// `i`: the snapshot on screen, or the selected version's, in a popup.
+    /// `i`: open the details popup on a snapshot. Moves in time keep it
+    /// open (see `keys.rs`), so it follows [`App::info_snapshot`].
     fn show_info(&mut self) -> bool {
-        let snap = match &self.view {
-            View::Folder if !self.on_disk() => self.set().get(self.idx()).cloned(),
-            View::Versions(v) if !v.disk => self
-                .version_node(v)
-                .and_then(|(r, _)| self.tracks.get(&v.path)?.set.get(r.from).cloned()),
-            View::Folder | View::Versions(_) => {
+        match &self.view {
+            View::Folder | View::Versions(_) if self.info_snapshot().is_none() => {
                 self.message = Some("The files on disk aren't a snapshot.".into());
-                return false;
+                false
             }
-            _ => None,
+            View::Folder | View::Versions(_) => {
+                self.info = true;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The snapshot on screen, or the selected version's, with its place
+    /// among the snapshots (from 1, oldest first) and how many there are.
+    /// `None` on disk.
+    pub fn info_snapshot(&self) -> Option<(SnapshotInfo, usize, usize)> {
+        let (set, i) = match &self.view {
+            View::Folder if !self.on_disk() => (self.set(), self.idx()),
+            View::Versions(v) if !v.disk => {
+                let (r, _) = self.version_node(v)?;
+                (self.tracks.get(&v.path)?.set.clone(), r.from)
+            }
+            _ => return None,
         };
-        self.info = snap;
-        self.info.is_some()
+        Some((set.get(i)?.clone(), i + 1, set.len()))
     }
 
     /// The file node shown in the preview of the versions view.

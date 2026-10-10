@@ -66,7 +66,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `{` `}` | Older / newer change of the selected item |
 | `⇥` `J` `K` | Preview: content or diff against disk, scroll |
 | `d` | Full-screen diff against disk (`p` in it: against the previous version) |
-| `i` | Snapshot details: label, description, what the backup added and read |
+| `i` | Snapshot details: label, description, what the backup added and read (`H` `L` `[` `]` move it through time) |
 | `S` | Folder sizes, and the bytes this snapshot added to the folder (walks each folder once; cached) |
 | `b` | Pin this snapshot as the base: the listing and `d` compare with it instead of the snapshot before (`b` on it again to unpin) |
 | `Space` `v` | Select / visual select |
