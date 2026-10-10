@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>restoric</title>
+<meta name="description" content="A terminal UI for browsing and restoring files from a restic repository by time, anchored on a folder.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{--bg:#E8ECEB;--fg:#18211F;--muted:#56635F;--line:#C6CFCC;--panel:#F4F6F5;--accent:#9A5E08;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;--sans:"IBM Plex Sans",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#101517;--fg:#D5DCDA;--muted:#8C9895;--line:#2A3437;--panel:#161D20;--accent:#E2A64B;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 var(--sans)}
+.page{max-width:900px;margin:0 auto;padding:40px 16px 56px}
+h1{font:700 28px var(--mono);margin:0 0 8px;letter-spacing:-.01em}
+h2{font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:40px 0 10px}
+p{margin:0 0 12px}
+.lead{font-size:18px;max-width:60ch}
+a{color:var(--accent)}
+nav{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0 24px}
+img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px}
+ul{padding-left:20px;margin:0}li{margin-bottom:6px}
+pre,code,kbd{font-family:var(--mono);font-size:13px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:0 0 12px}
+code,kbd{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+pre code{border:0;padding:0;background:none}
+table{border-collapse:collapse;width:100%}
+td{padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{white-space:nowrap}
+footer{margin-top:48px;color:var(--muted);font-size:13px}
+</style>
+</head><body><div class="page">
+<h1>restoric</h1>
+<p class="lead">Browse and restore files from a <a href="https://restic.net">restic</a> repository by time, anchored on a folder. Like Time Machine, in your terminal.</p>
+<nav><a href="https://github.com/borje/restoric">GitHub</a><a href="https://github.com/borje/restoric/releases">Releases</a><a href="https://github.com/borje/restoric/issues">Issues</a></nav>
+<img src="demo.gif" alt="restoric browsing a folder's history, diffing a version and restoring it" width="900">
+
+<h2>Why</h2>
+<p>You know the file was in <code>~/dev/project</code> last Tuesday. With plain restic you mount the repository or list snapshots and guess which one has it. restoric starts from the folder instead and steps through the moments it changed.</p>
+
+<h2>What it does</h2>
+<ul>
+  <li><b>Folder first.</b> Open a folder and scrub through time. It stops only at snapshots where that folder changed.</li>
+  <li><b>See the change.</b> Preview any version, or diff it against disk or the previous version.</li>
+  <li><b>Restore like copy and paste.</b> <kbd>y</kbd> yank, <kbd>p</kbd> restore next to the original, <kbd>P</kbd> overwrite after it tells you what differs. <code>:undo</code> puts it back.</li>
+  <li><b>Read-only.</b> Never writes to the repository. No FUSE, no mount.</li>
+  <li><b>Any backend.</b> Built on rustic_core: local, sftp, REST, rclone, S3, B2, Azure and more.</li>
+  <li><b>Looks like yazi.</b> Vim keys, mouse support, Nerd Font icons, themeable.</li>
+</ul>
+
+<h2>Install</h2>
+<pre><code>cargo install --locked --path .</code></pre>
+<p>Rust 1.91+. Release binaries for Linux (x86_64, aarch64) and macOS are on the <a href="https://github.com/borje/restoric/releases">releases page</a>.</p>
+
+<h2>Try it</h2>
+<pre><code>restoric demo     # no repository needed</code></pre>
+<pre><code>export RESTIC_REPOSITORY=sftp:nas:/backup/restic
+export RESTIC_PASSWORD_COMMAND="pass show restic"
+restoric                 # the current folder
+restoric ~/dev/project   # or any folder in your backups</code></pre>
+
+<h2>Keys</h2>
+<table>
+<tr><td><kbd>j</kbd> <kbd>k</kbd> <kbd>h</kbd> <kbd>l</kbd></td><td>Move, parent / open</td></tr>
+<tr><td><kbd>H</kbd> <kbd>L</kbd></td><td>Older / newer change in this folder</td></tr>
+<tr><td><kbd>⇥</kbd> <kbd>d</kbd></td><td>Preview content or diff / full-screen diff</td></tr>
+<tr><td><kbd>y</kbd> <kbd>p</kbd> <kbd>P</kbd></td><td>Yank, restore next to it, overwrite</td></tr>
+<tr><td><kbd>s</kbd> <kbd>/</kbd> <kbd>f</kbd></td><td>Search all snapshots, search, filter</td></tr>
+<tr><td><kbd>?</kbd></td><td>Full list</td></tr>
+</table>
+
+<footer>Licensed under the <a href="https://github.com/borje/restoric/blob/main/LICENSE">GNU AGPL v3</a> or later. Work in progress.</footer>
+</div></body></html>

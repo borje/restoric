@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.91"
 description = "Browse and restore a restic repository by time, anchored on a folder"
 license = "AGPL-3.0-or-later"
-exclude = ["docs/mockup.html", "spike/"]
+exclude = ["docs/index.html", "spike/"]
 
 [dependencies]
 anyhow = "1.0.104"

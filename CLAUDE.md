@@ -2,8 +2,6 @@
 
 A Rust TUI for browsing and restoring a restic repository by time, anchored on a folder. Built on rustic_core and ratatui, styled after yazi.
 
-The mockup for the UI is `docs/mockup.html`.
-
 ## Boundaries that hold the design together
 - Everything outside `src/repo/` talks to the repository only through the `Repo` trait. rustic_core types stay inside `src/repo/rustic.rs`.
 - The UI thread draws from `App` state and caches only. Repository access goes through `worker.rs` requests.
