@@ -39,17 +39,27 @@ fn locked_says_why() {
     ));
 }
 
-const PROMPT: &str = "(input hidden): ";
+const PROMPT: &str = "password for ";
+
+/// Columns of the pseudo-terminal: narrower than any repository path here,
+/// so the prompt has to shorten it.
+const COLS: u16 = 30;
 
 fn openpty() -> (OwnedFd, OwnedFd) {
     let (mut master, mut slave) = (0, 0);
+    let mut size = libc::winsize {
+        ws_row: 24,
+        ws_col: COLS,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
     let r = unsafe {
         libc::openpty(
             &mut master,
             &mut slave,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            &mut size,
         )
     };
     assert_eq!(r, 0, "openpty: {}", std::io::Error::last_os_error());
@@ -196,10 +206,12 @@ fn asks_when_nothing_gives_the_password() {
 
     let s = run(f, &["restoric\r"]);
     assert_eq!(rc(&s), "0", "{s}");
-    assert!(s.contains("password for "), "{s}");
     assert!(s.contains("\"snapshot\""), "{s}");
-    // Nothing between the prompt and the newline after it.
-    assert!(s.contains(&format!("{PROMPT}\r\n")), "echoed: {s}");
+    // One line, the middle of the location cut, and nothing echoed after it.
+    let line = s.split(PROMPT).nth(1).and_then(|l| l.split("\r\n").next());
+    let line = format!("{PROMPT}{}", line.unwrap_or_default());
+    assert!(line.chars().count() < usize::from(COLS), "{line:?}");
+    assert!(line.contains('…') && line.ends_with("/repo: "), "{line:?}");
     assert!(cooked(&s), "{s}");
 
     let s = run(f, &["nope\r", "restoric\r"]);
@@ -242,6 +254,6 @@ fn no_terminal_no_prompt() {
     let out = child.wait_with_output().unwrap();
     let err = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{err}");
-    assert!(err.contains("no password given"), "{err}");
-    assert!(!err.contains(PROMPT), "{err}");
+    // The error, with no prompt before it.
+    assert!(err.starts_with("restoric: no password given"), "{err}");
 }

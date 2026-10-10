@@ -14,6 +14,8 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, Ke
 use ratatui::crossterm::terminal;
 use zeroize::Zeroizing;
 
+use crate::ui::fmt::fit_middle;
+
 fn tty() -> io::Result<File> {
     OpenOptions::new().read(true).write(true).open("/dev/tty")
 }
@@ -85,7 +87,14 @@ impl Drop for Raw {
 /// Asks for a password after `label`, without echo. None when cancelled.
 pub fn ask(label: &str) -> io::Result<Option<Zeroizing<String>>> {
     let mut tty = tty()?;
-    write!(tty, "\r\x1b[K{label} (input hidden): ")?;
+    // On one line, so a long location gives up its middle. A size of 0
+    // means the terminal doesn't say.
+    let cols = terminal::size()
+        .ok()
+        .filter(|&(w, _)| w > 0)
+        .map_or(80, |(w, _)| usize::from(w));
+    let label = fit_middle(label, cols.saturating_sub(3));
+    write!(tty, "\r\x1b[K{label}: ")?;
     tty.flush()?;
     terminal::enable_raw_mode()?;
     let raw = Raw;

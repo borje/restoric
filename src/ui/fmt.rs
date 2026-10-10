@@ -108,6 +108,26 @@ pub fn fit(s: &str, w: usize) -> String {
     out
 }
 
+/// `s` cut to `w` columns in the middle, with `…` there when cut: the ends
+/// of a path or URL say more than its middle.
+pub fn fit_middle(s: &str, w: usize) -> String {
+    if width(s) <= w {
+        return s.to_string();
+    }
+    let mut tail = Vec::new();
+    let mut used = 0;
+    for c in s.chars().rev() {
+        let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+        if used + cw > w.saturating_sub(1) / 2 {
+            break;
+        }
+        tail.push(c);
+        used += cw;
+    }
+    let head = fit(s, w - used);
+    head + &tail.iter().rev().collect::<String>()
+}
+
 /// Words wrapped to `w` columns.
 pub fn wrap(text: &str, w: usize) -> Vec<String> {
     let mut out = Vec::new();
@@ -142,6 +162,11 @@ mod tests {
     fn fits_and_wraps() {
         assert_eq!(fit("config.go", 20), "config.go");
         assert_eq!(fit("a-very-long-name.go", 8), "a-very-…");
+        let url = "sftp:nas:/a/very/long/backup/path";
+        assert_eq!(fit_middle(url, 40), url);
+        assert_eq!(fit_middle(url, 16), "sftp:nas…up/path");
+        assert_eq!(width(&fit_middle(url, 17)), 17);
+        assert_eq!(fit_middle(url, 1), "…");
         assert_eq!(wrap("one two three", 7), ["one two", "three"]);
     }
 
