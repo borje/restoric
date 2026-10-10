@@ -26,7 +26,7 @@ With Rust 1.91 or newer:
 cargo install --locked restoric
 ```
 
-Or download a binary for Linux (x86_64, aarch64) or macOS (Apple silicon, Intel) from [Releases](https://github.com/borje/restoric/releases), unpack it and put `restoric` on your `PATH`. On macOS, if a binary downloaded in a browser won't open, run `xattr -d com.apple.quarantine restoric`.
+Or download a binary for Linux (x86_64, aarch64; `-musl` builds are static and run on any distro, Alpine included) or macOS (Apple silicon, Intel) from [Releases](https://github.com/borje/restoric/releases), unpack it and put `restoric` on your `PATH`. On macOS, if a binary downloaded in a browser won't open, run `xattr -d com.apple.quarantine restoric`.
 
 A [Nerd Font](https://www.nerdfonts.com) gives file-type icons; without one, use `--no-icons` or `icons = false`.
 
