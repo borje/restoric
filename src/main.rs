@@ -13,13 +13,15 @@ use restoric::disk::RealDisk;
 use restoric::index::timeline::{Filter, explain_empty, timeline_set};
 use restoric::index::{Index, Mode};
 use restoric::picker::Picker;
+use restoric::prompt;
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
-use restoric::repo::rustic::{BACKEND, Connection, OpenOptions, RusticRepo};
-use restoric::repos::{self, Candidate, ProbeCache};
+use restoric::repo::rustic::{BACKEND, Connection, Locked, OpenOptions, RusticRepo};
+use restoric::repos::{self, Candidate, ProbeCache, redact};
 use restoric::tui::{Io, Term};
 use restoric::ui::theme::Theme;
 use restoric::worker::{Ctx, Worker};
+use zeroize::Zeroizing;
 
 /// Browse and restore a restic repository by time, anchored on a folder.
 #[derive(Parser)]
@@ -151,7 +153,7 @@ fn env_access() -> Access {
     Access {
         repo: var("RESTIC_REPOSITORY"),
         repo_file: var("RESTIC_REPOSITORY_FILE").map(PathBuf::from),
-        password: std::env::var("RESTIC_PASSWORD").ok(),
+        password: var("RESTIC_PASSWORD"),
         password_file: var("RESTIC_PASSWORD_FILE").map(PathBuf::from),
         password_command: var("RESTIC_PASSWORD_COMMAND"),
         no_password: false,
@@ -162,12 +164,61 @@ fn open_options(a: Access) -> OpenOptions {
     OpenOptions {
         repo: a.repo,
         repo_file: a.repo_file,
-        password: a.password,
+        password: a.password.map(Zeroizing::new),
         password_file: a.password_file,
         password_command: a.password_command,
         no_password: a.no_password,
         cache_dir: None,
     }
+}
+
+/// The password prompt was cancelled: restoric stops without a message.
+#[derive(Debug, thiserror::Error)]
+#[error("cancelled")]
+struct Cancelled;
+
+/// Whether `err` says nothing gave a password, and there's a terminal to
+/// ask on.
+fn askable(err: &anyhow::Error) -> bool {
+    matches!(err.downcast_ref(), Some(Locked::NoPassword)) && prompt::available()
+}
+
+/// Opens `o`'s repository, asking for its password on the terminal when
+/// nothing else gives one.
+fn connect(o: OpenOptions, location: &str) -> Result<Connection> {
+    match Connection::open(&o) {
+        Err(e) if askable(&e) => ask_open(o, location),
+        r => r,
+    }
+}
+
+/// Asks for `location`'s password until it opens the repository: three
+/// tries, like restic.
+fn ask_open(mut o: OpenOptions, location: &str) -> Result<Connection> {
+    let label = format!("password for {}", redact(location));
+    for left in (0..3).rev() {
+        let pw = prompt::ask(&label)?.ok_or(Cancelled)?;
+        let why = if pw.is_empty() {
+            "empty password: a repository without one needs --insecure-no-password"
+        } else {
+            o.password = Some(pw);
+            prompt::show("checking password…");
+            let r = Connection::open(&o);
+            prompt::clear_line();
+            match r {
+                Err(e) if matches!(e.downcast_ref(), Some(Locked::WrongPassword)) => {
+                    "wrong password"
+                }
+                r => return r,
+            }
+        };
+        match left {
+            0 => {}
+            1 => prompt::show(&format!("{why}, 1 try left\n")),
+            n => prompt::show(&format!("{why}, {n} tries left\n")),
+        }
+    }
+    Err(Locked::WrongPassword.into())
 }
 
 /// Which snapshots are ours in the repository `entry` names (or the one
@@ -261,8 +312,9 @@ fn start(
                 .map(|f| f.display().to_string())
                 .unwrap_or_default()
         });
+        let c = connect(open_options(a), &location)?;
         Ok(Start::Repo {
-            repo: Box::new(RusticRepo::open(&open_options(a))?),
+            repo: Box::new(RusticRepo::from_connection(c)?),
             entry: None,
             location,
         })
@@ -280,7 +332,7 @@ fn start(
     if let [e] = config.repo.as_slice() {
         // Nothing to choose from: open it and remember what it holds.
         let a = resolve_access(&flags, &env, Some(e), home);
-        let c = Connection::open(&open_options(a))?;
+        let c = connect(open_options(a), &e.repository)?;
         cache.record(&e.repository, &c.snapshots()?, now);
         save_cache(cache_path.as_deref(), &cache);
         return Ok(Start::Repo {
@@ -293,22 +345,37 @@ fn start(
         return Ok(Start::Repos);
     }
     let tty = std::io::stderr().is_terminal();
+    // A cancelled prompt stops the search, and restoric.
+    let cancelled = std::cell::Cell::new(false);
     let chosen = repos::choose(
         &cands,
         folder,
         &mut cache,
         now,
         |i, probing| {
+            if cancelled.get() {
+                return Err(Cancelled.into());
+            }
             let e = &config.repo[i];
             if probing && tty {
                 eprint!("\rchecking {}…\x1b[K", repos::redact(&e.repository));
             }
-            let a = resolve_access(&flags, &env, Some(e), home);
-            let c = Connection::open(&open_options(a))?;
+            let o = open_options(resolve_access(&flags, &env, Some(e), home));
+            // Probing reads repositories that may not hold the folder: not
+            // worth a password prompt each.
+            let c = if probing {
+                Connection::open(&o)?
+            } else {
+                connect(o, &e.repository)?
+            };
             let snaps = c.snapshots()?;
             Ok((c, snaps))
         },
         |i, err| {
+            if err.is::<Cancelled>() {
+                cancelled.set(true);
+                return;
+            }
             let repo = repos::redact(&config.repo[i].repository);
             tracing::warn!("skipping {repo}: {err:#}");
             if tty {
@@ -321,6 +388,9 @@ fn start(
         eprint!("\r\x1b[K");
     }
     save_cache(cache_path.as_deref(), &cache);
+    if cancelled.get() {
+        return Err(Cancelled.into());
+    }
     match chosen {
         Some((i, c)) => Ok(Start::Repo {
             repo: Box::new(RusticRepo::from_connection(c)?),
@@ -583,7 +653,7 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
         // The repository opened from the repo level, kept for after the pick.
         let mut opened: Option<(usize, RusticRepo)> = None;
         let pick = {
-            let mut io = |io: Io| -> Result<Vec<restoric::repo::SnapshotInfo>> {
+            let mut io = |io: Io, term: &mut Term| -> Result<Vec<restoric::repo::SnapshotInfo>> {
                 let i = match io {
                     Io::Open(i) | Io::Refresh(i) => i,
                 };
@@ -597,8 +667,12 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
                     save_cache(cache_path.as_deref(), &cache);
                     return Ok(snaps);
                 }
-                let a = resolve_access(&flags, &env, Some(e), home.as_deref());
-                let c = Connection::open(&open_options(a)).map_err(|e| anyhow!("{}", short(&e)))?;
+                let o = open_options(resolve_access(&flags, &env, Some(e), home.as_deref()));
+                let c = match Connection::open(&o) {
+                    Err(err) if askable(&err) => term.suspended(|| ask_open(o, &e.repository))?,
+                    r => r,
+                }
+                .map_err(|e| anyhow!("{}", short(&e)))?;
                 let snaps = c.snapshots().map_err(|e| anyhow!("{}", short(&e)))?;
                 cache.record(&e.repository, &snaps, now);
                 save_cache(cache_path.as_deref(), &cache);
@@ -656,6 +730,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
+        Err(e) if e.is::<Cancelled>() => ExitCode::from(130),
         Err(e) => {
             tracing::error!("{e:#}");
             eprintln!("restoric: {e:#}");

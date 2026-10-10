@@ -17,7 +17,7 @@ impl Fixture {
     pub fn open(&self) -> RusticRepo {
         RusticRepo::open(&OpenOptions {
             repo: Some(self.root.join("repo").to_string_lossy().into_owned()),
-            password: Some("restoric".into()),
+            password: Some(String::from("restoric").into()),
             cache_dir: Some(self.root.join("rustic-cache")),
             ..OpenOptions::default()
         })

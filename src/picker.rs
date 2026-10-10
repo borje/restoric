@@ -234,7 +234,7 @@ impl Picker {
         mine: &[String],
         message: Option<String>,
     ) -> Self {
-        self.enter_groups(None, location, snaps, mine);
+        self.enter_groups(None, &redact(location), snaps, mine);
         self.message = message;
         self
     }

@@ -60,7 +60,7 @@ fn opens_a_repository_without_password() {
 
     let both = RusticRepo::open(&OpenOptions {
         repo: Some(repo.to_string_lossy().into_owned()),
-        password: Some("x".into()),
+        password: Some(String::from("x").into()),
         no_password: true,
         ..OpenOptions::default()
     });

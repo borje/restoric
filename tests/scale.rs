@@ -20,7 +20,7 @@ fn change_points_and_listing_are_fast() {
     let t = Instant::now();
     let repo = RusticRepo::open(&OpenOptions {
         repo: Some(dir.join("repo").to_string_lossy().into_owned()),
-        password: Some("restoric".into()),
+        password: Some(String::from("restoric").into()),
         ..OpenOptions::default()
     })
     .unwrap();

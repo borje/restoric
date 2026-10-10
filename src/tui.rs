@@ -60,9 +60,8 @@ fn base64(data: &[u8]) -> String {
     out
 }
 
-/// Shows bytes in `$PAGER` (default `less`), with the TUI suspended.
-fn page(terminal: &mut ratatui::DefaultTerminal, bytes: &[u8]) -> Result<()> {
-    restore();
+/// Shows bytes in `$PAGER` (default `less`). The TUI must be suspended.
+fn page(bytes: &[u8]) -> Result<()> {
     let pager = std::env::var("PAGER").unwrap_or_else(|_| "less".into());
     let mut words = pager.split_whitespace();
     let result = match words.next() {
@@ -79,9 +78,6 @@ fn page(terminal: &mut ratatui::DefaultTerminal, bytes: &[u8]) -> Result<()> {
             }),
         None => Ok(()),
     };
-    *terminal = ratatui::init();
-    execute!(stdout(), EnableMouseCapture)?;
-    terminal.clear()?;
     result.map_err(|e| anyhow::anyhow!("running {pager}: {e}"))
 }
 
@@ -99,8 +95,8 @@ pub enum Io {
 pub struct Term {
     terminal: ratatui::DefaultTerminal,
     events: Receiver<Event>,
-    /// The reader pauses while a pager owns the terminal, so it doesn't
-    /// take the pager's keys.
+    /// The reader pauses while `suspended` hands the terminal over, so it
+    /// doesn't take a pager's or a password prompt's keys.
     paused: Arc<AtomicBool>,
 }
 
@@ -142,13 +138,29 @@ impl Term {
         })
     }
 
+    /// Runs `f` with the terminal handed back: the TUI torn down and the
+    /// reader paused, so a pager or a password prompt gets the keys.
+    pub fn suspended<R>(&mut self, f: impl FnOnce() -> R) -> Result<R> {
+        self.paused.store(true, Ordering::Release);
+        // Let a poll in progress finish before `f` starts.
+        std::thread::sleep(Duration::from_millis(60));
+        restore();
+        let r = f();
+        self.terminal = ratatui::init();
+        let back = execute!(stdout(), EnableMouseCapture).and_then(|_| self.terminal.clear());
+        self.paused.store(false, Ordering::Release);
+        back?;
+        Ok(r)
+    }
+
     /// Runs the picker until a pick or a quit. `io` opens repositories on
-    /// request; its error is shown above the rows.
+    /// request, and can suspend the terminal to ask for a password; its
+    /// error is shown above the rows.
     pub fn pick(
         &mut self,
         picker: &mut Picker,
         theme: &Theme,
-        io: &mut dyn FnMut(Io) -> Result<Vec<SnapshotInfo>>,
+        io: &mut dyn FnMut(Io, &mut Term) -> Result<Vec<SnapshotInfo>>,
     ) -> Result<Option<Pick>> {
         loop {
             self.terminal.draw(|f| {
@@ -176,7 +188,7 @@ impl Term {
                 let area = f.area();
                 ui::picker::draw(picker, f.buffer_mut(), area, theme);
             })?;
-            let result = io(what);
+            let result = io(what, self);
             picker.busy = None;
             match (result, what) {
                 (Ok(snaps), Io::Open(_)) => picker.opened(i, &snaps),
@@ -210,13 +222,9 @@ impl Term {
                 match effect {
                     Effect::Clipboard(text) => copy(&text),
                     Effect::Pager { bytes, .. } => {
-                        self.paused.store(true, Ordering::Release);
-                        // Let a poll in progress finish before the pager starts.
-                        std::thread::sleep(Duration::from_millis(60));
-                        if let Err(e) = page(&mut self.terminal, &bytes) {
+                        if let Err(e) = self.suspended(|| page(&bytes)).and_then(|r| r) {
                             app.message = Some(format!("{e:#}"));
                         }
-                        self.paused.store(false, Ordering::Release);
                     }
                 }
             }

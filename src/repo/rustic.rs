@@ -15,6 +15,7 @@ use rustic_core::{
     RusticResult,
 };
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use super::{
     BlobId, Id, Node, NodeKind, Repo, RestoreStep, SnapshotId, SnapshotInfo, Stopped, Summary,
@@ -29,13 +30,25 @@ pub const BACKEND: &str = "rustic_core 0.13.0";
 pub struct OpenOptions {
     pub repo: Option<String>,
     pub repo_file: Option<PathBuf>,
-    pub password: Option<String>,
+    pub password: Option<Zeroizing<String>>,
     pub password_file: Option<PathBuf>,
     pub password_command: Option<String>,
     /// The repository has no password (`restic init --insecure-no-password`).
     pub no_password: bool,
     /// rustic's own cache (index, snapshots, tree packs); default is rustic's.
     pub cache_dir: Option<PathBuf>,
+}
+
+/// Why a repository wouldn't unlock, when asking for a password can help.
+#[derive(Debug, thiserror::Error)]
+pub enum Locked {
+    #[error(
+        "no password given: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE or RESTIC_PASSWORD_COMMAND, \
+         or pass --insecure-no-password for a repository without one"
+    )]
+    NoPassword,
+    #[error("wrong password")]
+    WrongPassword,
 }
 
 pub struct RusticRepo {
@@ -128,29 +141,32 @@ impl Connection {
             ),
         };
 
-        let mut cred = CredentialOptions::default();
         let given =
             o.password.is_some() || o.password_file.is_some() || o.password_command.is_some();
         if o.no_password && given {
             bail!("--insecure-no-password can't be used together with a password");
         }
-        if o.no_password {
+        let credentials = if o.no_password {
             // restic encrypts the key with an empty password then.
-            cred = cred.password(String::new());
+            Credentials::password("")
         } else if let Some(p) = &o.password {
-            cred = cred.password(p.clone());
-        } else if let Some(f) = &o.password_file {
-            cred = cred.password_file(f.clone());
-        } else if let Some(c) = &o.password_command {
-            cred = cred.password_command(
-                c.parse::<CommandInput>()
-                    .map_err(|e| anyhow!("bad password command: {e}"))?,
-            );
-        }
-        let credentials = cred.credentials().map_err(|e| anyhow!("{e}"))?.context(
-            "no password given: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE or RESTIC_PASSWORD_COMMAND, \
-             or pass --insecure-no-password for a repository without one",
-        )?;
+            // Not through CredentialOptions: it would keep a copy that
+            // Debug prints.
+            Credentials::password(p.as_str())
+        } else {
+            let mut cred = CredentialOptions::default();
+            if let Some(f) = &o.password_file {
+                cred = cred.password_file(f.clone());
+            } else if let Some(c) = &o.password_command {
+                cred = cred.password_command(
+                    c.parse::<CommandInput>()
+                        .map_err(|e| anyhow!("bad password command: {e}"))?,
+                );
+            }
+            cred.credentials()
+                .map_err(|e| anyhow!("{e}"))?
+                .ok_or(Locked::NoPassword)?
+        };
 
         let mut opts = RepositoryOptions::default();
         if let Some(d) = &o.cache_dir {
@@ -163,7 +179,13 @@ impl Connection {
 
         let open = Repository::new(&opts, &backends)
             .and_then(|r| r.open(&credentials))
-            .map_err(|e| anyhow!("{e}"))?;
+            .map_err(|e| {
+                if e.is_incorrect_password() {
+                    Locked::WrongPassword.into()
+                } else {
+                    anyhow!("{e}")
+                }
+            })?;
         Ok(Self {
             open,
             reopen: Reopen {

@@ -191,6 +191,27 @@ fn repos_open_error() {
     insta::assert_snapshot!(screen(&p, 100, 12));
 }
 
+/// A URL's user and password never show, and a wrong typed password says so.
+#[test]
+fn repos_hide_url_credentials() {
+    let secret = "rest:https://bege:hunter2@iridium:8000/dev-vm";
+    let mut c = cands();
+    c[1].repo = secret.into();
+    let mut p = picker(SRC).with_repos(&c, &ProbeCache::default());
+    p.failed(1, "wrong password");
+    let s = screen(&p, 100, 12);
+    assert!(!s.contains("hunter2"), "{s}");
+    insta::assert_snapshot!(s);
+
+    let p = picker(SRC).with_groups(secret, &snaps(), &mine(), None);
+    let s = screen(&p, 100, 12);
+    assert!(
+        s.contains("rest:https://bege:***@iridium:8000/dev-vm"),
+        "{s}"
+    );
+    assert!(!s.contains("hunter2"), "{s}");
+}
+
 #[test]
 fn repos_empty() {
     let p = picker(SRC).with_repos(&[], &ProbeCache::default());

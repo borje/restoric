@@ -49,10 +49,17 @@ restoric ~/dev/project   # or any folder in your backups
 
 Every backend rustic supports works: local, sftp, REST, rclone, S3, B2, Azure and the rest.
 
+With no password from any of these, restoric asks for it on the terminal, hidden. To skip the prompt, keep it in the system keychain and fetch it with a password command:
+
+```sh
+export RESTIC_PASSWORD_COMMAND="security find-generic-password -s restic -w"   # macOS
+export RESTIC_PASSWORD_COMMAND="secret-tool lookup service restic"             # Linux
+```
+
 | | |
 |---|---|
 | `-r`, `--repo`, `--repository-file` | The repository (or `RESTIC_REPOSITORY`, `RESTIC_REPOSITORY_FILE`) |
-| `--password-file`, `--password-command` | The password (or `RESTIC_PASSWORD`, `_FILE`, `_COMMAND`) |
+| `--password-file`, `--password-command` | The password (or `RESTIC_PASSWORD`, `_FILE`, `_COMMAND`); asked for when none is given |
 | `--insecure-no-password` | A repository made with `restic init --insecure-no-password` |
 | `--host NAME`, `--tag TAG` | Whose snapshots to show (default: this machine's hostname) |
 | `--strict` | Count any metadata change |
