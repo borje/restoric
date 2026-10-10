@@ -286,6 +286,7 @@ const ACTIONS: &[(&str, Action)] = &[
     ("help", Action::Help),
     ("info", Action::Info),
     ("sizes", Action::Sizes),
+    ("base", Action::Base),
     ("back", Action::Leave),
     ("quit", Action::Quit),
 ];

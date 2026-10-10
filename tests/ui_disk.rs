@@ -76,7 +76,7 @@ fn on_disk_navigation() {
 
     // Stepping onto disk reads the folder again.
     h.act(Action::GoDisk);
-    let key = (Version::Disk, PathBuf::from(SRC));
+    let key = (Version::Disk, None, PathBuf::from(SRC));
     assert!(h.app.listings.contains_key(&key));
     h.app.act(Action::GoDisk);
     assert!(!h.app.listings.contains_key(&key));

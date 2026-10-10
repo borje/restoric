@@ -41,7 +41,7 @@ fn change_points_and_listing_are_fast() {
         let t = Instant::now();
         let refs = index.refs(&set, &folder, &mut |_, _| {}).unwrap();
         let points = index.change_points(&refs).unwrap();
-        let listing = index.listing(&set, set.len() - 1, &folder).unwrap();
+        let listing = index.listing(&set, set.len() - 1, &folder, None).unwrap();
         index.flush().unwrap();
         let took = t.elapsed();
         eprintln!(

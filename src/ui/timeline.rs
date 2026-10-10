@@ -185,13 +185,15 @@ pub fn header(app: &App, g: &mut Grid) {
 }
 
 /// Rows 1 to 3: date labels, the row of dots, and the caret with the zoom
-/// control, under `sel`, or under the `on disk` cell for `None`. Clicking
-/// a dot does `pick(snapshot)`.
+/// control, under `sel`, or under the `on disk` cell for `None`, and a `b`
+/// under the pinned `base`. Clicking a dot does `pick(snapshot)`.
+#[allow(clippy::too_many_arguments)]
 pub fn draw(
     g: &mut Grid,
     axis: &Axis,
     zoom: u32,
     sel: Option<usize>,
+    base: Option<usize>,
     tr: &TrackRow,
     tz: &jiff::tz::TimeZone,
     pick: &dyn Fn(usize) -> Action,
@@ -298,6 +300,9 @@ pub fn draw(
             g.put(c, cr, "▵", t.dim);
         }
     }
+    if let Some(b) = base {
+        g.put(axis.col_of(b), cr, "b", t.accent.patch(t.bold));
+    }
     let caret = sel.map_or(x0 + tw + 4, |s| axis.col_of(s));
     g.put(caret, cr, "▲", t.accent);
     let zc = cols.saturating_sub(9);
@@ -359,5 +364,15 @@ pub fn draw_folder(app: &App, g: &mut Grid) {
             outer: None,
         },
     };
-    draw(g, &axis, app.zoom, sel, &row, &app.tz, &Action::GoSnapshot);
+    let base = app.base.and_then(|b| set.iter().position(|s| s.id == b));
+    draw(
+        g,
+        &axis,
+        app.zoom,
+        sel,
+        base,
+        &row,
+        &app.tz,
+        &Action::GoSnapshot,
+    );
 }

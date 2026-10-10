@@ -66,6 +66,8 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             &axis,
             app.zoom,
             if v.disk { None } else { sel.map(|s| s.from) },
+            app.base
+                .and_then(|b| track.set.iter().position(|s| s.id == b)),
             &row,
             &app.tz,
             &Action::GoSnapshot,

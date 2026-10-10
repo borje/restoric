@@ -78,7 +78,7 @@ const HELP: &[(&str, &str)] = &[
     ("␣  v", "select / visual select"),
     ("y  p  P", "yank, restore next to it, overwrite"),
     ("r  d  o", "restore options / full-screen diff / $PAGER"),
-    ("i   S", "snapshot details / folder sizes"),
+    ("i  S  b", "snapshot details / folder sizes / pin as base"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
     (".  zd   zi zo", "show deleted items / zoom timeline"),
@@ -124,7 +124,7 @@ pub fn help(app: &App, g: &mut Grid) {
         g.put_to(
             x + 9,
             diff,
-            "]c [c or n N changes · c vs disk · p vs previous",
+            "]c [c or n N changes · c vs disk · p vs previous · b vs base",
             t.text,
             end,
         );

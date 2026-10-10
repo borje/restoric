@@ -264,7 +264,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
         } else {
             Version::Snapshot(snap.id)
         };
-        let Some(Some(entries)) = app.listings.get(&(at, path)) else {
+        let Some(Some(entries)) = app.listing_at(at, &path) else {
             g.put(x0, y0 + 2, "loading…", t.dim);
             return;
         };

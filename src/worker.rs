@@ -54,10 +54,12 @@ pub enum Request {
         refs: Arc<Vec<NodeRef>>,
         points: Vec<usize>,
     },
-    /// The folder's entries at `set[snap]`.
+    /// The folder's entries at `set[snap]`, against `base` or the
+    /// snapshot before.
     Listing {
         set: Arc<Vec<SnapshotInfo>>,
         snap: usize,
+        base: Option<SnapshotInfo>,
         folder: PathBuf,
     },
     /// The folder's entries on disk against the newest snapshot in `set`
@@ -65,6 +67,9 @@ pub enum Request {
     DiskListing {
         set: Arc<Vec<SnapshotInfo>>,
         folder: PathBuf,
+        /// Against this snapshot instead (`b`); its counts aren't the
+        /// folder's `on disk` counts then, and aren't sent.
+        base: Option<SnapshotInfo>,
     },
     /// Items deleted from the folder before the newest snapshot that
     /// aren't on disk either: the `gone` rows of the `on disk` version.
@@ -91,11 +96,12 @@ pub enum Request {
     /// What's under a folder tree (`S`).
     Size { tree: TreeId },
     /// Bytes in files new or changed in `folder` at `set[snap]` against
-    /// the snapshot before (`S`).
+    /// `base` or the snapshot before (`S`).
     Added {
         set: Arc<Vec<SnapshotInfo>>,
         snap: usize,
         folder: PathBuf,
+        base: Option<SnapshotInfo>,
     },
     /// The nodes at `path` in some snapshots (the starts of versions).
     Nodes {
@@ -204,6 +210,8 @@ pub enum Response {
     },
     Listing {
         at: Version,
+        /// What it's compared with, when not the snapshot before (`b`).
+        base: Option<SnapshotId>,
         folder: PathBuf,
         /// `None` when the folder doesn't exist in that version.
         entries: Option<Arc<Vec<Entry>>>,
@@ -236,6 +244,7 @@ pub enum Response {
     },
     Added {
         at: SnapshotId,
+        base: Option<SnapshotId>,
         folder: PathBuf,
         bytes: u64,
     },
@@ -309,10 +318,16 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 }
                 send(Response::PointCounts { path, counts });
             }
-            Request::Listing { set, snap, folder } => {
-                let entries = index.listing(&set, snap, &folder)?;
+            Request::Listing {
+                set,
+                snap,
+                folder,
+                base,
+            } => {
+                let entries = index.listing(&set, snap, &folder, base.as_ref())?;
                 send(Response::Listing {
                     at: Version::Snapshot(set[snap].id),
+                    base: base.map(|b| b.id),
                     folder,
                     entries: entries.map(Arc::new),
                 });
@@ -325,9 +340,20 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     entries: Arc::new(entries),
                 });
             }
-            Request::DiskListing { set, folder } => {
+            Request::DiskListing { set, folder, base } => {
                 let disk = ctx.disk.as_ref();
-                let (entries, counts) = match index.disk_listing(disk, set.last(), &folder)? {
+                let against = base.as_ref().or(set.last());
+                if base.is_some() {
+                    let entries = index.disk_listing(disk, against, &folder)?;
+                    send(Response::Listing {
+                        at: Version::Disk,
+                        base: base.map(|b| b.id),
+                        folder,
+                        entries: entries.map(|(e, _)| Arc::new(e)),
+                    });
+                    return Ok(());
+                }
+                let (entries, counts) = match index.disk_listing(disk, against, &folder)? {
                     Some((e, c)) => (Some(Arc::new(e)), c),
                     None => (
                         None,
@@ -343,6 +369,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 });
                 send(Response::Listing {
                     at: Version::Disk,
+                    base: None,
                     folder,
                     entries,
                 });
@@ -389,17 +416,26 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 let size = index.tree_size(tree)?;
                 send(Response::Size { tree, size });
             }
-            Request::Added { set, snap, folder } => {
-                let tree = |i: usize| -> anyhow::Result<Option<TreeId>> {
-                    Ok(match index.node_ref(&set[i], &folder)? {
+            Request::Added {
+                set,
+                snap,
+                folder,
+                base,
+            } => {
+                let tree = |s: &SnapshotInfo| -> anyhow::Result<Option<TreeId>> {
+                    Ok(match index.node_ref(s, &folder)? {
                         NodeRef::Dir(t) => Some(t),
                         _ => None,
                     })
                 };
-                let prev = snap.checked_sub(1).map(tree).transpose()?.flatten();
-                let bytes = index.added_bytes(prev, tree(snap)?)?;
+                let prev = base
+                    .as_ref()
+                    .or_else(|| snap.checked_sub(1).map(|p| &set[p]));
+                let prev = prev.map(tree).transpose()?.flatten();
+                let bytes = index.added_bytes(prev, tree(&set[snap])?)?;
                 send(Response::Added {
                     at: set[snap].id,
+                    base: base.map(|b| b.id),
                     folder,
                     bytes,
                 });

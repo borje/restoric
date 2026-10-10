@@ -68,6 +68,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `d` | Full-screen diff against disk (`p` in it: against the previous version) |
 | `i` | Snapshot details: label, description, what the backup added and read |
 | `S` | Folder sizes, and the bytes this snapshot added to the folder (walks each folder once; cached) |
+| `b` | Pin this snapshot as the base: the listing and `d` compare with it instead of the snapshot before (`b` on it again to unpin) |
 | `Space` `v` | Select / visual select |
 | `y` `p` `P` | Yank, restore next to it, overwrite |
 | `r` | Restore options: overwrite, next to it, `~/Restored/`, `$PAGER` or tar |
@@ -106,7 +107,7 @@ half_down = "C-f"
 accent = "magenta"
 ```
 
-Keys are a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, the arrows, `Home`, `End`, `PageUp`, `PageDown` or `F1`–`F12`, and they win over the built-in ones in every view. The actions are `down` `up` `top` `bottom` `half_down` `half_up` `parent` `open` `versions` `root` `older_change` `newer_change` `older_snapshot` `newer_snapshot` `oldest_change` `newest_change` `older_item_change` `newer_item_change` `preview_mode` `scroll_down` `scroll_up` `deleted` `changes_only` `diff` `select` `visual` `yank` `paste` `overwrite` `restore` `show` `search` `filter` `find` `next_match` `prev_match` `command` `zoom_in` `zoom_out` `help` `info` `sizes` `quit`. The colours are `accent` `added` `changed` `deleted` `live` `dim` `dir` `code` `selected` (`selected` sets the background). A mistake in the file stops restoric with a message naming it.
+Keys are a character, `C-x`, `Enter`, `Tab`, `Space`, `Backspace`, the arrows, `Home`, `End`, `PageUp`, `PageDown` or `F1`–`F12`, and they win over the built-in ones in every view. The actions are `down` `up` `top` `bottom` `half_down` `half_up` `parent` `open` `versions` `root` `older_change` `newer_change` `older_snapshot` `newer_snapshot` `oldest_change` `newest_change` `older_item_change` `newer_item_change` `preview_mode` `scroll_down` `scroll_up` `deleted` `changes_only` `diff` `select` `visual` `yank` `paste` `overwrite` `restore` `show` `search` `filter` `find` `next_match` `prev_match` `command` `zoom_in` `zoom_out` `help` `info` `sizes` `base` `quit`. The colours are `accent` `added` `changed` `deleted` `live` `dim` `dir` `code` `selected` (`selected` sets the background). A mistake in the file stops restoric with a message naming it.
 
 Colours follow your terminal's 16-colour theme, and `NO_COLOR` turns them off. restoric keeps a cache in `~/.cache/restoric/`, what `:undo` needs in `~/.local/share/restoric/undo/` and a log in `~/.local/state/restoric/restoric.log` (`RESTORIC_LOG=debug` for more). These are the same on Linux and macOS, and follow the `XDG_*_HOME` variables when they're set.
 

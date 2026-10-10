@@ -67,20 +67,21 @@ pub fn sort(entries: &mut [Entry]) {
 }
 
 impl Index {
-    /// The entries of `folder` at `set[i]`, compared with `set[i - 1]`.
-    /// `None` if the folder doesn't exist at `set[i]`.
+    /// The entries of `folder` at `set[i]`, compared with `base` (`b`), or
+    /// else `set[i - 1]`. `None` if the folder doesn't exist at `set[i]`.
     pub fn listing(
         &self,
         set: &[SnapshotInfo],
         i: usize,
         folder: &Path,
+        base: Option<&SnapshotInfo>,
     ) -> Result<Option<Vec<Entry>>> {
         let NodeRef::Dir(cur) = self.node_ref(&set[i], folder)? else {
             return Ok(None);
         };
         let cur = self.tree(cur)?;
-        let prev = match i.checked_sub(1) {
-            Some(p) => match self.node_ref(&set[p], folder)? {
+        let prev = match base.or_else(|| i.checked_sub(1).map(|p| &set[p])) {
+            Some(p) => match self.node_ref(p, folder)? {
                 NodeRef::Dir(t) => self.tree(t)?,
                 _ => std::sync::Arc::new(Tree::default()),
             },

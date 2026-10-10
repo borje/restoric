@@ -1,0 +1,16 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 12)"
+---
+ restoric  ~/data
+  Jul 2026                                                                     on disk
+  ●                                    ●                                   ○  ┊ · a.txt  ○ data/
+  b                                                                        ▲               − 1× +
+
+ on disk  = latest    │ ≡ a.txt                         9 B  ~ │ a.txt · v2/2 · 9 B      ⇥ content
+▶Jul 03 10:00 +1−1    │ ≡ b.txt                         4 B  − │ unchanged since Jul 02 10:00
+ Jul 02 10:00 ~1      │ ≡ c.txt                         6 B    │
+ Jul 01 10:00 +3      │ ≡ d.txt                         5 B  + │   1+ one more
+                      │                                        │
+                      │                                        │
+ NOR  Jul 03 10:00  43bd49eb  vs Jul 01 10:00 (base)                      Jul 02 10:00  1/4  ? help

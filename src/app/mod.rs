@@ -142,6 +142,8 @@ pub enum DiffMode {
     Disk,
     /// The version before → the selected version (`p`).
     Previous,
+    /// The version in the pinned base snapshot → the selected version (`b`).
+    Base,
 }
 
 /// The full-screen diff.
@@ -224,6 +226,9 @@ pub enum Action {
     ChangesOnly,
     /// Show / hide folder sizes (`S`).
     Sizes,
+    /// Pin / unpin this snapshot as the base to compare with (`b`); in
+    /// the diff, compare with the base.
+    Base,
     /// Full-screen diff against disk (`d`; `⏎` in the versions view).
     Diff,
     /// Full-screen diff against the previous version (`p` in versions and diff).
@@ -295,6 +300,9 @@ impl Action {
     }
 }
 
+/// A listing by version, the base it's compared with (`b`) and folder.
+pub type ListingKey = (Version, Option<SnapshotId>, PathBuf);
+
 /// Lines added and removed going to the file on disk; `None` for binary.
 pub type DiskStat = Option<(usize, usize)>;
 
@@ -302,7 +310,7 @@ pub type DiskStat = Option<(usize, usize)>;
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Pending {
     Track(PathBuf),
-    Listing(Version, PathBuf),
+    Listing(Version, Option<SnapshotId>, PathBuf),
     Deleted(Version, PathBuf),
     Live(PathBuf),
     File(Fp),
@@ -312,7 +320,7 @@ enum Pending {
     Counts(PathBuf),
     Diff(DiffKey),
     Size(TreeId),
-    Added(SnapshotId, PathBuf),
+    Added(SnapshotId, Option<SnapshotId>, PathBuf),
 }
 
 impl Pending {
@@ -376,7 +384,7 @@ pub struct App {
     pub snap: Version,
     pub view: View,
     pub tracks: HashMap<PathBuf, Track>,
-    pub listings: HashMap<(Version, PathBuf), Option<Arc<Vec<Entry>>>>,
+    pub listings: HashMap<ListingKey, Option<Arc<Vec<Entry>>>>,
     /// Items deleted before the version before, by version and folder.
     pub deleted: HashMap<(Version, PathBuf), Arc<Vec<Entry>>>,
     /// What changed on disk since the newest snapshot, by path.
@@ -401,10 +409,14 @@ pub struct App {
     pub changes_only: bool,
     /// Show folder sizes (`S`).
     pub sizes: bool,
+    /// The snapshot listings and `d` compare with instead of the one
+    /// before (`b`).
+    pub base: Option<SnapshotId>,
     /// What's under folder trees, once asked for with `S`.
     pub tree_sizes: HashMap<TreeId, Size>,
-    /// Bytes in files new or changed in a folder at a snapshot.
-    pub added: HashMap<(SnapshotId, PathBuf), u64>,
+    /// Bytes in files new or changed in a folder at a snapshot, against
+    /// the base (`b`) or the snapshot before.
+    pub added: HashMap<(SnapshotId, Option<SnapshotId>, PathBuf), u64>,
     pub preview: PreviewMode,
     /// Preview scroll; `None` until the preview picks its first line.
     pub scroll: Option<usize>,
@@ -511,6 +523,7 @@ impl App {
             hide_new: false,
             changes_only: false,
             sizes: false,
+            base: None,
             tree_sizes: HashMap::new(),
             added: HashMap::new(),
             preview: PreviewMode::Content,
@@ -598,10 +611,26 @@ impl App {
     }
 
     pub fn listing(&self) -> Option<&Option<Arc<Vec<Entry>>>> {
-        self.listings.get(&(self.snap, self.folder.clone()))
+        self.listing_at(self.snap, &self.folder)
     }
 
+    /// A folder's listing at a version, compared with the base if one is
+    /// pinned.
+    pub fn listing_at(&self, at: Version, folder: &Path) -> Option<&Option<Arc<Vec<Entry>>>> {
+        self.listings.get(&(at, self.base, folder.to_path_buf()))
+    }
+
+    /// The pinned base snapshot (`b`).
+    fn base_info(&self) -> Option<SnapshotInfo> {
+        self.snapshot(self.base?).cloned()
+    }
+
+    /// Items deleted before the version before; none against a base,
+    /// where the `−` rows already say what's gone since it.
     fn ghost_entries(&self) -> Option<&Arc<Vec<Entry>>> {
+        if self.base.is_some() {
+            return None;
+        }
         self.deleted.get(&(self.snap, self.folder.clone()))
     }
 
@@ -830,7 +859,7 @@ impl App {
 
     fn want_live(&mut self, path: &Path, item: bool) {
         // A disk listing on its way brings the counts with it.
-        let listing = Pending::Listing(Version::Disk, path.to_path_buf());
+        let listing = Pending::Listing(Version::Disk, None, path.to_path_buf());
         if !self.live.contains_key(path) && !self.pending.contains(&listing) {
             let set = self.set_for(path);
             self.request(
@@ -845,8 +874,7 @@ impl App {
     }
 
     fn want_listing(&mut self, folder: &Path, at: Version) {
-        let key = (at, folder.to_path_buf());
-        if self.listings.contains_key(&key) {
+        if self.listing_at(at, folder).is_some() {
             return;
         }
         let Version::Snapshot(snap) = at else {
@@ -855,11 +883,12 @@ impl App {
         let set = self.set_for(folder);
         if let Some(i) = set.iter().position(|s| s.id == snap) {
             self.request(
-                Pending::Listing(at, folder.to_path_buf()),
+                Pending::Listing(at, self.base, folder.to_path_buf()),
                 Request::Listing {
                     set,
                     snap: i,
                     folder: folder.to_path_buf(),
+                    base: self.base_info(),
                 },
             );
         }
@@ -868,16 +897,16 @@ impl App {
     /// The folder on disk against the newest snapshot. Its `on disk`
     /// counts and the items deleted earlier come with it.
     fn want_disk_listing(&mut self, folder: &Path) {
-        let key = (Version::Disk, folder.to_path_buf());
-        if self.listings.contains_key(&key) {
+        if self.listing_at(Version::Disk, folder).is_some() {
             return;
         }
         let set = self.set_for(folder);
         self.request(
-            Pending::Listing(Version::Disk, folder.to_path_buf()),
+            Pending::Listing(Version::Disk, self.base, folder.to_path_buf()),
             Request::DiskListing {
                 set,
                 folder: folder.to_path_buf(),
+                base: self.base_info(),
             },
         );
     }
@@ -944,7 +973,7 @@ impl App {
             self.want_sizes();
         }
         let key = (self.snap, folder.clone());
-        if !self.deleted.contains_key(&key) {
+        if self.base.is_none() && !self.deleted.contains_key(&key) {
             let set = self.set();
             let req = match self.snap {
                 Version::Disk => Request::DiskDeletedEarlier {
@@ -993,11 +1022,16 @@ impl App {
             self.request(Pending::Size(tree), Request::Size { tree });
         }
         let folder = self.folder.clone();
-        if !self.added.contains_key(&(id, folder.clone())) {
-            let (set, snap) = (self.set(), self.idx());
+        if !self.added.contains_key(&(id, self.base, folder.clone())) {
+            let (set, snap, base) = (self.set(), self.idx(), self.base_info());
             self.request(
-                Pending::Added(id, folder.clone()),
-                Request::Added { set, snap, folder },
+                Pending::Added(id, self.base, folder.clone()),
+                Request::Added {
+                    set,
+                    snap,
+                    folder,
+                    base,
+                },
             );
         }
     }
@@ -1116,17 +1150,39 @@ impl App {
         // On the disk version it's the newest version → the file on disk,
         // whatever the mode.
         let to_disk = d.disk || d.mode == DiffMode::Disk;
+        let disk_side = || {
+            (
+                SideKey::Disk(d.path.clone()),
+                Side::Disk(d.path.clone()),
+                "on disk".to_string(),
+            )
+        };
         let ((ok, os, ol), (nk, ns, nl)) = match d.mode {
+            DiffMode::Base => {
+                // The version that was there at the base, if it was there.
+                let at = self.base.and_then(|b| t.index_of(b));
+                let old = match at.and_then(|b| runs.iter().find(|r| r.contains(b) && r.exists)) {
+                    Some(r) => {
+                        let (k, s) = repo_side(node(r)?);
+                        (
+                            k,
+                            s,
+                            format!("base {}", fmt::time(t.set[at?].time, &self.tz)),
+                        )
+                    }
+                    None => (SideKey::Nothing, Side::Nothing, "(nothing)".to_string()),
+                };
+                let new = if d.disk {
+                    disk_side()
+                } else {
+                    let (k, s) = repo_side(node(r0)?);
+                    (k, s, label(r0))
+                };
+                (old, new)
+            }
             _ if to_disk => {
                 let (k, s) = repo_side(node(r0)?);
-                (
-                    (k, s, label(r0)),
-                    (
-                        SideKey::Disk(d.path.clone()),
-                        Side::Disk(d.path.clone()),
-                        "on disk".to_string(),
-                    ),
-                )
+                ((k, s, label(r0)), disk_side())
             }
             _ => {
                 let older = runs[d.run + 1..].iter().find(|r| r.exists);
@@ -1189,6 +1245,12 @@ impl App {
         if let Some(r) = runs
             .get(d.run + 1..)
             .and_then(|r| r.iter().find(|r| r.exists))
+        {
+            wanted.push(r.from);
+        }
+        if d.mode == DiffMode::Base
+            && let Some(b) = self.base.and_then(|b| t.index_of(b))
+            && let Some(r) = runs.iter().find(|r| r.contains(b) && r.exists)
         {
             wanted.push(r.from);
         }
@@ -1321,11 +1383,13 @@ impl App {
             }
             Response::Listing {
                 at,
+                base,
                 folder,
                 entries,
             } => {
-                self.pending.remove(&Pending::Listing(at, folder.clone()));
-                self.listings.insert((at, folder), entries);
+                self.pending
+                    .remove(&Pending::Listing(at, base, folder.clone()));
+                self.listings.insert((at, base, folder), entries);
                 self.restore_selection();
                 self.ensure();
             }
@@ -1355,9 +1419,15 @@ impl App {
                 self.pending.remove(&Pending::Size(tree));
                 self.tree_sizes.insert(tree, size);
             }
-            Response::Added { at, folder, bytes } => {
-                self.pending.remove(&Pending::Added(at, folder.clone()));
-                self.added.insert((at, folder), bytes);
+            Response::Added {
+                at,
+                base,
+                folder,
+                bytes,
+            } => {
+                self.pending
+                    .remove(&Pending::Added(at, base, folder.clone()));
+                self.added.insert((at, base, folder), bytes);
             }
             Response::Nodes { path, nodes } => {
                 for (i, n) in nodes {
@@ -1643,7 +1713,8 @@ impl App {
     /// diffs agree with the rows.
     fn forget_disk_folder(&mut self) {
         let f = self.folder.clone();
-        self.listings.remove(&(Version::Disk, f.clone()));
+        self.listings
+            .retain(|(v, _, p), _| *v != Version::Disk || *p != f);
         self.deleted.remove(&(Version::Disk, f.clone()));
         self.live.remove(&f);
         let inside = |p: &Path| p.parent() == Some(f.as_path());
@@ -1655,7 +1726,7 @@ impl App {
             .retain(|k, _| !disk_side(&k.old) && !disk_side(&k.new));
         self.pending.retain(|p| match p {
             Pending::Live(q)
-            | Pending::Listing(Version::Disk, q)
+            | Pending::Listing(Version::Disk, _, q)
             | Pending::Deleted(Version::Disk, q) => *q != f,
             Pending::Disk(q) => !inside(q),
             _ => true,
@@ -1668,7 +1739,7 @@ impl App {
     pub(crate) fn forget_disk(&mut self, under: Option<&Path>) {
         let within = |p: &Path| under.is_none_or(|u| p.starts_with(u));
         self.listings
-            .retain(|(v, p), _| *v != Version::Disk || !within(p));
+            .retain(|(v, _, p), _| *v != Version::Disk || !within(p));
         self.deleted
             .retain(|(v, p), _| *v != Version::Disk || !within(p));
         self.live.retain(|p, _| !within(p));
@@ -1681,7 +1752,7 @@ impl App {
         self.pending.retain(|p| match p {
             Pending::Live(q)
             | Pending::Disk(q)
-            | Pending::Listing(Version::Disk, q)
+            | Pending::Listing(Version::Disk, _, q)
             | Pending::Deleted(Version::Disk, q) => !within(q),
             _ => true,
         });
@@ -2005,8 +2076,10 @@ impl App {
                 let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
                     return true;
                 };
+                let base = self.base.map(|_| DiffMode::Base);
                 if self.on_disk() && !e.is_gone() {
-                    return self.open_diff(path, 0, DiffMode::Previous, false, true);
+                    let mode = base.unwrap_or(DiffMode::Previous);
+                    return self.open_diff(path, 0, mode, false, true);
                 }
                 let Some(id) = self.set().get(self.entry_snapshot(&e)).map(|s| s.id) else {
                     return true;
@@ -2015,7 +2088,25 @@ impl App {
                     .index_of(id)
                     .and_then(|s| run_at(&t.runs, s))
                     .map_or(0, |(k, _)| t.runs.len() - 1 - k);
-                return self.open_diff(path, run, DiffMode::Disk, false, false);
+                let mode = base.unwrap_or(DiffMode::Disk);
+                return self.open_diff(path, run, mode, false, false);
+            }
+            Action::Base => {
+                let Version::Snapshot(id) = self.snap else {
+                    return fail(
+                        self,
+                        "Pin a snapshot as the base, not the files on disk.".into(),
+                    );
+                };
+                self.base = (self.base != Some(id)).then_some(id);
+                self.message = Some(match self.base {
+                    Some(_) => format!(
+                        "Comparing with {}. Press b on it again to stop.",
+                        self.time(i)
+                    ),
+                    None => "Comparing with the snapshot before again.".into(),
+                });
+                self.ensure();
             }
             Action::DiffPrevious | Action::NextHunk | Action::PrevHunk => {}
             Action::ToggleMark => self.toggle_mark(),
@@ -2305,6 +2396,13 @@ impl App {
             Action::DiffPrevious if d.disk => {}
             Action::DiffPrevious => {
                 next.mode = DiffMode::Previous;
+                next.scroll = 0;
+            }
+            Action::Base if self.base.is_none() => {
+                return fail(self, "No base: pin one with b in the folder view.");
+            }
+            Action::Base => {
+                next.mode = DiffMode::Base;
                 next.scroll = 0;
             }
             Action::Open => next.force = true,

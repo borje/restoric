@@ -345,6 +345,49 @@ fn folder_sizes() {
     // 2026/ holds a (1 B) and b (2 B); the snapshot changed b to "bb" and
     // e to "ee" and added g: 5 bytes of new or changed files.
     let id = h.app.set()[h.app.idx()].id;
-    assert_eq!(h.app.added.get(&(id, "/home/bege/Bilder".into())), Some(&5));
+    let key = (id, None, "/home/bege/Bilder".into());
+    assert_eq!(h.app.added.get(&key), Some(&5));
     assert_eq!(h.app.folder_size(), Some(9));
+}
+
+const THREE: &str = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write a.txt one\\n
+  write b.txt two\\n
+  write c.txt three\\n
+snapshot 2026-07-02 10:00
+  write a.txt one more\\n
+snapshot 2026-07-03 10:00
+  rm b.txt
+  write d.txt four\\n
+";
+
+/// `b` pins a base: the listing and `d` compare with it instead of the
+/// snapshot before, until `b` on it again.
+#[test]
+fn base_snapshot() {
+    let mut h = Harness::with(THREE, "/home/bege/data");
+    h.at("2026-07-01 10:00").keys("b");
+    assert!(h.app.base.is_some());
+    h.at("2026-07-03 10:00");
+    h.app.message = None;
+    insta::assert_snapshot!("base_listing", h.screen(100, 12));
+    h.select("a.txt").keys("d");
+    insta::assert_snapshot!("base_diff", h.screen(100, 10));
+    h.keys("q");
+    // S counts what changed since the base too: a's 9 bytes and d's 5.
+    h.keys("S");
+    let (id, base) = (h.app.set()[h.app.idx()].id, h.app.base);
+    let key = (id, base, "/home/bege/data".into());
+    assert_eq!(h.app.added.get(&key), Some(&14));
+    h.at("2026-07-01 10:00").keys("b");
+    assert!(h.app.base.is_none());
+    // On disk the base can't be pinned.
+    h.keys("99Lb");
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("Pin a snapshot as the base, not the files on disk.")
+    );
 }

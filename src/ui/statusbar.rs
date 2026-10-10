@@ -53,6 +53,7 @@ pub fn draw(app: &App, g: &mut Grid) {
     if let View::Diff(d) = &app.view {
         let c = g.put(0, r, " DIFF ", t.badge_blue) + 1;
         let mode = match d.mode {
+            crate::app::DiffMode::Base => "vs base (b)",
             _ if d.disk => "vs previous (p)",
             crate::app::DiffMode::Disk => "vs disk (c)",
             crate::app::DiffMode::Previous => "vs previous (p)",
@@ -109,7 +110,16 @@ pub fn draw(app: &App, g: &mut Grid) {
             }
         }
     };
-    if app.on_disk() {
+    // What the listing compares with, when it's a pinned base (`b`).
+    let base = app.base.and_then(|b| app.snapshot(b)).map(|b| {
+        let vs = format!("vs {} (base)", fmt::time(b.time, &app.tz));
+        (vs, t.accent)
+    });
+    if app.on_disk() && base.is_some() {
+        mid.push(("on disk".into(), t.live.patch(t.bold)));
+        mid.push(("  ".into(), t.text));
+        mid.extend(base);
+    } else if app.on_disk() {
         // The files on disk against the newest snapshot.
         mid.push(("on disk".into(), t.live.patch(t.bold)));
         mid.push(("  ".into(), t.text));
@@ -146,7 +156,9 @@ pub fn draw(app: &App, g: &mut Grid) {
                 mid.push(("  ".into(), t.text));
             }
         }
-        if let Some(state) = app.state().filter(|s| s.loaded()) {
+        if let Some(b) = base {
+            mid.push(b);
+        } else if let Some(state) = app.state().filter(|s| s.loaded()) {
             if state.versions().contains(&i) {
                 mid.push((name, t.dim));
                 if let Some(counts) = state.counts.get(&i) {
@@ -163,7 +175,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             && let (Some(s), Some(total)) = (set.get(i), app.folder_size())
         {
             mid.push((format!("  {}", fmt::size(total)), t.text));
-            if let Some(&a) = app.added.get(&(s.id, app.folder.clone()))
+            if let Some(&a) = app.added.get(&(s.id, app.base, app.folder.clone()))
                 && a > 0
             {
                 mid.push((format!(" +{} new or changed", fmt::size(a)), t.added));

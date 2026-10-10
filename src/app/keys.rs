@@ -125,6 +125,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
         KeyCode::Char('?') | KeyCode::Char('~') => Help,
         KeyCode::Char('i') => Info,
         KeyCode::Char('S') => Sizes,
+        KeyCode::Char('b') => Base,
         KeyCode::Char('q') => Leave,
         _ => return None,
     })
