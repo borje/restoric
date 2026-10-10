@@ -80,6 +80,7 @@ fn action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action> {
             ('g', KeyCode::Char('h')) => Some(Root),
             ('z', KeyCode::Char('d')) => Some(ToggleDeleted),
             ('z', KeyCode::Char('n')) => Some(HideNew),
+            ('z', KeyCode::Char('c')) => Some(ChangesOnly),
             ('c', KeyCode::Char(c @ ('c' | 'd' | 'f'))) => Some(Copy(c)),
             _ => None,
         };

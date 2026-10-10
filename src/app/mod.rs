@@ -220,6 +220,8 @@ pub enum Action {
     ToggleDeleted,
     /// Hide / show files and folders not in the newest snapshot, on disk (`zn`).
     HideNew,
+    /// Hide / show what didn't change (`zc`).
+    ChangesOnly,
     /// Full-screen diff against disk (`d`; `⏎` in the versions view).
     Diff,
     /// Full-screen diff against the previous version (`p` in versions and diff).
@@ -391,6 +393,8 @@ pub struct App {
     /// Hide files and folders not in the newest snapshot on the on disk
     /// version (`zn`).
     pub hide_new: bool,
+    /// Hide what didn't change (`zc`).
+    pub changes_only: bool,
     pub preview: PreviewMode,
     /// Preview scroll; `None` until the preview picks its first line.
     pub scroll: Option<usize>,
@@ -495,6 +499,7 @@ impl App {
             pending: HashSet::new(),
             ghosts: false,
             hide_new: false,
+            changes_only: false,
             preview: PreviewMode::Content,
             scroll: None,
             scroll_base: Cell::new(0),
@@ -615,17 +620,38 @@ impl App {
         self.hide_new && self.on_disk() && matches!(e.delta, Delta::Added | Delta::New(_))
     }
 
-    /// How many rows not in the backup `zn` hides, among those the name
-    /// filter would show.
-    pub fn new_hidden(&self) -> usize {
+    /// Hidden by `zc`: unchanged since the snapshot before (or, on disk,
+    /// since the newest snapshot).
+    fn hidden_same(&self, e: &Entry) -> bool {
+        self.changes_only
+            && match &e.delta {
+                Delta::Same => true,
+                Delta::Counts(c) => c.is_empty(),
+                _ => false,
+            }
+    }
+
+    /// How many listing rows `hides` hides, among those the name filter
+    /// would show.
+    fn count_hidden(&self, hides: impl Fn(&Entry) -> bool) -> usize {
         let filter = self.filter_key();
         match self.listing() {
             Some(Some(entries)) => entries
                 .iter()
-                .filter(|e| self.hidden_new(e) && Self::name_passes(e, &filter))
+                .filter(|e| hides(e) && Self::name_passes(e, &filter))
                 .count(),
             _ => 0,
         }
+    }
+
+    /// How many rows not in the backup `zn` hides.
+    pub fn new_hidden(&self) -> usize {
+        self.count_hidden(|e| self.hidden_new(e))
+    }
+
+    /// How many unchanged rows `zc` hides.
+    pub fn same_hidden(&self) -> usize {
+        self.count_hidden(|e| self.hidden_same(e))
     }
 
     /// Rows of the listing: `..` (below the root), then entries, with the
@@ -639,7 +665,9 @@ impl App {
             return rows;
         };
         let filter = self.filter_key();
-        let shown = |e: &Entry| !self.hidden_new(e) && Self::name_passes(e, &filter);
+        let shown = |e: &Entry| {
+            !self.hidden_new(e) && !self.hidden_same(e) && Self::name_passes(e, &filter)
+        };
         let ghosts: &[Entry] = match (self.ghosts, self.ghost_entries()) {
             (true, Some(g)) => g,
             _ => &[],
@@ -1886,6 +1914,11 @@ impl App {
                 }
                 let anchor = self.visual_anchor();
                 self.hide_new = !self.hide_new;
+                self.rows_changed(anchor);
+            }
+            Action::ChangesOnly => {
+                let anchor = self.visual_anchor();
+                self.changes_only = !self.changes_only;
                 self.rows_changed(anchor);
             }
             Action::Diff => {

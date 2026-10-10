@@ -263,6 +263,13 @@ pub fn draw(app: &App, g: &mut Grid) {
             Action::HideNew,
         ));
     }
+    let same_hidden = app.same_hidden();
+    if same_hidden > 0 {
+        hints.push((
+            format!("{same_hidden} unchanged · zc to show"),
+            Action::ChangesOnly,
+        ));
+    }
     for (n, (label, a)) in hints.into_iter().enumerate() {
         if rows.len() + n < height {
             g.put_act(l0 + 3, bottom - n as u16, &label, t.dim2, a);

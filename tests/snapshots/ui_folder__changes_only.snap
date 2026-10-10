@@ -1,0 +1,18 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 14)"
+---
+ restoric  ~/Bilder
+  Jul 2026                                                                     on disk
+  ●                                                                        ●  ┊ · 2026/  ○ Bilder/
+                                                                           ▲               − 1× +
+
+ on disk  = latest    │ ▸ 2026/                             ~1 │ 2026/
+▶Jul 02 10:00 +1~2    │ ○ e.jpg                        2 B  ~  │
+ Jul 01 10:00 +6      │ ○ g.jpg                        1 B  +  │ ○ a.jpg
+                      │                                        │ ○ b.jpg                          ~
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │   3 unchanged · zc to show             │
+ NOR  Jul 02 10:00  34157dda  Bilder/ +1 ~2                                             1/3  ? help

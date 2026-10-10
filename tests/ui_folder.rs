@@ -296,3 +296,30 @@ fn snapshot_info() {
     let info = h.app.info.as_ref().expect("details");
     assert!(info.label.is_empty() && info.parent.is_none());
 }
+
+const PHOTOS: &str = "
+host bege-laptop
+root /home/bege/Bilder
+snapshot 2026-07-01 10:00
+  write 2026/a.jpg a
+  write 2026/b.jpg b
+  write old/c.jpg c
+  write d.jpg d
+  write e.jpg e
+  write f.jpg f
+snapshot 2026-07-02 10:00
+  write 2026/b.jpg bb
+  write e.jpg ee
+  write g.jpg g
+";
+
+/// `zc` hides what didn't change, and the footer says how much.
+#[test]
+fn changes_only() {
+    let mut h = Harness::with(PHOTOS, "/home/bege/Bilder");
+    h.at("2026-07-02 10:00").keys("zc");
+    insta::assert_snapshot!(h.screen(100, 14));
+    h.keys("zc");
+    assert!(!h.app.changes_only);
+    assert_eq!(h.app.rows().len(), 6);
+}

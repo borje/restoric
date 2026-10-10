@@ -266,6 +266,7 @@ const ACTIONS: &[(&str, Action)] = &[
     ("scroll_down", Action::Scroll(3)),
     ("scroll_up", Action::Scroll(-3)),
     ("deleted", Action::ToggleDeleted),
+    ("changes_only", Action::ChangesOnly),
     ("diff", Action::Diff),
     ("select", Action::ToggleMark),
     ("visual", Action::Visual),
