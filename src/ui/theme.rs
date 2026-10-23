@@ -80,7 +80,7 @@ impl Theme {
             code: fg(Color::Cyan),
             strike: Modifier::CROSSED_OUT,
             selected: Style::default().bg(Color::DarkGray),
-            marker: Style::default().bg(Color::Yellow).fg(Color::Black),
+            marker: fg(Color::Yellow).add_modifier(Modifier::BOLD),
             status_bar: Style::default(),
             badge: Style::default()
                 .bg(Color::Yellow)

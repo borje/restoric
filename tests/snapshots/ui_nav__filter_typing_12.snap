@@ -4,7 +4,7 @@ expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
   Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·○ ·  ·  ┊ ○ config.go  ○ src/
+  ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·● ·  ·  ┊ ○ config.go  ○ src/
                                                                       ▲                    − 1× +
 
  on disk  ~1          │   ..                                   │ config.go · v5/5        ⇥ content

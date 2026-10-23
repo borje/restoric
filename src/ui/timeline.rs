@@ -256,10 +256,10 @@ pub fn draw(
         } else {
             (" ", t.dim2)
         };
-        let style = if sel.is_some_and(|s| list.contains(&s)) {
-            t.marker
+        let (sym, style) = if sel.is_some_and(|s| list.contains(&s)) {
+            ("●", t.marker)
         } else {
-            style
+            (sym, style)
         };
         let target = list
             .iter()
@@ -274,8 +274,8 @@ pub fn draw(
         Some(o) if o.live == Some(true) => (o.on, t.live),
         _ => ("·", t.dim2),
     };
-    let style = if sel.is_none() { t.marker } else { live.1 };
-    g.put_act(x0 + tw + 4, rr, live.0, style, Action::GoDisk);
+    let (sym, style) = if sel.is_none() { ("●", t.marker) } else { live };
+    g.put_act(x0 + tw + 4, rr, sym, style, Action::GoDisk);
     let lx = x0 + tw + 6;
     let w = cols.saturating_sub(lx + 1) as usize;
     let mut c = g.put(lx, rr, &fmt::fit(&tr.label, w), tr.label_style);

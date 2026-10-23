@@ -4,7 +4,7 @@ expression: "h.screen(100, 12)"
 ---
  restoric  ~/data
   Jul 2026                                                                     on disk
-  ●                                    ●                                   ○  ┊ · a.txt  ○ data/
+  ●                                    ●                                   ●  ┊ · a.txt  ○ data/
   b                                                                        ▲               − 1× +
 
  on disk  = latest    │ ≡ a.txt                         9 B  ~ │ a.txt · v2/2 · 9 B      ⇥ content
