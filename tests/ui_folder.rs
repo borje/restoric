@@ -457,3 +457,31 @@ snapshot 2026-09-20 10:00
     h.keys("H");
     insta::assert_snapshot!(h.screen(100, 10));
 }
+
+/// kitty draws a Nerd Font icon two cells wide only when a written space
+/// follows it, so the space after each icon must reach the terminal even
+/// on a screen that started blank.
+#[test]
+fn icons_are_followed_by_a_written_space() {
+    let mut h = Harness::new(SRC);
+    h.app.icons = true;
+    let area = Rect::new(0, 0, 100, 34);
+    let mut buf = Buffer::empty(area);
+    ui::draw(&mut h.app, &mut buf, area, &Theme::new(true));
+    let sent: Vec<(u16, u16)> = Buffer::empty(area)
+        .diff(&buf)
+        .iter()
+        .map(|&(x, y, _)| (x, y))
+        .collect();
+    let mut icons = 0;
+    for y in 0..area.height {
+        for x in 0..area.width - 1 {
+            if buf[(x, y)].symbol().chars().any(|c| ('\u{e000}'..='\u{f8ff}').contains(&c)) {
+                icons += 1;
+                assert_eq!(buf[(x + 1, y)].symbol(), " ", "after icon at {x},{y}");
+                assert!(sent.contains(&(x + 1, y)), "space after icon at {x},{y} not sent");
+            }
+        }
+    }
+    assert!(icons > 0);
+}

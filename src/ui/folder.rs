@@ -193,7 +193,11 @@ pub fn draw(app: &App, g: &mut Grid) {
             continue;
         };
         let (icon, icon_style) = icons::icon(&e.node, &t, app.icons);
-        g.put(l0 + 1, y, icon, icon_style);
+        // The space is written too: kitty draws a Nerd Font icon two cells wide only
+        // when a real space follows, and a never-written cell is not one.
+        // ponytail: the icon's color is what gets the space sent; with colors off
+        // it still isn't, force a full first redraw if that matters.
+        g.put(l0 + 1, y, &format!("{icon} "), icon_style);
         let mut name = e.node.name.to_string_lossy().into_owned();
         if e.is_dir() {
             name.push('/');
