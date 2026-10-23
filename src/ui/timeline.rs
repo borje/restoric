@@ -274,7 +274,11 @@ pub fn draw(
         Some(o) if o.live == Some(true) => (o.on, t.live),
         _ => ("·", t.dim2),
     };
-    let (sym, style) = if sel.is_none() { ("●", t.marker) } else { live };
+    let (sym, style) = if sel.is_none() {
+        ("●", t.marker)
+    } else {
+        live
+    };
     g.put_act(x0 + tw + 4, rr, sym, style, Action::GoDisk);
     let lx = x0 + tw + 6;
     let w = cols.saturating_sub(lx + 1) as usize;

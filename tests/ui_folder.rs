@@ -476,10 +476,17 @@ fn icons_are_followed_by_a_written_space() {
     let mut icons = 0;
     for y in 0..area.height {
         for x in 0..area.width - 1 {
-            if buf[(x, y)].symbol().chars().any(|c| ('\u{e000}'..='\u{f8ff}').contains(&c)) {
+            if buf[(x, y)]
+                .symbol()
+                .chars()
+                .any(|c| ('\u{e000}'..='\u{f8ff}').contains(&c))
+            {
                 icons += 1;
                 assert_eq!(buf[(x + 1, y)].symbol(), " ", "after icon at {x},{y}");
-                assert!(sent.contains(&(x + 1, y)), "space after icon at {x},{y} not sent");
+                assert!(
+                    sent.contains(&(x + 1, y)),
+                    "space after icon at {x},{y} not sent"
+                );
             }
         }
     }
