@@ -1,6 +1,6 @@
 # The README's demo, recorded with vhs (https://github.com/charmbracelet/vhs).
-# Install restoric first (cargo install --locked --path .), then regenerate
-# from the repository root:
+# Regenerate from the repository root with `just demo` (or `just publish-demo`
+# to also commit and push it). By hand: put a built restoric on PATH, then
 #
 #     vhs docs/demo.tape
 #
