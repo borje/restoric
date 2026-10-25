@@ -206,6 +206,10 @@ pub fn draw(app: &App, g: &mut Grid) {
     if let Some(y) = &app.yanked {
         mid.push((format!("  {} yanked", y.len()), t.accent));
     }
+    let marked = app.marked_rows().len();
+    if marked > 0 {
+        mid.push((format!("  {marked} marked"), t.accent));
+    }
 
     if let Some(e) = app.selected()
         && !e.is_dir()

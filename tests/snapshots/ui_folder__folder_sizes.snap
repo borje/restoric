@@ -7,7 +7,7 @@ expression: "h.screen(100, 12)"
   ●                                                                        ●  ┊ · 2026/  ○ Bilder/
                                                                            ▲               − 1× +
 
- on disk  = latest    │ ▸ 2026/                        3 B  ~1 │ 2026/
+ on disk  = latest    │ ▾ 2026/                        3 B  ~1 │ 2026/
 ▶Jul 02 10:00 +1~2    │ ▸ old/                         1 B     │
  Jul 01 10:00 +6      │ ○ d.jpg                        1 B     │ ○ a.jpg
                       │ ○ e.jpg                        2 B  ~  │ ○ b.jpg                          ~

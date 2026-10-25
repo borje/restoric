@@ -8,7 +8,7 @@ expression: "h.screen(100, 34)"
   ▲                                                                                        − 1× +
 
  on disk  ~1          │   ..                     ╭────────────────────────────────────────────────╮
-   ┄ 2 unchanged ┄    │ ▸ api/                   │ This is the oldest version of this folder.     │
+   ┄ 2 unchanged ┄    │ ▾ api/                   │ This is the oldest version of this folder.     │
  Sep 27 08:52 ~1      │ ▸ models/                ╰────────────────────────────────────────────────╯
    ┄ 2 unchanged ┄    │ ◇ config.go                   47 B  +  │ ◇ routes.go                      +
  Sep 20 20:35 ~1      │ ◇ legacy.go                   62 B  +  │

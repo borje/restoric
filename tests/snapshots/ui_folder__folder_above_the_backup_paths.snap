@@ -7,7 +7,7 @@ expression: "h.screen(100, 20)"
   ●                                                                        ●  ┊ · logs/  ○ trading/
                                                                            ▲               − 1× +
 
- on disk  = latest    │ ▸ logs/                             ~1 │ logs/
+ on disk  = latest    │ ▾ logs/                             ~1 │ logs/
 ▶Sep 02 10:00 ~1      │                                        │
  Sep 01 10:00 +1      │                                        │ ≡ run.log                        ~
                       │                                        │

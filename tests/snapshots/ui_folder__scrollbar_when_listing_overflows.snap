@@ -1,0 +1,14 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 10)"
+---
+ restoric  ~/dev/project
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ○  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ●    ○· ·○·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ docs/  ○ project/
+                                                                      ▲                    − 1× +
+
+ on disk  ~1          │ ▾ docs/                                ┃ docs/
+   ┄ 2 unchanged ┄    │ ▸ scripts/                             ┃
+▶Sep 27 08:52 ~1      │ ▸ src/                              ~1 ┃ ¶ notes.md
+   ┄ 2 unchanged ┄    │ ○ go.mod                      27 B     │
+ NOR  Sep 27 08:52  c177b849  project/ ~1                                               1/5  ? help

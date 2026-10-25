@@ -192,7 +192,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             }
             continue;
         };
-        let (icon, icon_style) = icons::icon(&e.node, &t, app.icons);
+        let (icon, icon_style) = icons::icon(&e.node, &t, app.icons, k == app.sel);
         // The space is written too: kitty draws a Nerd Font icon two cells wide only
         // when a real space follows, and a never-written cell is not one.
         // ponytail: the icon's color is what gets the space sent; with colors off
@@ -246,7 +246,12 @@ pub fn draw(app: &App, g: &mut Grid) {
         }
     }
     let y = TOP + (rows.len() - off).min(height) as u16;
+    // ".." alone is a listing with no entries.
+    let empty = rows.iter().all(|r| *r == Row::Up);
     match app.listing() {
+        Some(Some(_)) if empty && y <= bottom => {
+            g.put(l0 + 3, y, "empty", t.dim);
+        }
         None if y <= bottom => {
             g.put(l0 + 3, y, "loading…", t.dim);
         }
@@ -291,6 +296,14 @@ pub fn draw(app: &App, g: &mut Grid) {
 
     if let Some((p0, p1)) = p.preview {
         g.vline(p0 - 1, TOP, bottom);
+        // Scrollbar thumb over the divider when the listing overflows.
+        if rows.len() > height && height > 0 {
+            let len = (height * height / rows.len()).max(1);
+            let pos = off * (height - len) / (rows.len() - height);
+            for i in 0..len {
+                g.put(p0 - 1, TOP + (pos + i) as u16, "┃", t.dim);
+            }
+        }
         preview::folder_view(app, g, p0 + 1, p1, TOP, bottom);
     }
 }

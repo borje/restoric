@@ -1,0 +1,18 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(100, 14)"
+---
+ restoric  /r/void
+  Jul 2026                                                                     on disk
+  ●                                                                           ┊ · void/
+  ▲                                                                                        − 1× +
+
+ on disk  = latest    │   ..                                   │ Parent folder
+▶Jul 14 09:00 +1      │   empty                                │ /r/
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+ NOR  Jul 14 09:00  39685fd4  void/ +1                                                  0/0  ? help

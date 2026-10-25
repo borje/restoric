@@ -6,12 +6,13 @@ use ratatui::style::Style;
 use super::theme::Theme;
 use crate::repo::{Node, NodeKind};
 
-pub fn icon(node: &Node, t: &Theme, nerd: bool) -> (&'static str, Style) {
+/// `open`: the cursor is on this node; folders show as open.
+pub fn icon(node: &Node, t: &Theme, nerd: bool, open: bool) -> (&'static str, Style) {
     if nerd {
-        return nerd_icon(node, t);
+        return nerd_icon(node, t, open);
     }
     if node.kind == NodeKind::Dir {
-        return ("▸", t.changed);
+        return (if open { "▾" } else { "▸" }, t.changed);
     }
     if let NodeKind::Symlink { .. } = node.kind {
         return ("→", t.dim);
@@ -33,10 +34,18 @@ fn ext(node: &Node) -> String {
         .unwrap_or_default()
 }
 
-fn nerd_icon(node: &Node, t: &Theme) -> (&'static str, Style) {
+fn nerd_icon(node: &Node, t: &Theme, open: bool) -> (&'static str, Style) {
     match node.kind {
-        NodeKind::Dir => return ("\u{f07b}", t.changed),
+        NodeKind::Dir => return (if open { "\u{f07c}" } else { "\u{f07b}" }, t.changed),
         NodeKind::Symlink { .. } => return ("\u{f0c1}", t.dim),
+        _ => {}
+    }
+    match node.name.to_string_lossy().to_lowercase().as_str() {
+        "cargo.toml" | "cargo.lock" => return ("\u{e7a8}", t.dim),
+        "makefile" | "justfile" => return ("\u{f489}", t.changed),
+        "dockerfile" => return ("\u{f308}", t.accent),
+        "license" | "licence" => return ("\u{f15c}", t.live),
+        ".gitignore" | ".gitattributes" => return ("\u{e702}", t.dim),
         _ => {}
     }
     match ext(node).as_str() {

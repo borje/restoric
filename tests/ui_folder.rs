@@ -492,3 +492,19 @@ fn icons_are_followed_by_a_written_space() {
     }
     assert!(icons > 0);
 }
+
+#[test]
+fn scrollbar_when_listing_overflows() {
+    let mut h = Harness::new(SRC);
+    h.keys("gh");
+    insta::assert_snapshot!(h.screen(100, 10));
+}
+
+#[test]
+fn empty_folder_hint() {
+    let mut h = Harness::with(
+        "host h\nroot /r\nsnapshot 2026-07-14 09:00\n  write a.txt x\n  mkdir void\n",
+        "/r/void",
+    );
+    insta::assert_snapshot!(h.screen(100, 14));
+}

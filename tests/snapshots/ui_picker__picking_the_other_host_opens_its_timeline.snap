@@ -7,7 +7,7 @@ expression: "h.screen(100, 34)"
   ●                                                                        ●  ┊ ● etc/  ○ data/
                                                                            ▲               − 1× +
 
- on disk  −3          │ ▸ etc/                              ~1 │ etc/
+ on disk  −3          │ ▾ etc/                              ~1 │ etc/
 ▶Sep 01 10:00 ~1      │ ▸ src/                                 │
  Aug 01 10:00 +3      │ ¶ README.md                    6 B     │ ○ app.conf                       ~
                       │                                        │

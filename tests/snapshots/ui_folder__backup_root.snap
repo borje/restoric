@@ -7,7 +7,7 @@ expression: "h.screen(100, 34)"
   ● ·   ○  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ●    ○· ·○·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ docs/  ○ project/
                                                                       ▲                    − 1× +
 
- on disk  ~1          │ ▸ docs/                                │ docs/
+ on disk  ~1          │ ▾ docs/                                │ docs/
    ┄ 2 unchanged ┄    │ ▸ scripts/                             │
 ▶Sep 27 08:52 ~1      │ ▸ src/                              ~1 │ ¶ notes.md
    ┄ 2 unchanged ┄    │ ○ go.mod                      27 B     │
