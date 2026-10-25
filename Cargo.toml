@@ -1,6 +1,6 @@
 [package]
 name = "restoric"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.91"
 description = "Browse and restore a restic repository by time, anchored on a folder"
