@@ -465,6 +465,26 @@ pub struct App {
     pub exists: HashMap<PathBuf, bool>,
 }
 
+/// What to add to a message when old copies an undo put back couldn't be
+/// removed afterwards: the user's files are back, and the copies are
+/// still taking up room in the undo folder, which only they can see to.
+/// Empty when none are left.
+fn copies_left(left: &[(PathBuf, String)], home: Option<&Path>) -> String {
+    match left {
+        [] => String::new(),
+        [(p, why)] => format!(
+            " The old copy couldn't be removed and stays at {}: {why}",
+            fmt::path(p, home)
+        ),
+        [(p, why), ..] => format!(
+            " {} old copies couldn't be removed and stay under {}: {why}",
+            left.len(),
+            // `<step>/files/<i>/<name>`: the step's files folder.
+            fmt::path(p.parent().and_then(Path::parent).unwrap_or(p), home)
+        ),
+    }
+}
+
 impl App {
     /// `everything` is every snapshot, of which `filter` picks this
     /// machine's; `folder` must be in some of those.
@@ -1483,13 +1503,19 @@ impl App {
                 how,
                 done,
                 stopped: true,
+                left,
             } => {
                 let items = self.restore_ended().map_or(done.len(), |r| r.items);
-                self.message = Some(match (&how, done.len()) {
-                    (How::Overwrite, _) => "Stopped · nothing was overwritten".into(),
-                    (_, 0) => "Stopped · nothing was restored".into(),
+                let mut msg = match (&how, done.len()) {
+                    (How::Overwrite, _) => "Stopped · nothing was overwritten".to_string(),
+                    (_, 0) => "Stopped · nothing was restored".to_string(),
                     (_, n) => format!("Stopped · restored {n} of {items}"),
-                });
+                };
+                if !left.is_empty() {
+                    msg.push('.');
+                    msg.push_str(&copies_left(&left, self.home.as_deref()));
+                }
+                self.message = Some(msg);
                 self.disk_changed();
             }
             Response::Restored { how, done, .. } => {
@@ -1538,6 +1564,7 @@ impl App {
             }
             Response::Undone(undone) => {
                 let mut msg = match undone.back.as_slice() {
+                    [] => "Nothing was left to put back.".to_string(),
                     [p] => format!(
                         "Put back {}.",
                         p.file_name()
@@ -1546,21 +1573,7 @@ impl App {
                     ),
                     ps => format!("Put back {} items.", ps.len()),
                 };
-                // The user's files are back; the old copies are still
-                // taking up room in the undo folder, which only they can
-                // see to.
-                match undone.left.as_slice() {
-                    [] => {}
-                    [(p, why)] => msg.push_str(&format!(
-                        " The old copy couldn't be removed and stays at {}: {why}",
-                        p.display()
-                    )),
-                    [(p, why), ..] => msg.push_str(&format!(
-                        " {} old copies couldn't be removed and stay under {}: {why}",
-                        undone.left.len(),
-                        p.parent().and_then(Path::parent).unwrap_or(p).display()
-                    )),
-                }
+                msg.push_str(&copies_left(&undone.left, self.home.as_deref()));
                 self.message = Some(msg);
                 self.disk_changed();
             }

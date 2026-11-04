@@ -139,7 +139,14 @@ pub fn wrap(text: &str, w: usize) -> Vec<String> {
         if !line.is_empty() {
             line.push(' ');
         }
-        line.push_str(word);
+        // A word wider than a line (a path) is broken where the line ends.
+        for c in word.chars() {
+            let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+            if !line.is_empty() && width(&line) + cw > w {
+                out.push(std::mem::take(&mut line));
+            }
+            line.push(c);
+        }
     }
     if !line.is_empty() {
         out.push(line);
@@ -168,6 +175,11 @@ mod tests {
         assert_eq!(width(&fit_middle(url, 17)), 17);
         assert_eq!(fit_middle(url, 1), "…");
         assert_eq!(wrap("one two three", 7), ["one two", "three"]);
+        assert_eq!(
+            wrap("at /a/long/path done", 7),
+            ["at", "/a/long", "/path", "done"]
+        );
+        assert_eq!(wrap("x åäöåäö", 4), ["x", "åäöå", "äö"]);
     }
 
     #[test]

@@ -9,7 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use common::{Harness, SRC};
 use restoric::app::Effect;
 use restoric::repo::RestoreStep;
-use restoric::restore::{Done, How, Progress};
+use restoric::restore::{Done, How, Progress, Undone};
 use restoric::worker::{Request, Response};
 
 #[test]
@@ -259,6 +259,7 @@ fn stop_restore_18() {
         how: How::NextTo,
         done: Vec::new(),
         stopped: true,
+        left: Vec::new(),
     });
     assert!(h.app.restoring.is_none());
     assert_eq!(
@@ -291,6 +292,7 @@ fn one_restore_at_a_time_and_cancel() {
             dest: PathBuf::from(SRC).join("config.go.2026-09-09_1923"),
         }],
         stopped: true,
+        left: Vec::new(),
     });
     assert_eq!(h.app.message.as_deref(), Some("Stopped · restored 1 of 2"));
     h.keys(":cancel").key(KeyCode::Enter);
@@ -311,6 +313,7 @@ fn a_restore_that_ends_closes_the_stop_popup() {
             dest: PathBuf::from(SRC).join("config.go.2026-09-09_1923"),
         }],
         stopped: false,
+        left: Vec::new(),
     });
     assert!(h.app.confirm.is_none());
     assert_eq!(
@@ -346,6 +349,7 @@ fn quitting_during_a_restore_asks_and_waits() {
         how: How::Overwrite,
         done: Vec::new(),
         stopped: true,
+        left: Vec::new(),
     });
     assert!(h.app.quit);
     assert_eq!(
@@ -377,4 +381,42 @@ fn overwrite_plan() {
     h.keys("n").keys("r1").key(KeyCode::Enter);
     assert!(h.app.dialog.as_ref().is_some_and(|d| d.confirm));
     insta::assert_snapshot!("overwrite_plan_dialog", h.screen(100, 20));
+}
+
+/// An undo, or a stopped overwrite, whose old copies couldn't be removed
+/// afterwards says so, and where they stay.
+#[test]
+fn old_copies_that_stay_are_in_the_message() {
+    let mut h = Harness::new(SRC);
+    let files = PathBuf::from("/home/bege/.local/share/restoric/undo/20260909T192300.000/files");
+    let why = || "Permission denied (os error 13)".to_string();
+    let one = vec![(files.join("0/config.go"), why())];
+    let two = vec![
+        (files.join("0/config.go"), why()),
+        (files.join("1/api"), why()),
+    ];
+    let src = PathBuf::from(SRC);
+    // The message is a popup at the top right.
+    let mut screens = Vec::new();
+    h.app.apply(Response::Undone(Undone {
+        back: vec![src.join("config.go")],
+        left: one.clone(),
+    }));
+    screens.push(h.screen(100, 12));
+    h.app.apply(Response::Undone(Undone {
+        back: vec![src.join("config.go"), src.join("api")],
+        left: two,
+    }));
+    screens.push(h.screen(100, 12));
+    // Every entry was skipped: nothing of the user's had been replaced.
+    h.app.apply(Response::Undone(Undone::default()));
+    screens.push(h.screen(100, 12));
+    h.app.apply(Response::Restored {
+        how: How::Overwrite,
+        done: Vec::new(),
+        stopped: true,
+        left: one,
+    });
+    screens.push(h.screen(100, 12));
+    insta::assert_snapshot!(screens.join("\n\n"));
 }

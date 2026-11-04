@@ -265,6 +265,9 @@ pub enum Response {
         done: Vec<Done>,
         /// Stopped by the user before the end.
         stopped: bool,
+        /// Old copies a stopped overwrite couldn't remove after putting
+        /// them back.
+        left: Vec<(PathBuf, String)>,
     },
     /// The restore failed; what it had done is cleaned up.
     RestoreFailed(String),
@@ -484,6 +487,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                         how,
                         done: o.done,
                         stopped: o.stopped,
+                        left: o.left,
                     }),
                     Err(e) => {
                         tracing::warn!("restore: {e:#}");

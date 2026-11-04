@@ -429,3 +429,100 @@ fn an_undo_says_which_old_copies_it_couldnt_remove() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
     fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
 }
+
+/// A step whose manifest names a path nothing was at, from a process that
+/// died before the restore claimed the name, leaves whatever is at the
+/// path now: the restore never put anything there, so it's the user's.
+#[test]
+fn undo_leaves_a_path_alone_when_the_restore_never_claimed_it() {
+    let s = setup();
+    let undo_dir = s.places.undo_dir.clone().unwrap();
+    let session = undo_dir.join("20260701T100000.000");
+    fs::create_dir_all(&session).unwrap();
+    let manifest = serde_json::json!({
+        "entries": [{ "path": s.root.join("new.txt"), "saved": null }]
+    });
+    fs::write(session.join("manifest.json"), manifest.to_string()).unwrap();
+    fs::write(s.root.join("new.txt"), "made by hand later\n").unwrap();
+
+    let undone = undo(&s.places).unwrap();
+    assert_eq!(s.read("new.txt"), "made by hand later\n");
+    assert!(undone.back.is_empty(), "{:?}", undone.back);
+    assert!(s.sessions().is_empty(), "the step is finished with");
+}
+
+/// What a restore created at a free name is removed by undo, and counts
+/// as put back only if it was still there.
+#[test]
+fn undo_removes_what_the_restore_created() {
+    let s = setup();
+    assert!(!s.root.join("cur").exists());
+    s.overwrite(&["cur"]).unwrap();
+    assert_eq!(
+        fs::read_link(s.root.join("cur")).unwrap(),
+        PathBuf::from("a.txt")
+    );
+    let undone = undo(&s.places).unwrap();
+    assert_eq!(undone.back, [s.root.join("cur")]);
+    assert!(s.root.join("cur").symlink_metadata().is_err());
+
+    s.overwrite(&["cur"]).unwrap();
+    fs::remove_file(s.root.join("cur")).unwrap();
+    let undone = undo(&s.places).unwrap();
+    assert!(undone.back.is_empty(), "{:?}", undone.back);
+    assert!(s.sessions().is_empty());
+}
+
+/// A stop whose rollback puts everything back is a stop, not a failure,
+/// even when an old copy couldn't be removed afterwards: the outcome
+/// says which copies stay.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_stopped_overwrite_reports_the_old_copies_it_couldnt_remove() {
+    use std::os::unix::fs::PermissionsExt;
+    if restoric::repo::is_root() {
+        eprintln!("skipped: root can remove anything");
+        return;
+    }
+    let Some(s) = across_devices() else { return };
+    fs::create_dir(s.root.join("sub/locked")).unwrap();
+    fs::write(s.root.join("sub/locked/f"), "keep\n").unwrap();
+    let items = [s.target("a.txt"), s.target("sub")];
+    let cancel = Cancel::default();
+    let stop = cancel.clone();
+    let mut locked = None;
+    let o = run(
+        &s.repo,
+        &items,
+        &How::Overwrite,
+        &s.places,
+        &mut |p| {
+            // `sub` has been moved aside by now; lock a folder in the copy
+            // so that it can't be removed after it's put back.
+            if p.item == 1 && locked.is_none() {
+                let session = s.sessions().pop().unwrap();
+                let l = session.join("files/1/sub/locked");
+                fs::set_permissions(&l, fs::Permissions::from_mode(0o555)).unwrap();
+                locked = Some(l);
+                stop.cancel();
+            }
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert!(o.stopped);
+    assert!(o.done.is_empty());
+    assert_eq!(s.read("a.txt"), "my a\n");
+    assert_eq!(s.read("sub/c.txt"), "my c\n");
+    assert_eq!(s.read("sub/locked/f"), "keep\n");
+    let locked = locked.unwrap();
+    assert_eq!(o.left.len(), 1, "{:?}", o.left);
+    assert_eq!(o.left[0].0, locked.parent().unwrap());
+    assert!(
+        locked.join("f").exists(),
+        "the copy stays until it can be removed"
+    );
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
+}

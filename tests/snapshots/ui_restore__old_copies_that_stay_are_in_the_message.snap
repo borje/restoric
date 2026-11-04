@@ -1,0 +1,58 @@
+---
+source: tests/ui_restore.rs
+expression: "screens.join(\"\\n\\n\")"
+---
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ · api/  ○ src/
+                                                                      ▲                    − 1× +
+
+ on disk  …           │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▾ api/                   │ Put back config.go. The old copy couldn't be   │
+▶Sep 27 08:52 ~1      │ ▸ models/                │ removed and stays at                           │
+   ┄ 2 unchanged ┄    │ ◇ config.go              │ ~/.local/share/restoric/undo/20260909T192300.0 │
+ Sep 20 20:35 ~1      │ ◇ main.go                │ 00/files/0/config.go: Permission denied (os    │
+   ┄ 2 unchanged ┄    │ ◇ server.go              │ error 13)                                      │
+ NOR  Sep 27 08:52  c177b849  src/ ~1            ╰────────────────────────────────────────────────╯
+
+
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ · api/  ○ src/
+                                                                      ▲                    − 1× +
+
+ on disk  …           │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▾ api/                   │ Put back 2 items. 2 old copies couldn't be     │
+▶Sep 27 08:52 ~1      │ ▸ models/                │ removed and stay under                         │
+   ┄ 2 unchanged ┄    │ ◇ config.go              │ ~/.local/share/restoric/undo/20260909T192300.0 │
+ Sep 20 20:35 ~1      │ ◇ main.go                │ 00/files: Permission denied (os error 13)      │
+   ┄ 2 unchanged ┄    │ ◇ server.go              ╰────────────────────────────────────────────────╯
+ NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+
+
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ · api/  ○ src/
+                                                                      ▲                    − 1× +
+
+ on disk  …           │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▾ api/                   │ Nothing was left to put back.                  │
+▶Sep 27 08:52 ~1      │ ▸ models/                ╰────────────────────────────────────────────────╯
+   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    ┃ ◇ middleware.go
+ Sep 20 20:35 ~1      │ ◇ main.go                     108 B    ┃ ◇ routes.go
+   ┄ 2 unchanged ┄    │ ◇ server.go                    42 B  ~ │
+ NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+
+
+ restoric  ~/dev/project/src
+  Jul 2026        Aug                         Sep                              on disk
+  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ · api/  ○ src/
+                                                                      ▲                    − 1× +
+
+ on disk  …           │   ..                     ╭────────────────────────────────────────────────╮
+   ┄ 2 unchanged ┄    │ ▾ api/                   │ Stopped · nothing was overwritten. The old     │
+▶Sep 27 08:52 ~1      │ ▸ models/                │ copy couldn't be removed and stays at          │
+   ┄ 2 unchanged ┄    │ ◇ config.go              │ ~/.local/share/restoric/undo/20260909T192300.0 │
+ Sep 20 20:35 ~1      │ ◇ main.go                │ 00/files/0/config.go: Permission denied (os    │
+   ┄ 2 unchanged ┄    │ ◇ server.go              │ error 13)                                      │
+ NOR  Sep 27 08:52  c177b849  src/ ~1            ╰────────────────────────────────────────────────╯

@@ -172,6 +172,9 @@ pub struct Done {
 pub struct Outcome {
     pub done: Vec<Done>,
     pub stopped: bool,
+    /// Old copies a stopped overwrite put back but couldn't remove from
+    /// the undo step afterwards, with why (see [`Undone::left`]).
+    pub left: Vec<(PathBuf, String)>,
 }
 
 /// How far a restore has got, for the status bar.
@@ -247,6 +250,7 @@ pub fn run(
             return Ok(Outcome {
                 done,
                 stopped: true,
+                left: Vec::new(),
             });
         }
         let mut report = |step| rep.send(i, t, step);
@@ -302,6 +306,7 @@ pub fn run(
                 return Ok(Outcome {
                     done,
                     stopped: true,
+                    left: Vec::new(),
                 });
             }
             Err(e) => {
@@ -313,6 +318,7 @@ pub fn run(
     Ok(Outcome {
         done,
         stopped: false,
+        left: Vec::new(),
     })
 }
 
@@ -328,6 +334,14 @@ struct UndoEntry {
     path: PathBuf,
     /// Where the old version is kept; `None` if nothing was there.
     saved: Option<PathBuf>,
+    /// Whether the restore has claimed the name, when nothing was there:
+    /// set once it has, so that what's at the path is the restore's and
+    /// undo removes it. Until then (the process died first) whatever is
+    /// at the path was put there by something else, or is at most the
+    /// claimed empty name, and stays. With a copy, the copy's being there
+    /// is what says this.
+    #[serde(default)]
+    claimed: bool,
 }
 
 const MANIFEST: &str = "manifest.json";
@@ -338,9 +352,11 @@ const MANIFEST: &str = "manifest.json";
 /// put back.
 ///
 /// Each entry is in the manifest before its original is moved, and the
-/// copy is at its recorded place only once it's whole (see [`move_aside`]):
+/// copy is at its recorded place only once it's whole (see [`move_aside`]);
+/// an entry for a free name is marked claimed only once the name is:
 /// whatever the process dies in the middle of, [`rollback`] either finds a
-/// whole copy to put back or leaves the path alone.
+/// whole copy to put back, something of the restore's to remove, or
+/// leaves the path alone.
 fn overwrite(
     repo: &dyn Repo,
     targets: &[Target],
@@ -350,17 +366,11 @@ fn overwrite(
 ) -> Result<Outcome> {
     let stopped = |session: &Path, manifest: &Manifest| -> Result<Outcome> {
         let undone = rollback(session, manifest)?;
-        // Everything is back; a copy that stays is for the user to see
-        // to, and this is where they hear of it.
-        if let Some((copy, why)) = undone.left.first() {
-            bail!(
-                "stopped, and everything is back, but the old copy couldn't be removed and stays at {}: {why}",
-                copy.display()
-            );
-        }
+        // Everything is back: a stop, whatever copies stay.
         Ok(Outcome {
             done: Vec::new(),
             stopped: true,
+            left: undone.left,
         })
     };
     let mut done = Vec::new();
@@ -368,6 +378,7 @@ fn overwrite(
         return Ok(Outcome {
             done,
             stopped: false,
+            left: Vec::new(),
         });
     }
     let session = new_session(places.undo_dir.as_deref())?;
@@ -380,6 +391,7 @@ fn overwrite(
         manifest.entries.push(UndoEntry {
             path: t.path.clone(),
             saved: saved.clone(),
+            claimed: false,
         });
         if let Err(e) = write_manifest(&session, &manifest) {
             // Nothing has been touched for this entry, and the manifest on
@@ -404,6 +416,11 @@ fn overwrite(
         let res = moved.and_then(|()| {
             crate::repo::claim(&t.node, &t.path)?;
             claimed = true;
+            if saved.is_none() {
+                // From here on what's at the path is ours.
+                manifest.entries.last_mut().expect("pushed above").claimed = true;
+                write_manifest(&session, &manifest)?;
+            }
             let mut report = |step| rep.send(i, t, step);
             repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
                 cancel.cancelled()
@@ -464,6 +481,7 @@ fn overwrite(
     Ok(Outcome {
         done,
         stopped: false,
+        left: Vec::new(),
     })
 }
 
@@ -562,7 +580,8 @@ pub fn undo(places: &Places) -> Result<Undone> {
 ///
 /// Can be run again after failing half way: each entry leaves the manifest
 /// as it's put back, and an entry whose copy is gone (put back already, or
-/// never made) leaves its path alone rather than deleting what's there.
+/// never made), or whose name the restore never claimed, leaves its path
+/// alone rather than deleting what's there.
 fn rollback(session: &Path, m: &Manifest) -> Result<Undone> {
     if m.entries.is_empty() {
         remove_session(session);
@@ -589,11 +608,12 @@ fn remove_session(session: &Path) {
     }
 }
 
-/// Puts back the last entry of `left`, drops it from the manifest, and
+/// Puts back the last entry of `todo`, drops it from the manifest, and
 /// removes the step once it's empty. Returns the path if something was put
-/// back: an entry whose copy is gone (never made, or put back already)
-/// leaves its path alone. Fails with the entry still in the manifest, so
-/// it can be run again.
+/// back (or removed): an entry whose copy is gone (never made, or put back
+/// already), or whose free name the restore never claimed, leaves its path
+/// alone. Fails with the entry still in the manifest, so it can be run
+/// again.
 ///
 /// The copy is removed only after the manifest no longer names it, so a
 /// copy that was put back across file systems and then couldn't be
@@ -611,12 +631,16 @@ fn put_back_last(
     let saved = e.saved.clone();
     let back = match &saved {
         Some(s) if !exists(s) => false,
+        None if !e.claimed => false,
         _ => {
+            let was = exists(&path);
             remove_path(&path).with_context(|| format!("removing {}", path.display()))?;
             if let Some(s) = &saved {
                 place(s, &path).with_context(|| format!("putting back {}", path.display()))?;
             }
-            true
+            // Removing what the restore created counts only if it was
+            // still there.
+            saved.is_some() || was
         }
     };
     let entry = todo.entries.pop().expect("checked above");
@@ -732,8 +756,8 @@ fn copy_fresh(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Copies a file, link or folder with its permissions and times; links
-/// are copied as links.
+/// Copies a file, link or folder with its permissions and times (a
+/// folder's time only on unix); links are copied as links.
 fn copy_path(from: &Path, to: &Path) -> io::Result<()> {
     let m = from.symlink_metadata()?;
     if m.file_type().is_symlink() {
@@ -768,25 +792,28 @@ fn copy_path(from: &Path, to: &Path) -> io::Result<()> {
 }
 
 /// Sets the modification time of the fresh copy at `p`, which `fs::copy`
-/// has already given `m`'s mode. A read-only mode (`0o444`, every file
-/// under `.git/objects`) can't be opened for writing, so the time is set
-/// with the mode relaxed for the moment it takes, then the mode put back.
+/// has already given `m`'s mode.
+#[cfg(unix)]
+fn set_modified(p: &Path, t: std::time::SystemTime, _m: &fs::Metadata) -> io::Result<()> {
+    // The owner can set the time through a read-only handle (`futimens`
+    // doesn't need write access), so a read-only mode (`0o444`, every
+    // file under `.git/objects`) needs no relaxing: the copy never
+    // spends a moment writable.
+    fs::File::open(p)?.set_modified(t)
+}
+
+/// Sets the modification time of the fresh copy at `p`, which `fs::copy`
+/// has already given `m`'s mode. The read-only attribute stops the file
+/// being opened for writing, so the time is set with it cleared for the
+/// moment it takes, then put back.
+#[cfg(not(unix))]
 fn set_modified(p: &Path, t: std::time::SystemTime, m: &fs::Metadata) -> io::Result<()> {
     let open = || fs::File::options().write(true).open(p);
     match open() {
         Ok(f) => f.set_modified(t),
         Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
-            #[cfg(unix)]
-            let writable = {
-                use std::os::unix::fs::PermissionsExt;
-                fs::Permissions::from_mode(m.permissions().mode() | 0o200)
-            };
-            #[cfg(not(unix))]
-            let writable = {
-                let mut w = m.permissions();
-                w.set_readonly(false);
-                w
-            };
+            let mut writable = m.permissions();
+            writable.set_readonly(false);
             fs::set_permissions(p, writable)?;
             let res = open().and_then(|f| f.set_modified(t));
             fs::set_permissions(p, m.permissions())?;

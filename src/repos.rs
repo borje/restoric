@@ -93,8 +93,10 @@ fn canonical_password(location: &str) -> Option<String> {
     // The URL starts at its scheme: the run of scheme characters before `://`.
     let sep = location.find("://")?;
     let scheme = location[..sep]
-        .rfind(|c: char| !(c.is_ascii_alphanumeric() || "+-.".contains(c)))
-        .map_or(0, |i| i + 1);
+        .char_indices()
+        .rev()
+        .find(|(_, c)| !(c.is_ascii_alphanumeric() || "+-.".contains(*c)))
+        .map_or(0, |(i, c)| i + c.len_utf8());
     let url = url::Url::parse(&location[scheme..]).ok()?;
     url.password().filter(|p| !p.is_empty()).map(str::to_string)
 }
@@ -543,6 +545,22 @@ mod tests {
         assert_eq!(c("rest:https://me@nas/"), None);
         assert_eq!(c("rest:https://me:@nas/"), None);
         assert_eq!(c("/mnt/b"), None);
+        // A multi-byte character right before the scheme is skipped whole.
+        assert_eq!(c("rest:ü://me:pw@host"), None);
+        assert_eq!(c("täg:https://me:pw@host/").as_deref(), Some("pw"));
+        assert_eq!(c("://me:pw@host"), None);
+    }
+
+    #[test]
+    fn scrubbing_survives_a_multibyte_char_before_the_scheme() {
+        assert_eq!(
+            scrub("URL `rest:ü://me:pw@host` failed", "rest:ü://me:pw@host"),
+            "URL `rest:ü://me:***@host` failed"
+        );
+        assert_eq!(
+            scrub("https://me:pw@host/", "täg:https://me:pw@host/"),
+            "https://me:***@host/"
+        );
     }
 
     #[test]

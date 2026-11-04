@@ -209,15 +209,18 @@ impl Config {
         self.disk_cache_mb.unwrap_or(2048) << 20
     }
 
-    /// `restore_dir` with `~` expanded, if set. `None` for a `~` path
-    /// without a home folder to expand it with: no folder, rather than one
-    /// called `~` wherever restoric was started.
-    pub fn restore_dir(&self, home: Option<&Path>) -> Option<PathBuf> {
-        let d = self.restore_dir.as_ref()?;
+    /// `restore_dir` with `~` expanded, if set. A `~` path without a home
+    /// folder to expand it with is an error that names it: not a folder
+    /// called `~` wherever restoric was started, and not silently no
+    /// folder either, with a hint to set `restore_dir` when it is set.
+    pub fn restore_dir(&self, home: Option<&Path>) -> Result<Option<PathBuf>> {
+        let Some(d) = self.restore_dir.as_ref() else {
+            return Ok(None);
+        };
         if home.is_none() && (d == "~" || d.starts_with("~/")) {
-            return None;
+            bail!("restore_dir = {d:?} in the config needs HOME set to expand its ~");
         }
-        Some(expand_home(d, home))
+        Ok(Some(expand_home(d, home)))
     }
 
     /// The `[keys]` overrides.
@@ -378,12 +381,14 @@ selected = "#202830"
         assert_eq!(c.preview_limit(), 128 * 1024);
         assert_eq!(c.diff_limit(), 2 << 20);
         assert_eq!(
-            c.restore_dir(Some(Path::new("/home/me"))),
+            c.restore_dir(Some(Path::new("/home/me"))).unwrap(),
             Some(PathBuf::from("/home/me/Got back"))
         );
-        // Without a home folder `~` names nothing: no folder, rather than
-        // one called `~` wherever restoric was started.
-        assert_eq!(c.restore_dir(None), None);
+        // Without a home folder `~` names nothing: an error that says so,
+        // rather than a folder called `~` wherever restoric was started,
+        // or no folder and a hint to set restore_dir.
+        let err = c.restore_dir(None).unwrap_err().to_string();
+        assert!(err.contains("~/Got back") && err.contains("HOME"), "{err}");
         let keys = c.keymap().unwrap();
         assert_eq!(
             keys[&(KeyCode::Char('i'), KeyModifiers::NONE)],

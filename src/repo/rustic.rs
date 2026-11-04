@@ -22,6 +22,26 @@ use super::{
     Tree, TreeId,
 };
 
+/// `text`, an error from running the password command, with the command
+/// hidden: a failing command is quoted in the error, and its text often
+/// holds the password (`echo hunter2`). Hidden as `given` and as rustic
+/// prints it, re-joined from its words (`echo "hunter2"` comes out `echo
+/// hunter2`). A bare command name carries no secret, and hiding it would
+/// blank that word wherever the message uses it (`pass: x is not in the
+/// password store`), so it stays.
+fn hide_command(text: &str, given: &str, parsed: &CommandInput) -> String {
+    if parsed.args().is_empty() {
+        return text.to_string();
+    }
+    let mut out = text.to_string();
+    for c in [given, parsed.to_string().as_str()] {
+        if !c.is_empty() {
+            out = out.replace(c, "***");
+        }
+    }
+    out
+}
+
 /// Names the cache's backend version: a new rustic_core starts a new cache.
 pub const BACKEND: &str = "rustic_core 0.13.0";
 
@@ -163,31 +183,25 @@ impl Connection {
             Credentials::password(p.as_str())
         } else {
             let mut cred = CredentialOptions::default();
-            // The command as given and as rustic prints it: re-joined
-            // from its words, so `echo "hunter2"` comes out `echo hunter2`.
-            let mut command = Vec::new();
+            let mut command = None;
             if let Some(f) = &o.password_file {
                 cred = cred.password_file(f.clone());
             } else if let Some(c) = &o.password_command {
                 let parsed = c
                     .parse::<CommandInput>()
                     .map_err(|e| anyhow!("bad password command: {e}"))?;
-                command.extend([c.clone(), parsed.to_string()]);
-                cred = cred.password_command(parsed);
+                cred = cred.password_command(parsed.clone());
+                command = Some((c.as_str(), parsed));
             }
             cred.credentials()
                 .map_err(|e| {
-                    // A failing command is quoted in the error, and its
-                    // text often holds the password (`echo hunter2`).
                     let e = err_at(&repo, e);
-                    if command.is_empty() {
-                        return e;
+                    match &command {
+                        Some((given, parsed)) => {
+                            anyhow!("{}", hide_command(&e.to_string(), given, parsed))
+                        }
+                        None => e,
                     }
-                    let mut text = e.to_string();
-                    for c in command.iter().filter(|c| !c.is_empty()) {
-                        text = text.replace(c.as_str(), "***");
-                    }
-                    anyhow!("{text}")
                 })?
                 .ok_or(Locked::NoPassword)?
         };
@@ -511,6 +525,35 @@ mod tests {
     fn entry(name: &str) -> RusticResult<(PathBuf, RNode)> {
         let node = RNode::new_node(OsStr::new(name), NodeType::File, Metadata::default());
         Ok((PathBuf::from("src").join(name), node))
+    }
+
+    #[test]
+    fn a_password_command_with_arguments_is_hidden_and_a_bare_one_is_not() {
+        let hide = |text: &str, given: &str| {
+            hide_command(text, given, &given.parse::<CommandInput>().unwrap())
+        };
+        assert_eq!(
+            hide(
+                "password command `echo hunter2` failed: echo \"hunter2\" exited",
+                "echo \"hunter2\""
+            ),
+            "password command `***` failed: *** exited"
+        );
+        assert_eq!(
+            hide(
+                "password command `pass show restic/nas` failed: pass: restic/nas is not in the password store",
+                "pass show restic/nas"
+            ),
+            "password command `***` failed: pass: restic/nas is not in the password store"
+        );
+        // A bare command: no secret in it, and the message stays readable.
+        assert_eq!(
+            hide(
+                "password command `pass` failed: pass: restic/nas is not in the password store",
+                "pass"
+            ),
+            "password command `pass` failed: pass: restic/nas is not in the password store"
+        );
     }
 
     #[test]

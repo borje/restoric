@@ -468,7 +468,7 @@ fn tui(
     app.diff_limit = config.diff_limit();
     app.keymap = config.keymap()?;
     app.start_at = view.at.clone();
-    if let Some(d) = config.restore_dir(app.home.as_deref()) {
+    if let Some(d) = config.restore_dir(app.home.as_deref())? {
         app.places.restore_dir = Some(d);
     }
     if let Some(name) = &view.select {
