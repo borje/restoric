@@ -269,7 +269,8 @@ pub enum Response {
         /// them back.
         left: Vec<(PathBuf, String)>,
     },
-    /// The restore failed; what it had done is cleaned up.
+    /// The restore failed. What it had made of the failed item is removed;
+    /// the message says what stays (items before it, an old copy).
     RestoreFailed(String),
     Undone(restore::Undone),
     Exists(Vec<(PathBuf, bool)>),

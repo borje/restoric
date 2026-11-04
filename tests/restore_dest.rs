@@ -212,3 +212,42 @@ fn a_failed_link_restore_leaves_what_is_at_its_name() {
     let m = planted.symlink_metadata().expect("the planted file stays");
     assert!(m.is_file(), "the planted file stays a file");
 }
+
+/// A restore of several items that fails part way removes what it had
+/// made of the failed item, and no more: the message says that the items
+/// before it were restored and stay.
+#[test]
+fn a_failed_restore_says_the_items_before_it_stay() {
+    let s = setup();
+    // The snapshot has no b.txt: its restore fails once its name is taken.
+    let mut gone = s.target("a.txt");
+    gone.path = s.root.join("b.txt");
+    let items = [s.target("a.txt"), s.target("sub"), gone];
+    let err = run(
+        &s.repo,
+        &items,
+        &How::RestoreDir,
+        &s.places,
+        &mut |_| {},
+        &Cancel::default(),
+    )
+    .unwrap_err();
+    let text = format!("{err:#}");
+    assert!(text.contains("b.txt"), "{text}");
+    assert!(
+        text.contains("the 2 items before it were restored and stay"),
+        "{text}"
+    );
+    let day = s
+        .places
+        .restore_dir
+        .as_ref()
+        .unwrap()
+        .join("2026-07-01_1000");
+    let mut names: Vec<String> = fs::read_dir(&day)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["a.txt", "sub"]);
+}

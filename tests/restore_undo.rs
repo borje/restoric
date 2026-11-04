@@ -526,3 +526,61 @@ fn a_stopped_overwrite_reports_the_old_copies_it_couldnt_remove() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
     fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
 }
+
+/// A step for a link at a free name, from a process that died after
+/// claiming the name but before the link was made: a regular file at the
+/// name by now was put there by something else, and stays. Only a link
+/// to the restored target is the restore's to remove.
+#[cfg(unix)]
+#[test]
+fn undo_removes_only_the_link_a_restore_made() {
+    let s = setup();
+    let undo_dir = s.places.undo_dir.clone().unwrap();
+    let session = undo_dir.join("20260701T100000.000");
+    fs::create_dir_all(&session).unwrap();
+    let manifest = serde_json::json!({
+        "entries": [{ "path": s.root.join("cur"), "saved": null, "claimed": { "Link": "a.txt" } }]
+    });
+    fs::write(session.join("manifest.json"), manifest.to_string()).unwrap();
+    fs::write(s.root.join("cur"), "made by hand later\n").unwrap();
+
+    let undone = undo(&s.places).unwrap();
+    assert_eq!(s.read("cur"), "made by hand later\n");
+    assert!(undone.back.is_empty(), "{:?}", undone.back);
+    assert!(s.sessions().is_empty(), "the step is finished with");
+
+    // The same step, with the link in place: undo removes it.
+    fs::create_dir_all(&session).unwrap();
+    fs::write(session.join("manifest.json"), manifest.to_string()).unwrap();
+    fs::remove_file(s.root.join("cur")).unwrap();
+    std::os::unix::fs::symlink("a.txt", s.root.join("cur")).unwrap();
+    assert_eq!(undo(&s.places).unwrap().back, [s.root.join("cur")]);
+    assert!(s.root.join("cur").symlink_metadata().is_err());
+}
+
+/// A step whose manifest can't be read (written by a later version, say)
+/// stops undo with the step named and what to do about it, and the
+/// steps before it can be undone once it's moved away.
+#[test]
+fn an_unreadable_step_names_itself_and_keeps_earlier_steps_undoable() {
+    let s = setup();
+    s.overwrite(&["a.txt"]).unwrap();
+    let bad = s
+        .places
+        .undo_dir
+        .clone()
+        .unwrap()
+        .join("99991231T235959.000");
+    fs::create_dir_all(&bad).unwrap();
+    fs::write(bad.join("manifest.json"), "{ not a manifest").unwrap();
+
+    let err = undo(&s.places).unwrap_err();
+    let text = format!("{err:#}");
+    assert!(text.contains(&bad.display().to_string()), "{text}");
+    assert!(text.contains("move the step away"), "{text}");
+    assert_eq!(s.read("a.txt"), "alpha\n", "nothing was put back");
+
+    fs::rename(&bad, s.root.join("bad-step")).unwrap();
+    assert_eq!(undo(&s.places).unwrap().back, [s.root.join("a.txt")]);
+    assert_eq!(s.read("a.txt"), "my a\n");
+}

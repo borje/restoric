@@ -26,7 +26,7 @@ use crate::index::timeline::{Filter, covers, explain_empty};
 use crate::index::versions::{Run, run_at};
 use crate::index::{Mode, ModeSwitch, Version, fold};
 use crate::repo::{FileBytes, Node, NodeKind, SnapshotId, SnapshotInfo, TreeId};
-use crate::restore::{How, Places, Plan, PlanFor, Target};
+use crate::restore::{self, How, Places, Plan, PlanFor, Target};
 use crate::ui::fmt;
 use crate::worker::{Cancel, Request, Response, Side};
 use cmdline::{Input, InputKind};
@@ -479,8 +479,7 @@ fn copies_left(left: &[(PathBuf, String)], home: Option<&Path>) -> String {
         [(p, why), ..] => format!(
             " {} old copies couldn't be removed and stay under {}: {why}",
             left.len(),
-            // `<step>/files/<i>/<name>`: the step's files folder.
-            fmt::path(p.parent().and_then(Path::parent).unwrap_or(p), home)
+            fmt::path(restore::step_of(p), home)
         ),
     }
 }

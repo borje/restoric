@@ -73,11 +73,18 @@ pub fn ago(d: SignedDuration) -> String {
     }
 }
 
-/// `p` with a leading `~` replaced by `home`.
+/// Whether `p` is `~` or under it: a path only a home folder can expand.
+pub fn in_home(p: &str) -> bool {
+    p == "~" || p.starts_with("~/")
+}
+
+/// `p` with a leading `~` replaced by `home`, when there is one.
 pub fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
-    match (p.strip_prefix("~/"), home) {
-        (Some(rest), Some(h)) => h.join(rest),
-        (_, Some(h)) if p == "~" => h.to_path_buf(),
+    match home {
+        Some(h) if in_home(p) => match p.get(2..) {
+            Some(rest) => h.join(rest),
+            None => h.to_path_buf(),
+        },
         _ => PathBuf::from(p),
     }
 }
@@ -132,20 +139,27 @@ pub fn fit_middle(s: &str, w: usize) -> String {
 pub fn wrap(text: &str, w: usize) -> Vec<String> {
     let mut out = Vec::new();
     let mut line = String::new();
+    // The line's width so far, kept up rather than measured again for
+    // every character of a long path.
+    let mut used = 0;
     for word in text.split(' ') {
-        if !line.is_empty() && width(&line) + 1 + width(word) > w {
+        if !line.is_empty() && used + 1 + width(word) > w {
             out.push(std::mem::take(&mut line));
+            used = 0;
         }
         if !line.is_empty() {
             line.push(' ');
+            used += 1;
         }
         // A word wider than a line (a path) is broken where the line ends.
         for c in word.chars() {
             let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-            if !line.is_empty() && width(&line) + cw > w {
+            if !line.is_empty() && used + cw > w {
                 out.push(std::mem::take(&mut line));
+                used = 0;
             }
             line.push(c);
+            used += cw;
         }
     }
     if !line.is_empty() {
@@ -180,6 +194,8 @@ mod tests {
             ["at", "/a/long", "/path", "done"]
         );
         assert_eq!(wrap("x åäöåäö", 4), ["x", "åäöå", "äö"]);
+        assert_eq!(wrap("ab cdef gh", 4), ["ab", "cdef", "gh"]);
+        assert_eq!(wrap("/a/b/c/d/e", 3), ["/a/", "b/c", "/d/", "e"]);
     }
 
     #[test]
@@ -192,6 +208,10 @@ mod tests {
             PathBuf::from("/home/bege/x")
         );
         assert_eq!(expand_home("/x", Some(home)), PathBuf::from("/x"));
+        assert_eq!(expand_home("~", Some(home)), home);
+        assert_eq!(expand_home("~x", Some(home)), PathBuf::from("~x"));
+        assert_eq!(expand_home("~/x", None), PathBuf::from("~/x"));
+        assert!(in_home("~") && in_home("~/x") && !in_home("~x"));
     }
 
     #[test]

@@ -10,7 +10,7 @@ use serde::Deserialize;
 use zeroize::Zeroizing;
 
 use crate::app::Action;
-use crate::ui::fmt::expand_home;
+use crate::ui::fmt::{expand_home, in_home};
 use crate::ui::theme::Theme;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -217,7 +217,7 @@ impl Config {
         let Some(d) = self.restore_dir.as_ref() else {
             return Ok(None);
         };
-        if home.is_none() && (d == "~" || d.starts_with("~/")) {
+        if home.is_none() && in_home(d) {
             bail!("restore_dir = {d:?} in the config needs HOME set to expand its ~");
         }
         Ok(Some(expand_home(d, home)))

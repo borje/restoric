@@ -177,6 +177,24 @@ pub struct Outcome {
     pub left: Vec<(PathBuf, String)>,
 }
 
+impl Outcome {
+    fn finished(done: Vec<Done>) -> Self {
+        Outcome {
+            done,
+            stopped: false,
+            left: Vec::new(),
+        }
+    }
+
+    fn stopped(done: Vec<Done>) -> Self {
+        Outcome {
+            done,
+            stopped: true,
+            left: Vec::new(),
+        }
+    }
+}
+
 /// How far a restore has got, for the status bar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Progress {
@@ -247,11 +265,7 @@ pub fn run(
     let mut done = Vec::new();
     for (i, t) in targets.iter().enumerate() {
         if cancel.cancelled() {
-            return Ok(Outcome {
-                done,
-                stopped: true,
-                left: Vec::new(),
-            });
+            return Ok(Outcome::stopped(done));
         }
         let mut report = |step| rep.send(i, t, step);
         let st = stamp(t.snapshot.time, &places.tz);
@@ -285,7 +299,10 @@ pub fn run(
                 }),
                 // Nothing of ours is at `dest`: whatever is there now was
                 // put there by something else, and stays.
-                Err(e) => return Err(e.context(format!("restoring {}", t.path.display()))),
+                Err(e) => {
+                    let e = e.context(format!("restoring {}", t.path.display()));
+                    return Err(with_earlier(e, done.len(), how));
+                }
             }
         };
         // A tar archive removes itself when it fails (and nothing is at
@@ -293,7 +310,7 @@ pub fn run(
         // claimed name, or the partial copy: nothing was there before.
         let clean = |dest: &Path| {
             if *how != How::Tar {
-                let _ = unclaim(&t.node, dest);
+                let _ = unclaim(&Claimed::of(&t.node), dest);
             }
         };
         match res {
@@ -303,23 +320,16 @@ pub fn run(
             }),
             Err(e) if is_stopped(&e) => {
                 clean(&dest);
-                return Ok(Outcome {
-                    done,
-                    stopped: true,
-                    left: Vec::new(),
-                });
+                return Ok(Outcome::stopped(done));
             }
             Err(e) => {
                 clean(&dest);
-                return Err(e.context(format!("restoring {}", t.path.display())));
+                let e = e.context(format!("restoring {}", t.path.display()));
+                return Err(with_earlier(e, done.len(), how));
             }
         }
     }
-    Ok(Outcome {
-        done,
-        stopped: false,
-        left: Vec::new(),
-    })
+    Ok(Outcome::finished(done))
 }
 
 /// One undo step: what an overwrite replaced.
@@ -334,14 +344,36 @@ struct UndoEntry {
     path: PathBuf,
     /// Where the old version is kept; `None` if nothing was there.
     saved: Option<PathBuf>,
-    /// Whether the restore has claimed the name, when nothing was there:
-    /// set once it has, so that what's at the path is the restore's and
-    /// undo removes it. Until then (the process died first) whatever is
-    /// at the path was put there by something else, or is at most the
-    /// claimed empty name, and stays. With a copy, the copy's being there
-    /// is what says this.
+    /// What the restore has claimed the name for, when nothing was there:
+    /// set once it has, so that undo removes just that (see [`unclaim`]).
+    /// Until then (the process died first) whatever is at the path was
+    /// put there by something else, or is at most the claimed empty name,
+    /// and stays. With a copy, the copy's being there is what says this.
     #[serde(default)]
-    claimed: bool,
+    claimed: Option<Claimed>,
+}
+
+/// What a restore claimed a free name for, and so what's its to remove
+/// there (see [`unclaim`]).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+enum Claimed {
+    File,
+    Dir,
+    /// A link to this target.
+    Link(PathBuf),
+    /// Something restoric doesn't restore: the name was only found free.
+    Nothing,
+}
+
+impl Claimed {
+    fn of(node: &Node) -> Self {
+        match &node.kind {
+            NodeKind::File => Claimed::File,
+            NodeKind::Dir => Claimed::Dir,
+            NodeKind::Symlink { target } => Claimed::Link(PathBuf::from(target)),
+            NodeKind::Other(_) => Claimed::Nothing,
+        }
+    }
 }
 
 const MANIFEST: &str = "manifest.json";
@@ -373,25 +405,21 @@ fn overwrite(
             left: undone.left,
         })
     };
-    let mut done = Vec::new();
     if targets.is_empty() {
-        return Ok(Outcome {
-            done,
-            stopped: false,
-            left: Vec::new(),
-        });
+        return Ok(Outcome::finished(Vec::new()));
     }
+    let mut done = Vec::new();
     let session = new_session(places.undo_dir.as_deref())?;
     let mut manifest = Manifest::default();
     for (i, t) in targets.iter().enumerate() {
         if cancel.cancelled() {
             return stopped(&session, &manifest);
         }
-        let saved = exists(&t.path).then(|| saved_at(&session, i, t));
+        let saved = exists(&t.path).then(|| saved_at(&session, i, &t.name()));
         manifest.entries.push(UndoEntry {
             path: t.path.clone(),
             saved: saved.clone(),
-            claimed: false,
+            claimed: None,
         });
         if let Err(e) = write_manifest(&session, &manifest) {
             // Nothing has been touched for this entry, and the manifest on
@@ -401,7 +429,7 @@ fn overwrite(
                 remove_session(&session);
             }
             let e = e.context(format!("restoring {}", t.path.display()));
-            return Err(with_earlier(e, done.len()));
+            return Err(with_earlier(e, done.len(), &How::Overwrite));
         }
         let moved = match &saved {
             Some(to) => fs::create_dir_all(to.parent().expect("has a parent"))
@@ -412,13 +440,14 @@ fn overwrite(
                 None => Ok(()),
             },
         };
+        let claim = Claimed::of(&t.node);
         let mut claimed = false;
         let res = moved.and_then(|()| {
             crate::repo::claim(&t.node, &t.path)?;
             claimed = true;
             if saved.is_none() {
                 // From here on what's at the path is ours.
-                manifest.entries.last_mut().expect("pushed above").claimed = true;
+                manifest.entries.last_mut().expect("pushed above").claimed = Some(claim.clone());
                 write_manifest(&session, &manifest)?;
             }
             let mut report = |step| rep.send(i, t, step);
@@ -438,7 +467,7 @@ fn overwrite(
                 // and it stays. Either way there's nothing to put back.
                 None => {
                     if claimed {
-                        let _ = unclaim(&t.node, &t.path);
+                        let _ = unclaim(&claim, &t.path);
                     }
                     match drop_last(&session, &mut manifest) {
                         Ok(()) => e,
@@ -467,7 +496,7 @@ fn overwrite(
                     }
                 }
             };
-            return Err(with_earlier(e, done.len()));
+            return Err(with_earlier(e, done.len(), &How::Overwrite));
         }
         done.push(Done {
             target: t.path.clone(),
@@ -478,32 +507,35 @@ fn overwrite(
     if cancel.cancelled() {
         return stopped(&session, &manifest);
     }
-    Ok(Outcome {
-        done,
-        stopped: false,
-        left: Vec::new(),
-    })
+    Ok(Outcome::finished(done))
 }
 
-/// `e`, and that the `n` items of the step before the failed one were
-/// overwritten and stay so: the step is kept, and :undo puts them back.
-fn with_earlier(e: anyhow::Error, n: usize) -> anyhow::Error {
-    match n {
-        0 => e,
-        1 => anyhow::anyhow!(
-            "{e:#}; the item before it was overwritten, and :undo puts the old version back"
-        ),
-        n => anyhow::anyhow!(
-            "{e:#}; the {n} items before it were overwritten, and :undo puts the old versions back"
-        ),
-    }
+/// `e`, and that the `n` items before the failed one were restored and
+/// stay so; overwritten ones as the undo step, which :undo puts back.
+fn with_earlier(e: anyhow::Error, n: usize, how: &How) -> anyhow::Error {
+    let (before, s, stay) = match n {
+        0 => return e,
+        1 => ("the item before it was".to_string(), "", "stays"),
+        n => (format!("the {n} items before it were"), "s", "stay"),
+    };
+    let then = match how {
+        How::Overwrite => format!("overwritten, and :undo puts the old version{s} back"),
+        How::Tar => format!("written and {stay}"),
+        _ => format!("restored and {stay}"),
+    };
+    anyhow::anyhow!("{e:#}; {before} {then}")
 }
 
 /// `<session>/files/<i>/<name>`: where item `i` of a step keeps what it
 /// replaced. Built from the item's number and name only; joining the
 /// original's absolute path would, on Windows, give that path itself.
-fn saved_at(session: &Path, i: usize, t: &Target) -> PathBuf {
-    session.join("files").join(i.to_string()).join(t.name())
+fn saved_at(session: &Path, i: usize, name: &str) -> PathBuf {
+    session.join("files").join(i.to_string()).join(name)
+}
+
+/// The step an undo copy (an [`Undone::left`] path) is kept in.
+pub fn step_of(copy: &Path) -> &Path {
+    copy.ancestors().nth(3).unwrap_or(copy)
 }
 
 fn new_session(undo_dir: Option<&Path>) -> Result<PathBuf> {
@@ -550,7 +582,10 @@ pub struct Undone {
 ///
 /// A step with nothing left in it (put back, but its folder couldn't be
 /// removed then) is removed if it can be, and never counts as the last
-/// overwrite.
+/// overwrite. A step whose manifest can't be read stops the undo, named:
+/// it isn't skipped, since its files folder may hold what that overwrite
+/// replaced, and the steps before it go back in order once it's moved
+/// away.
 pub fn undo(places: &Places) -> Result<Undone> {
     let read = places.undo_dir.as_deref().map(fs::read_dir);
     let mut sessions: Vec<PathBuf> = match read {
@@ -563,10 +598,16 @@ pub fn undo(places: &Places) -> Result<Undone> {
     sessions.sort();
     while let Some(session) = sessions.pop() {
         let manifest = session.join(MANIFEST);
-        let m: Manifest = fs::read(&manifest)
+        let m: Manifest = match fs::read(&manifest)
             .map_err(anyhow::Error::from)
             .and_then(|bytes| Ok(serde_json::from_slice(&bytes)?))
-            .with_context(|| format!("reading {}", manifest.display()))?;
+        {
+            Ok(m) => m,
+            Err(e) => bail!(
+                "can't read the undo step {}: {e:#}. Its files folder keeps what that overwrite replaced; move the step away to undo earlier ones",
+                session.display()
+            ),
+        };
         if m.entries.is_empty() {
             remove_session(&session);
             continue;
@@ -611,9 +652,9 @@ fn remove_session(session: &Path) {
 /// Puts back the last entry of `todo`, drops it from the manifest, and
 /// removes the step once it's empty. Returns the path if something was put
 /// back (or removed): an entry whose copy is gone (never made, or put back
-/// already), or whose free name the restore never claimed, leaves its path
-/// alone. Fails with the entry still in the manifest, so it can be run
-/// again.
+/// already), or whose free name the restore never claimed, or holds
+/// something other than what the restore made, leaves its path alone.
+/// Fails with the entry still in the manifest, so it can be run again.
 ///
 /// The copy is removed only after the manifest no longer names it, so a
 /// copy that was put back across file systems and then couldn't be
@@ -629,40 +670,31 @@ fn put_back_last(
     };
     let path = e.path.clone();
     let saved = e.saved.clone();
-    let back = match &saved {
-        Some(s) if !exists(s) => false,
-        None if !e.claimed => false,
-        _ => {
-            let was = exists(&path);
+    let back = match (&saved, &e.claimed) {
+        (Some(s), _) if !exists(s) => false,
+        (Some(s), _) => {
             remove_path(&path).with_context(|| format!("removing {}", path.display()))?;
-            if let Some(s) = &saved {
-                place(s, &path).with_context(|| format!("putting back {}", path.display()))?;
-            }
-            // Removing what the restore created counts only if it was
-            // still there.
-            saved.is_some() || was
+            place(s, &path).with_context(|| format!("putting back {}", path.display()))?;
+            true
         }
+        // Removing what the restore made counts only if it was still there.
+        (None, Some(c)) => {
+            unclaim(c, &path).with_context(|| format!("removing {}", path.display()))?
+        }
+        (None, None) => false,
     };
-    let entry = todo.entries.pop().expect("checked above");
-    if let Err(e) = write_manifest(session, todo) {
-        todo.entries.push(entry);
-        return Err(e);
-    }
+    drop_last(session, todo)?;
     if let Some(s) = &saved
         && let Err(e) = remove_path(s)
     {
         tracing::warn!("leaving the undo copy {}: {e}", s.display());
         left.push((s.clone(), e.to_string()));
     }
-    if todo.entries.is_empty() {
-        remove_session(session);
-    }
     Ok(back.then_some(path))
 }
 
-/// Drops the last entry of `m`, one nothing was done for, from the
-/// manifest on disk, and the step with it once it's empty. Fails with the
-/// entry still in `m`.
+/// Drops the last entry of `m` from the manifest on disk, and the step
+/// with it once it's empty. Fails with the entry still in `m`.
 fn drop_last(session: &Path, m: &mut Manifest) -> Result<()> {
     let Some(entry) = m.entries.pop() else {
         return Ok(());
@@ -677,29 +709,32 @@ fn drop_last(session: &Path, m: &mut Manifest) -> Result<()> {
     Ok(())
 }
 
-/// Removes what [`claim`](crate::repo::claim) and a failed restore of
-/// `node` left at `dest`, and nothing else: the claimed file or folder
-/// (with whatever the restore put in it), or a link to the node's target.
-/// Anything else at the name was put there by something else, and stays.
-fn unclaim(node: &Node, dest: &Path) -> io::Result<()> {
-    match &node.kind {
-        NodeKind::File | NodeKind::Dir => remove_path(dest),
-        NodeKind::Symlink { target } => match fs::read_link(dest) {
-            Ok(t) if t.as_os_str() == target => fs::remove_file(dest),
-            _ => Ok(()),
+/// Removes what [`claim`](crate::repo::claim) and a restore of what the
+/// name was claimed for left at `dest`, and nothing else: the claimed file
+/// or folder (with whatever the restore put in it), or a link to the
+/// target. Anything else at the name was put there by something else, and
+/// stays. Says whether something was removed.
+fn unclaim(c: &Claimed, dest: &Path) -> io::Result<bool> {
+    match c {
+        Claimed::File | Claimed::Dir => remove_path(dest),
+        Claimed::Link(target) => match fs::read_link(dest) {
+            Ok(t) if t == *target => fs::remove_file(dest).map(|()| true),
+            _ => Ok(false),
         },
-        NodeKind::Other(_) => Ok(()),
+        Claimed::Nothing => Ok(false),
     }
 }
 
-/// Removes a file, link or folder; never follows symlinks.
-fn remove_path(p: &Path) -> io::Result<()> {
+/// Removes a file, link or folder; never follows symlinks. Says whether
+/// there was one.
+fn remove_path(p: &Path) -> io::Result<bool> {
     match p.symlink_metadata() {
-        Ok(m) if m.is_dir() => fs::remove_dir_all(p),
-        Ok(_) => fs::remove_file(p),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+        Ok(m) if m.is_dir() => fs::remove_dir_all(p)?,
+        Ok(_) => fs::remove_file(p)?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
     }
+    Ok(true)
 }
 
 /// Moves `from` to `to`, a name nothing is at in a folder of the undo
@@ -726,7 +761,8 @@ fn copy_aside(from: &Path, to: &Path) -> io::Result<()> {
         let _ = remove_path(&part);
         return Err(e);
     }
-    remove_path(from)
+    remove_path(from)?;
+    Ok(())
 }
 
 /// Puts `from` at `to`, a name nothing is at: a rename, or across file
@@ -1027,6 +1063,12 @@ mod tests {
         fs::write(from.join("a"), "a\n").unwrap();
         fs::write(from.join("sub/b"), "b\n").unwrap();
         from
+    }
+
+    #[test]
+    fn an_undo_copy_knows_its_step() {
+        let step = Path::new("/u/20260701T100000.000");
+        assert_eq!(step_of(&saved_at(step, 1, "sub")), step);
     }
 
     /// The copy a cross-device move makes shows up at `to` whole, with no

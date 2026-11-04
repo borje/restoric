@@ -25,7 +25,7 @@ expression: "screens.join(\"\\n\\n\")"
    ┄ 2 unchanged ┄    │ ▾ api/                   │ Put back 2 items. 2 old copies couldn't be     │
 ▶Sep 27 08:52 ~1      │ ▸ models/                │ removed and stay under                         │
    ┄ 2 unchanged ┄    │ ◇ config.go              │ ~/.local/share/restoric/undo/20260909T192300.0 │
- Sep 20 20:35 ~1      │ ◇ main.go                │ 00/files: Permission denied (os error 13)      │
+ Sep 20 20:35 ~1      │ ◇ main.go                │ 00: Permission denied (os error 13)            │
    ┄ 2 unchanged ┄    │ ◇ server.go              ╰────────────────────────────────────────────────╯
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
 
