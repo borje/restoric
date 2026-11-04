@@ -13,6 +13,8 @@ use restoric::worker::Cancel;
 
 struct Setup {
     _dir: tempfile::TempDir,
+    /// The undo folder, when it's on another file system.
+    _other: Option<tempfile::TempDir>,
     root: PathBuf,
     repo: FakeRepo,
     snap: SnapshotInfo,
@@ -40,6 +42,7 @@ fn setup() -> Setup {
     };
     Setup {
         _dir: dir,
+        _other: None,
         root,
         repo,
         snap,
@@ -204,4 +207,119 @@ fn a_failed_overwrite_puts_the_original_back() {
     assert_eq!(s.read("a.txt"), "alpha\n", "the first item stays restored");
     assert_eq!(undo(&s.places).unwrap(), [s.root.join("a.txt")]);
     assert_eq!(s.read("a.txt"), "my a\n");
+}
+
+/// A step whose copy was only part made (the process died while copying
+/// across file systems) leaves the original where it is: the copy is at
+/// its recorded place only once it's whole.
+#[test]
+fn undo_leaves_a_path_alone_when_only_a_partial_copy_was_made() {
+    let s = setup();
+    let undo_dir = s.places.undo_dir.clone().unwrap();
+    let session = undo_dir.join("20260701T100000.000");
+    let saved = session.join("files").join("0").join("a.txt");
+    fs::create_dir_all(saved.parent().unwrap()).unwrap();
+    fs::write(saved.with_file_name("a.txt.part"), "my").unwrap();
+    let manifest = serde_json::json!({
+        "entries": [{ "path": s.root.join("a.txt"), "saved": saved }]
+    });
+    fs::write(session.join("manifest.json"), manifest.to_string()).unwrap();
+
+    assert!(undo(&s.places).unwrap().is_empty());
+    assert_eq!(s.read("a.txt"), "my a\n");
+    assert!(s.sessions().is_empty(), "the step is finished with");
+}
+
+/// An undo folder on another file system than the files: moving aside is
+/// a copy. Linux only, and only where the temporary folder and /dev/shm
+/// are different mounts.
+#[cfg(target_os = "linux")]
+fn across_devices() -> Option<Setup> {
+    let mut s = setup();
+    let shm = std::path::Path::new("/dev/shm");
+    let probe = s.root.join("probe");
+    fs::write(&probe, "").unwrap();
+    let other = shm.join(format!("restoric-probe-{}", std::process::id()));
+    let crosses = matches!(
+        fs::rename(&probe, &other),
+        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices
+    );
+    let _ = fs::remove_file(&probe);
+    let _ = fs::remove_file(&other);
+    if !crosses {
+        eprintln!(
+            "skipped: {} and /dev/shm are one file system",
+            s.root.display()
+        );
+        return None;
+    }
+    let other = tempfile::Builder::new()
+        .prefix("restoric-undo-")
+        .tempdir_in(shm)
+        .unwrap();
+    s.places.undo_dir = Some(other.path().join("undo"));
+    s._other = Some(other);
+    Some(s)
+}
+
+/// Across file systems the copy is whole at its recorded place, with no
+/// `.part` left, and undo copies it back and removes the step.
+#[cfg(target_os = "linux")]
+#[test]
+fn an_overwrite_across_file_systems_can_be_undone() {
+    let Some(s) = across_devices() else { return };
+    s.overwrite(&["a.txt", "sub"]).unwrap();
+    assert_eq!(s.read("a.txt"), "alpha\n");
+    assert_eq!(s.read("sub/c.txt"), "charlie\n");
+    let session = s.sessions().pop().unwrap();
+    let saved = walk(&session.join("files"));
+    assert_eq!(
+        saved,
+        [
+            session.join("files/0/a.txt"),
+            session.join("files/1/sub/c.txt")
+        ]
+    );
+
+    assert_eq!(undo(&s.places).unwrap().len(), 2);
+    assert_eq!(s.read("a.txt"), "my a\n");
+    assert_eq!(s.read("sub/c.txt"), "my c\n");
+    assert!(s.sessions().is_empty());
+}
+
+/// Across file systems, moving aside copies the original and then removes
+/// it. When removing fails part way, the whole copy is what's left of the
+/// original: the step keeps it, the error says so, and undo puts it back.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_move_aside_that_cant_remove_the_original_keeps_the_copy_for_undo() {
+    use std::os::unix::fs::PermissionsExt;
+    if restoric::repo::is_root() {
+        eprintln!("skipped: root can remove anything");
+        return;
+    }
+    let Some(s) = across_devices() else { return };
+    let locked = s.root.join("sub/locked");
+    fs::create_dir(&locked).unwrap();
+    fs::write(locked.join("f"), "keep\n").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let err = s.overwrite(&["sub"]).unwrap_err();
+    let text = format!("{err:#}");
+    assert!(
+        text.contains("moving") && text.contains("kept for undo"),
+        "{text}"
+    );
+    let session = s.sessions().pop().expect("the step is kept");
+    assert_eq!(
+        fs::read_to_string(session.join("files/0/sub/c.txt")).unwrap(),
+        "my c\n"
+    );
+    assert!(!session.join("files/0/sub.part").exists());
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(undo(&s.places).unwrap(), [s.root.join("sub")]);
+    assert_eq!(s.read("sub/c.txt"), "my c\n");
+    assert_eq!(s.read("sub/locked/f"), "keep\n");
+    assert!(undo(&s.places).is_err(), "nothing left to undo");
 }

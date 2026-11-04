@@ -172,7 +172,15 @@ impl Connection {
                 );
             }
             cred.credentials()
-                .map_err(|e| anyhow!("{e}"))?
+                .map_err(|e| {
+                    // A failing command is quoted in the error, and its
+                    // text often holds the password (`echo hunter2`).
+                    let e = err_at(&repo, e);
+                    match &o.password_command {
+                        Some(c) => anyhow!("{}", e.to_string().replace(c.as_str(), "***")),
+                        None => e,
+                    }
+                })?
                 .ok_or(Locked::NoPassword)?
         };
 
@@ -237,6 +245,11 @@ impl RusticRepo {
         })
     }
 
+    /// rustic's error as ours, with the repository's password hidden.
+    fn err(&self, e: impl std::fmt::Display) -> anyhow::Error {
+        err_at(&self.reopen.location, e)
+    }
+
     fn full(&self) -> Result<Arc<Repository<IndexedFullStatus>>> {
         let mut full = self.full.lock().unwrap();
         if let Some(r) = &*full {
@@ -246,7 +259,7 @@ impl RusticRepo {
         let repo = Repository::new_with_progress(&r.opts, &r.backends, ToMeter(self.meter.clone()))
             .and_then(|repo| repo.open(&r.credentials))
             .and_then(|repo| repo.to_indexed())
-            .map_err(|e| err_at(&r.location, e))?;
+            .map_err(|e| self.err(e))?;
         let repo = Arc::new(repo);
         *full = Some(repo.clone());
         Ok(repo)
@@ -338,13 +351,13 @@ impl Repo for RusticRepo {
     }
 
     fn snapshots(&self) -> Result<Vec<SnapshotInfo>> {
-        let snaps = self.trees.get_all_snapshots().map_err(|e| anyhow!("{e}"))?;
+        let snaps = self.trees.get_all_snapshots().map_err(|e| self.err(e))?;
         Ok(snaps.into_iter().map(snapshot_from).collect())
     }
 
     fn tree(&self, id: &TreeId) -> Result<Arc<Tree>> {
         let rid = rustic_core::TreeId::from(rustic_core::Id::new(id.0.0));
-        let t = self.trees.get_tree(&rid).map_err(|e| anyhow!("{e}"))?;
+        let t = self.trees.get_tree(&rid).map_err(|e| self.err(e))?;
         Ok(Arc::new(Tree::from_stored(
             t.nodes.iter().map(node_from).collect(),
         )))
@@ -355,13 +368,11 @@ impl Repo for RusticRepo {
             bail!("not a file");
         }
         let repo = self.full()?;
-        let open = repo
-            .open_file(&rnode_from(node))
-            .map_err(|e| anyhow!("{e}"))?;
+        let open = repo.open_file(&rnode_from(node)).map_err(|e| self.err(e))?;
         let len = node.size.saturating_sub(offset).min(len) as usize;
         let data = repo
             .read_file_at(&open, offset as usize, len)
-            .map_err(|e| anyhow!("{e}"))?;
+            .map_err(|e| self.err(e))?;
         Ok(data.to_vec())
     }
 
@@ -383,7 +394,8 @@ impl Repo for RusticRepo {
         // rustic runs on its own thread; this one watches the meter and
         // `cancelled`, which needn't be shareable between threads.
         let res = std::thread::scope(|s| {
-            let run = s.spawn(|| restore_with(&repo, snap, path, dest, &stop));
+            let run =
+                s.spawn(|| restore_with(&repo, snap, path, dest, &stop, &self.reopen.location));
             while !run.is_finished() {
                 if cancelled() {
                     stop.store(true, Ordering::Relaxed);
@@ -420,19 +432,20 @@ impl Repo for RusticRepo {
 }
 
 /// rustic's restore of `path` to `dest`; gives up with [`Stopped`] if `stop`
-/// is set by the time the plan is made.
+/// is set by the time the plan is made. `location` is the repository as
+/// given, for hiding its password in rustic's errors.
 fn restore_with(
     repo: &Repository<IndexedFullStatus>,
     snap: &SnapshotInfo,
     path: &Path,
     dest: &Path,
     stop: &AtomicBool,
+    location: &str,
 ) -> Result<()> {
+    let err = |e: Box<RusticError>| err_at(location, e);
     let tree = rustic_core::TreeId::from(rustic_core::Id::new(snap.tree.0.0));
     let rel: PathBuf = path.components().skip(1).collect();
-    let node = repo
-        .node_from_path(tree, &rel)
-        .map_err(|e| anyhow!("{e}"))?;
+    let node = repo.node_from_path(tree, &rel).map_err(err)?;
     let is_dir = node.is_dir();
     // RestoreOptions is `non_exhaustive`: no struct literal.
     #[allow(clippy::field_reassign_with_default)]
@@ -444,18 +457,16 @@ fn restore_with(
     let dest_str = dest
         .to_str()
         .context("restoring to a path that isn't UTF-8 isn't supported")?;
-    let dest = LocalDestination::new(dest_str, true, !is_dir).map_err(|e| anyhow!("{e}"))?;
-    let ls = repo
-        .ls(&node, &LsOptions::default())
-        .map_err(|e| anyhow!("{e}"))?;
+    let dest = LocalDestination::new(dest_str, true, !is_dir).map_err(err)?;
+    let ls = repo.ls(&node, &LsOptions::default()).map_err(err)?;
     let plan = repo
         .prepare_restore(&opts, plain_names(ls.clone()), &dest, false)
-        .map_err(|e| anyhow!("{e}"))?;
+        .map_err(err)?;
     if stop.load(Ordering::Relaxed) {
         return Err(Stopped.into());
     }
     repo.restore(plan, &opts, plain_names(ls), &dest)
-        .map_err(|e| anyhow!("{e}"))?;
+        .map_err(err)?;
     Ok(())
 }
 

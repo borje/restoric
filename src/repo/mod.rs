@@ -9,7 +9,7 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use jiff::Timestamp;
 
 /// A 32-byte content address, as restic uses for everything.
@@ -290,11 +290,31 @@ pub fn is_root() -> bool {
     }
 }
 
-/// Fails unless `dest` is free: absent, or an empty file or folder the
-/// caller created to claim the name. A restore creates the name itself
-/// (with `O_EXCL`, or `mkdir`) before writing, so that nothing planted at
-/// a predictable name between choosing it and writing (a link into
-/// another user's folder, say) gets written through. Never follows links.
+/// Takes the name `dest` for `node` before anything is written there: an
+/// empty file (created exclusively) or an empty folder, neither of which
+/// follows a link something else may have put at that name since it was
+/// found free. [`Repo::restore`] then fills it in, checking with
+/// [`check_dest`] that the name is claimed or free. A link is created by
+/// the restore itself, which fails if the name is taken.
+pub fn claim(node: &Node, dest: &Path) -> Result<()> {
+    match node.kind {
+        NodeKind::File => {
+            std::fs::File::create_new(dest)
+                .with_context(|| format!("creating {}", dest.display()))?;
+        }
+        NodeKind::Dir => {
+            std::fs::create_dir(dest).with_context(|| format!("creating {}", dest.display()))?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Fails unless `dest` is free: absent, or an empty file or folder that
+/// [`claim`] made. A restore claims the name (with `O_EXCL`, or `mkdir`)
+/// before writing, so that nothing planted at a predictable name between
+/// choosing it and writing (a link into another user's folder, say) gets
+/// written through. Never follows links.
 pub fn check_dest(dest: &Path) -> Result<()> {
     let Ok(m) = dest.symlink_metadata() else {
         return Ok(());

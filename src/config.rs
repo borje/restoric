@@ -80,7 +80,8 @@ pub struct Access {
     pub no_password: bool,
 }
 
-/// Shows whether there's a password, never what it is.
+/// Shows whether there's a password, never what it is; nor the command
+/// that gives it, which often has it in its text (`echo hunter2`).
 impl std::fmt::Debug for Access {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Access")
@@ -88,7 +89,10 @@ impl std::fmt::Debug for Access {
             .field("repo_file", &self.repo_file)
             .field("password", &self.password.as_ref().map(|_| "***"))
             .field("password_file", &self.password_file)
-            .field("password_command", &self.password_command)
+            .field(
+                "password_command",
+                &self.password_command.as_ref().map(|_| "***"),
+            )
             .field("no_password", &self.no_password)
             .finish()
     }

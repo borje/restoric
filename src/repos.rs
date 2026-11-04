@@ -49,46 +49,54 @@ fn key(repo: &str) -> String {
         .collect()
 }
 
-/// The password in `location`'s URL user info (`rest:https://me:pw@host/`),
-/// if it has one.
-fn url_password(location: &str) -> Option<&str> {
+/// Where the password in `location`'s URL user info is, if it has one:
+/// `(colon, at)`, the positions of the `:` before the password and of the
+/// `@` after it, as in `rest:https://me:pw@host/`. An empty password
+/// (`me:@host`) is no password.
+fn url_user_info(location: &str) -> Option<(usize, usize)> {
     let start = location.find("://")? + 3;
     let rest = &location[start..];
     let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
     let at = authority.rfind('@')?;
     let colon = authority[..at].find(':')?;
-    Some(&authority[colon + 1..at]).filter(|pw| !pw.is_empty())
+    (at > colon + 1).then_some((start + colon, start + at))
 }
 
 /// `location` with the password in a URL's user info hidden
 /// (`rest:https://me:***@host/`), for logs, messages and the screen.
 pub fn redact(location: &str) -> String {
-    let Some(start) = location.find("://").map(|i| i + 3) else {
-        return location.to_string();
-    };
-    let rest = &location[start..];
-    let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
-    let Some(at) = authority.rfind('@') else {
-        return location.to_string();
-    };
-    let Some(colon) = authority[..at].find(':') else {
-        return location.to_string();
-    };
-    format!(
-        "{}{}:***{}",
-        &location[..start],
-        &rest[..colon],
-        &rest[at..]
-    )
+    match url_user_info(location) {
+        Some((colon, at)) => format!("{}:***{}", &location[..colon], &location[at..]),
+        None => location.to_string(),
+    }
 }
 
-/// `text` with `location`'s URL password hidden wherever it appears.
-/// rustic's backend errors quote the whole URL, password included.
+/// `text` with `location`'s URL password hidden wherever it's quoted as
+/// part of a URL (`:pw@`): as given, and as the `url` crate prints it
+/// (percent-encoded), which is how rustic's backend errors quote the
+/// whole URL. Only that form is touched: a short password would otherwise
+/// be hidden out of ordinary words too.
 pub fn scrub(text: &str, location: &str) -> String {
-    match url_password(location) {
-        Some(pw) => text.replace(pw, "***"),
-        None => text.to_string(),
+    let Some((colon, at)) = url_user_info(location) else {
+        return text.to_string();
+    };
+    let mut out = text.replace(&location[colon..=at], ":***@");
+    if let Some(pw) = canonical_password(location) {
+        out = out.replace(&format!(":{pw}@"), ":***@");
     }
+    out
+}
+
+/// The password of `location`'s URL as the `url` crate prints it, if the
+/// URL parses: `rest:https://me:p=w@host/` gives `p%3Dw`.
+fn canonical_password(location: &str) -> Option<String> {
+    // The URL starts at its scheme: the run of scheme characters before `://`.
+    let sep = location.find("://")?;
+    let scheme = location[..sep]
+        .rfind(|c: char| !(c.is_ascii_alphanumeric() || "+-.".contains(c)))
+        .map_or(0, |i| i + 1);
+    let url = url::Url::parse(&location[scheme..]).ok()?;
+    url.password().filter(|p| !p.is_empty()).map(str::to_string)
 }
 
 impl ProbeCache {
@@ -483,12 +491,58 @@ mod tests {
             ),
             "URL `https://me:***@nas:8000/x` parsing failed"
         );
-        assert_eq!(scrub("hunter2 hunter2", location), "*** ***");
+        assert_eq!(
+            scrub("me:hunter2@nas me:hunter2@nas", location),
+            "me:***@nas me:***@nas"
+        );
+        // Only as part of a URL: a short password isn't hidden out of words.
+        assert_eq!(
+            scrub(
+                "Failed to read data from the backend",
+                "rest:https://me:a@nas/"
+            ),
+            "Failed to read data from the backend"
+        );
+        assert_eq!(scrub("hunter2 on its own", location), "hunter2 on its own");
         assert_eq!(
             scrub("me:hunter2 is wrong", "rest:https://me@nas/"),
             "me:hunter2 is wrong"
         );
         assert_eq!(scrub("x", "rest:https://me:@nas/"), "x");
+        assert_eq!(scrub("me:@nas", "rest:https://me:@nas/"), "me:@nas");
+        // As the url crate prints it, too.
+        assert_eq!(
+            scrub(
+                "https://me:p%3Dw%3B1@nas/ and https://me:p=w;1@nas/",
+                "rest:https://me:p=w;1@nas/"
+            ),
+            "https://me:***@nas/ and https://me:***@nas/"
+        );
+        assert_eq!(
+            scrub("https://me:p%C3%A5%20x@nas/", "rest:https://me:på x@nas/"),
+            "https://me:***@nas/"
+        );
+        assert_eq!(
+            scrub("https://me:p%40ss@nas/", "rest:https://me:p@ss@nas/"),
+            "https://me:***@nas/"
+        );
+    }
+
+    #[test]
+    fn the_canonical_password_is_what_the_url_crate_prints() {
+        let c = |s| canonical_password(s);
+        assert_eq!(
+            c("rest:https://me:p=w;1@nas/").as_deref(),
+            Some("p%3Dw%3B1")
+        );
+        assert_eq!(
+            c("rest:https://me:hunter2@nas:8000/x").as_deref(),
+            Some("hunter2")
+        );
+        assert_eq!(c("s3:https://me:a%20b@nas/").as_deref(), Some("a%20b"));
+        assert_eq!(c("rest:https://me@nas/"), None);
+        assert_eq!(c("rest:https://me:@nas/"), None);
+        assert_eq!(c("/mnt/b"), None);
     }
 
     #[test]
@@ -505,6 +559,7 @@ mod tests {
         );
         for same in [
             "rest:http://me@host/",
+            "rest:http://me:@host/",
             "sftp:me@nas:/backup",
             "/mnt/b",
             "rclone:r:p",

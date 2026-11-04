@@ -267,7 +267,7 @@ pub fn run(
         let res = if *how == How::Tar {
             write_tar(repo, t, &dest, &mut report, cancel)
         } else {
-            claim(&t.node, &dest)?;
+            crate::repo::claim(&t.node, &dest)?;
             repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {
                 cancel.cancelled()
             })
@@ -316,12 +316,14 @@ struct UndoEntry {
 const MANIFEST: &str = "manifest.json";
 
 /// Moves what's on disk into a new undo folder, then restores over it.
-/// If a restore fails, what was moved away is put back. If it's stopped,
-/// every item of this step is put back.
+/// If a restore fails, what was moved away is put back; if that fails too,
+/// the step keeps it for undo. If it's stopped, every item of this step is
+/// put back.
 ///
-/// Each entry is in the manifest before its original is moved: whatever
-/// the process dies in the middle of, the step lists where the original
-/// is, and [`rollback`] leaves alone a path whose copy was never made.
+/// Each entry is in the manifest before its original is moved, and the
+/// copy is at its recorded place only once it's whole (see [`move_aside`]):
+/// whatever the process dies in the middle of, [`rollback`] either finds a
+/// whole copy to put back or leaves the path alone.
 fn overwrite(
     repo: &dyn Repo,
     targets: &[Target],
@@ -336,9 +338,15 @@ fn overwrite(
             stopped: true,
         })
     };
+    let mut done = Vec::new();
+    if targets.is_empty() {
+        return Ok(Outcome {
+            done,
+            stopped: false,
+        });
+    }
     let session = new_session(places.undo_dir.as_deref())?;
     let mut manifest = Manifest::default();
-    let mut done = Vec::new();
     for (i, t) in targets.iter().enumerate() {
         if cancel.cancelled() {
             return stopped(&session, &manifest);
@@ -348,27 +356,27 @@ fn overwrite(
             path: t.path.clone(),
             saved: saved.clone(),
         });
-        write_manifest(&session, &manifest)?;
+        if let Err(e) = write_manifest(&session, &manifest) {
+            // Nothing has been touched for this entry, and the manifest on
+            // disk is still the one without it.
+            manifest.entries.pop();
+            if manifest.entries.is_empty() {
+                remove_session(&session);
+            }
+            return Err(e);
+        }
         let moved = match &saved {
             Some(to) => fs::create_dir_all(to.parent().expect("has a parent"))
-                .and_then(|()| move_path(&t.path, to))
+                .and_then(|()| move_aside(&t.path, to))
                 .with_context(|| format!("moving {} aside", t.path.display())),
             None => match t.path.parent() {
                 Some(p) => fs::create_dir_all(p).map_err(Into::into),
                 None => Ok(()),
             },
         };
-        if let Err(e) = moved {
-            // The original is still where it was.
-            manifest.entries.pop();
-            let _ = write_manifest(&session, &manifest);
-            if manifest.entries.is_empty() {
-                let _ = fs::remove_dir_all(&session);
-            }
-            return Err(e);
-        }
-        let mut report = |step| rep.send(i, t, step);
-        let res = claim(&t.node, &t.path).and_then(|()| {
+        let res = moved.and_then(|()| {
+            let mut report = |step| rep.send(i, t, step);
+            crate::repo::claim(&t.node, &t.path)?;
             repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
                 cancel.cancelled()
             })
@@ -377,17 +385,16 @@ fn overwrite(
             if is_stopped(&e) {
                 return stopped(&session, &manifest);
             }
-            // Put the old version back and stop.
-            let _ = remove_path(&t.path);
-            if let Some(s) = &saved {
-                let _ = move_path(s, &t.path);
-            }
-            manifest.entries.pop();
-            write_manifest(&session, &manifest)?;
-            if manifest.entries.is_empty() {
-                let _ = fs::remove_dir_all(&session);
-            }
-            return Err(e.context(format!("restoring {}", t.path.display())));
+            let e = e.context(format!("restoring {}", t.path.display()));
+            // Put the old version back and stop. The entry's copy is whole
+            // if it's there, so this is safe whichever step failed.
+            return Err(match put_back_last(&session, &mut manifest) {
+                Ok(_) => e,
+                Err(back) => anyhow::anyhow!(
+                    "{e:#}; the old {} is kept for undo, but putting it back failed: {back:#}",
+                    t.path.display()
+                ),
+            });
         }
         done.push(Done {
             target: t.path.clone(),
@@ -402,25 +409,6 @@ fn overwrite(
         done,
         stopped: false,
     })
-}
-
-/// Takes the name `dest` for `node` before anything is written there: an
-/// empty file (created exclusively) or an empty folder, neither of which
-/// follows a link something else may have put at that name since it was
-/// found free. The restore then fills it in; see [`crate::repo::check_dest`].
-/// A link is created by the restore itself, which fails if the name is
-/// taken.
-fn claim(node: &Node, dest: &Path) -> Result<()> {
-    match node.kind {
-        NodeKind::File => {
-            fs::File::create_new(dest).with_context(|| format!("creating {}", dest.display()))?;
-        }
-        NodeKind::Dir => {
-            fs::create_dir(dest).with_context(|| format!("creating {}", dest.display()))?;
-        }
-        _ => {}
-    }
-    Ok(())
 }
 
 /// `<session>/files/<i>/<name>`: where item `i` of a step keeps what it
@@ -441,12 +429,23 @@ fn new_session(undo_dir: Option<&Path>) -> Result<PathBuf> {
     Ok(session)
 }
 
+/// Writes the manifest whole or not at all: to a temporary name, then
+/// renamed over the old one, so a crash or a full disk mid-write leaves
+/// the previous manifest, never a truncated one that undo can't read.
 fn write_manifest(session: &Path, m: &Manifest) -> Result<()> {
-    fs::write(session.join(MANIFEST), serde_json::to_vec_pretty(m)?)?;
+    let path = session.join(MANIFEST);
+    let tmp = session.join(format!("{MANIFEST}.tmp"));
+    fs::write(&tmp, serde_json::to_vec_pretty(m)?)
+        .and_then(|()| fs::rename(&tmp, &path))
+        .with_context(|| format!("writing {}", path.display()))?;
     Ok(())
 }
 
 /// Undoes the last overwrite. Returns the paths it put back.
+///
+/// A step with nothing left in it (put back, but its folder couldn't be
+/// removed then) is removed if it can be, and never counts as the last
+/// overwrite.
 pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
     let read = places.undo_dir.as_deref().map(fs::read_dir);
     let mut sessions: Vec<PathBuf> = match read {
@@ -457,11 +456,19 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
         _ => Vec::new(),
     };
     sessions.sort();
-    let Some(session) = sessions.pop() else {
-        bail!("Nothing to undo.");
-    };
-    let m: Manifest = serde_json::from_slice(&fs::read(session.join(MANIFEST))?)?;
-    rollback(&session, &m)
+    while let Some(session) = sessions.pop() {
+        let manifest = session.join(MANIFEST);
+        let m: Manifest = fs::read(&manifest)
+            .map_err(anyhow::Error::from)
+            .and_then(|bytes| Ok(serde_json::from_slice(&bytes)?))
+            .with_context(|| format!("reading {}", manifest.display()))?;
+        if m.entries.is_empty() {
+            remove_session(&session);
+            continue;
+        }
+        return rollback(&session, &m);
+    }
+    bail!("Nothing to undo.");
 }
 
 /// Puts back everything an undo step replaced, then removes the step.
@@ -471,26 +478,69 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
 /// as it's put back, and an entry whose copy is gone (put back already, or
 /// never made) leaves its path alone rather than deleting what's there.
 fn rollback(session: &Path, m: &Manifest) -> Result<Vec<PathBuf>> {
+    if m.entries.is_empty() {
+        remove_session(session);
+        return Ok(Vec::new());
+    }
     let mut left = m.clone();
     let mut back = Vec::new();
-    while let Some(e) = left.entries.last() {
-        match &e.saved {
-            Some(s) if !exists(s) => {}
-            saved => {
-                remove_path(&e.path).with_context(|| format!("removing {}", e.path.display()))?;
-                if let Some(s) = saved {
-                    move_path(s, &e.path)
-                        .with_context(|| format!("putting back {}", e.path.display()))?;
-                }
-                back.push(e.path.clone());
-            }
-        }
-        left.entries.pop();
-        let _ = write_manifest(session, &left);
+    while !left.entries.is_empty() {
+        // The last one removes the step.
+        back.extend(put_back_last(session, &mut left)?);
     }
-    fs::remove_dir_all(session)?;
     back.reverse();
     Ok(back)
+}
+
+/// Removes a step nothing is left in. Everything is back by then; what
+/// can stop this is a copy that couldn't be removed, which stays as a
+/// leftover the next undo tries again.
+fn remove_session(session: &Path) {
+    if let Err(e) = fs::remove_dir_all(session) {
+        tracing::warn!("leaving the undo step {}: {e}", session.display());
+    }
+}
+
+/// Puts back the last entry of `left`, drops it from the manifest, and
+/// removes the step once it's empty. Returns the path if something was put
+/// back: an entry whose copy is gone (never made, or put back already)
+/// leaves its path alone. Fails with the entry still in the manifest, so
+/// it can be run again.
+///
+/// The copy is removed only after the manifest no longer names it, so a
+/// copy that was put back across file systems and then couldn't be
+/// removed is a leftover, never something a later undo would put back
+/// over the user's files.
+fn put_back_last(session: &Path, left: &mut Manifest) -> Result<Option<PathBuf>> {
+    let Some(e) = left.entries.last() else {
+        return Ok(None);
+    };
+    let path = e.path.clone();
+    let saved = e.saved.clone();
+    let back = match &saved {
+        Some(s) if !exists(s) => false,
+        _ => {
+            remove_path(&path).with_context(|| format!("removing {}", path.display()))?;
+            if let Some(s) = &saved {
+                place(s, &path).with_context(|| format!("putting back {}", path.display()))?;
+            }
+            true
+        }
+    };
+    let entry = left.entries.pop().expect("checked above");
+    if let Err(e) = write_manifest(session, left) {
+        left.entries.push(entry);
+        return Err(e);
+    }
+    if let Some(s) = &saved
+        && let Err(e) = remove_path(s)
+    {
+        tracing::warn!("leaving the undo copy {}: {e}", s.display());
+    }
+    if left.entries.is_empty() {
+        remove_session(session);
+    }
+    Ok(back.then_some(path))
 }
 
 /// Removes a file, link or folder; never follows symlinks.
@@ -503,20 +553,58 @@ fn remove_path(p: &Path) -> io::Result<()> {
     }
 }
 
-/// Renames, or copies and removes across file systems. Fails with the
-/// source untouched.
-fn move_path(from: &Path, to: &Path) -> io::Result<()> {
+/// Moves `from` to `to`, a name nothing is at in a folder of the undo
+/// step: a rename, or across file systems [`copy_aside`]. Either way, `to`
+/// holds a copy only once it's whole.
+fn move_aside(from: &Path, to: &Path) -> io::Result<()> {
     match fs::rename(from, to) {
         Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
-            if let Err(e) = copy_path(from, to) {
-                let _ = remove_path(to);
-                return Err(e);
-            }
-            remove_path(from)
-        }
+        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => copy_aside(from, to),
         Err(e) => Err(e),
     }
+}
+
+/// Copies `from` to `<to>.part`, renames that to `to` once it's whole,
+/// then removes `from`. A copy that fails is removed and the source is
+/// untouched; removing the source after a whole copy can fail part way,
+/// and then the copy at `to` is what's whole.
+fn copy_aside(from: &Path, to: &Path) -> io::Result<()> {
+    let mut part = to.as_os_str().to_owned();
+    part.push(".part");
+    let part = PathBuf::from(part);
+    copy_fresh(from, &part)?;
+    if let Err(e) = fs::rename(&part, to) {
+        let _ = remove_path(&part);
+        return Err(e);
+    }
+    remove_path(from)
+}
+
+/// Puts `from` at `to`, a name nothing is at: a rename, or across file
+/// systems a copy, after which the source is still where it was. A copy
+/// that fails is removed.
+fn place(from: &Path, to: &Path) -> io::Result<()> {
+    match fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => copy_fresh(from, to),
+        Err(e) => Err(e),
+    }
+}
+
+/// Copies `from` to `to`, which must not exist (so that what's removed
+/// after a failure is only this copy).
+fn copy_fresh(from: &Path, to: &Path) -> io::Result<()> {
+    if exists(to) {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("{} already exists", to.display()),
+        ));
+    }
+    if let Err(e) = copy_path(from, to) {
+        let _ = remove_path(to);
+        return Err(e);
+    }
+    Ok(())
 }
 
 /// Copies a file, link or folder with its permissions and times; links
@@ -721,4 +809,90 @@ fn append<W: Write>(
         NodeKind::Other(_) => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every file under `dir`, relative to it, with its content.
+    fn tree(dir: &Path) -> Vec<(PathBuf, String)> {
+        fn walk(root: &Path, dir: &Path, v: &mut Vec<(PathBuf, String)>) {
+            for e in fs::read_dir(dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    walk(root, &p, v);
+                } else {
+                    let rel = p.strip_prefix(root).unwrap().to_path_buf();
+                    v.push((rel, fs::read_to_string(&p).unwrap_or_default()));
+                }
+            }
+        }
+        let mut v = Vec::new();
+        walk(dir, dir, &mut v);
+        v.sort();
+        v
+    }
+
+    fn sample(dir: &Path) -> PathBuf {
+        let from = dir.join("from");
+        fs::create_dir_all(from.join("sub")).unwrap();
+        fs::write(from.join("a"), "a\n").unwrap();
+        fs::write(from.join("sub/b"), "b\n").unwrap();
+        from
+    }
+
+    /// The copy a cross-device move makes shows up at `to` whole, with no
+    /// `.part` left, and the source is gone.
+    #[test]
+    fn copy_aside_moves_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = sample(dir.path());
+        let to = dir.path().join("to");
+        copy_aside(&from, &to).unwrap();
+        assert!(!exists(&from));
+        assert!(!exists(&dir.path().join("to.part")));
+        assert_eq!(
+            tree(&to),
+            [
+                (PathBuf::from("a"), "a\n".into()),
+                (PathBuf::from("sub/b"), "b\n".into())
+            ]
+        );
+    }
+
+    /// A copy that fails part way leaves nothing at `to` or next to it,
+    /// and the source as it was.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_copy_aside_leaves_the_source_and_no_copy() {
+        use std::os::unix::fs::PermissionsExt;
+        if crate::repo::is_root() {
+            eprintln!("skipped: root can read anything");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let from = sample(dir.path());
+        fs::set_permissions(from.join("sub/b"), fs::Permissions::from_mode(0o000)).unwrap();
+        let to = dir.path().join("to");
+        copy_aside(&from, &to).unwrap_err();
+        assert!(!exists(&to));
+        assert!(!exists(&dir.path().join("to.part")));
+        fs::set_permissions(from.join("sub/b"), fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(tree(&from).len(), 2);
+    }
+
+    /// A copy never goes over something that's already at `to`, and a
+    /// failure doesn't remove it.
+    #[test]
+    fn copy_fresh_refuses_an_occupied_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = sample(dir.path());
+        let to = dir.path().join("to");
+        fs::create_dir(&to).unwrap();
+        fs::write(to.join("theirs"), "x").unwrap();
+        let e = copy_fresh(&from, &to).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read_to_string(to.join("theirs")).unwrap(), "x");
+    }
 }
