@@ -116,9 +116,17 @@ impl RusticProgress for ToMeter {
 
 /// What it takes to open the repository again. No `Debug`: it holds the password.
 struct Reopen {
+    /// As given, for hiding its password in rustic's errors.
+    location: String,
     opts: RepositoryOptions,
     backends: RepositoryBackends,
     credentials: Credentials,
+}
+
+/// rustic's error as ours, with the password of `location`'s URL hidden:
+/// rustic_backend's REST errors quote the whole URL.
+fn err_at(location: &str, e: impl std::fmt::Display) -> anyhow::Error {
+    anyhow!("{}", crate::repos::scrub(&e.to_string(), location))
 }
 
 /// An opened repository whose index isn't loaded yet: enough to list
@@ -173,9 +181,9 @@ impl Connection {
             opts = opts.cache_dir(d.clone());
         }
         let backends = BackendOptions::default()
-            .repository(repo)
+            .repository(repo.clone())
             .to_backends()
-            .map_err(|e| anyhow!("{e}"))?;
+            .map_err(|e| err_at(&repo, e))?;
 
         let open = Repository::new(&opts, &backends)
             .and_then(|r| r.open(&credentials))
@@ -183,12 +191,13 @@ impl Connection {
                 if e.is_incorrect_password() {
                     Locked::WrongPassword.into()
                 } else {
-                    anyhow!("{e}")
+                    err_at(&repo, e)
                 }
             })?;
         Ok(Self {
             open,
             reopen: Reopen {
+                location: repo,
                 opts,
                 backends,
                 credentials,
@@ -198,7 +207,10 @@ impl Connection {
 
     /// Every snapshot in the repository, without loading the index.
     pub fn snapshots(&self) -> Result<Vec<SnapshotInfo>> {
-        let snaps = self.open.get_all_snapshots().map_err(|e| anyhow!("{e}"))?;
+        let snaps = self
+            .open
+            .get_all_snapshots()
+            .map_err(|e| err_at(&self.reopen.location, e))?;
         Ok(snaps.into_iter().map(snapshot_from).collect())
     }
 }
@@ -211,7 +223,10 @@ impl RusticRepo {
     /// Loads the index of an opened repository.
     pub fn from_connection(c: Connection) -> Result<Self> {
         let id = id_from(&c.open.config().id);
-        let trees = c.open.to_indexed_ids().map_err(|e| anyhow!("{e}"))?;
+        let trees = c
+            .open
+            .to_indexed_ids()
+            .map_err(|e| err_at(&c.reopen.location, e))?;
         Ok(Self {
             id,
             trees,
@@ -231,7 +246,7 @@ impl RusticRepo {
         let repo = Repository::new_with_progress(&r.opts, &r.backends, ToMeter(self.meter.clone()))
             .and_then(|repo| repo.open(&r.credentials))
             .and_then(|repo| repo.to_indexed())
-            .map_err(|e| anyhow!("{e}"))?;
+            .map_err(|e| err_at(&r.location, e))?;
         let repo = Arc::new(repo);
         *full = Some(repo.clone());
         Ok(repo)
@@ -360,9 +375,7 @@ impl Repo for RusticRepo {
     ) -> Result<()> {
         let _one = self.restoring.lock().unwrap_or_else(|e| e.into_inner());
         progress(RestoreStep::Preparing);
-        if dest.symlink_metadata().is_ok() {
-            bail!("{} already exists", dest.display());
-        }
+        super::check_dest(dest)?;
         let repo = self.full()?;
         let meter = &self.meter;
         meter.reset();

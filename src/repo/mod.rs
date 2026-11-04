@@ -9,7 +9,7 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use jiff::Timestamp;
 
 /// A 32-byte content address, as restic uses for everything.
@@ -249,8 +249,10 @@ pub trait Repo: Send + Sync {
     /// Up to `len` bytes of a file node, from `offset`.
     fn read_at(&self, node: &Node, offset: u64, len: u64) -> Result<Vec<u8>>;
     /// Restores what's at `path` in `snap` (a file, link or folder) to
-    /// `dest`, which must not exist yet; its parent must. Keeps mode,
-    /// modification time and symlinks; owner and group only as root.
+    /// `dest`; its parent must exist. `dest` must not, unless the caller
+    /// has claimed the name with an empty file or folder (see
+    /// [`check_dest`]). Keeps mode, modification time and symlinks; owner
+    /// and group only as root.
     ///
     /// Reports how far it got through `progress`. `cancelled` is asked once
     /// the restore is planned, before file contents are copied; if it says
@@ -286,6 +288,28 @@ pub fn is_root() -> bool {
     {
         false
     }
+}
+
+/// Fails unless `dest` is free: absent, or an empty file or folder the
+/// caller created to claim the name. A restore creates the name itself
+/// (with `O_EXCL`, or `mkdir`) before writing, so that nothing planted at
+/// a predictable name between choosing it and writing (a link into
+/// another user's folder, say) gets written through. Never follows links.
+pub fn check_dest(dest: &Path) -> Result<()> {
+    let Ok(m) = dest.symlink_metadata() else {
+        return Ok(());
+    };
+    let claimed = if m.is_file() {
+        m.len() == 0
+    } else if m.is_dir() {
+        std::fs::read_dir(dest).is_ok_and(|mut d| d.next().is_none())
+    } else {
+        false
+    };
+    if !claimed {
+        bail!("{} already exists", dest.display());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

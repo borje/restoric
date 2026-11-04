@@ -243,6 +243,9 @@ pub fn run(
         let st = stamp(t.snapshot.time, &places.tz);
         let name = t.name();
         let parent = t.path.parent().context("can't restore /")?;
+        if *how == How::RestoreDir && !places.restore_dir.is_absolute() {
+            bail!("no restore folder: set HOME, or restore_dir in the config");
+        }
         let dest = match how {
             How::NextTo if !exists(&t.path) => {
                 fs::create_dir_all(parent)?;
@@ -264,6 +267,7 @@ pub fn run(
         let res = if *how == How::Tar {
             write_tar(repo, t, &dest, &mut report, cancel)
         } else {
+            claim(&t.node, &dest)?;
             repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {
                 cancel.cancelled()
             })
@@ -274,13 +278,16 @@ pub fn run(
                 dest,
             }),
             Err(e) if is_stopped(&e) => {
+                // The claimed name, if the restore didn't get to it.
+                let _ = remove_path(&dest);
                 return Ok(Outcome {
                     done,
                     stopped: true,
                 });
             }
             Err(e) => {
-                // Nothing was at `dest` before: what's there is the partial copy.
+                // Nothing was at `dest` before: what's there is the claimed
+                // name, or the partial copy.
                 let _ = remove_path(&dest);
                 return Err(e.context(format!("restoring {}", t.path.display())));
             }
@@ -311,6 +318,10 @@ const MANIFEST: &str = "manifest.json";
 /// Moves what's on disk into a new undo folder, then restores over it.
 /// If a restore fails, what was moved away is put back. If it's stopped,
 /// every item of this step is put back.
+///
+/// Each entry is in the manifest before its original is moved: whatever
+/// the process dies in the middle of, the step lists where the original
+/// is, and [`rollback`] leaves alone a path whose copy was never made.
 fn overwrite(
     repo: &dyn Repo,
     targets: &[Target],
@@ -332,28 +343,37 @@ fn overwrite(
         if cancel.cancelled() {
             return stopped(&session, &manifest);
         }
-        let saved = if exists(&t.path) {
-            let rel = t.path.strip_prefix("/").unwrap_or(&t.path);
-            let to = session.join("files").join(rel);
-            fs::create_dir_all(to.parent().expect("has a parent"))?;
-            move_path(&t.path, &to)
-                .with_context(|| format!("moving {} aside", t.path.display()))?;
-            Some(to)
-        } else {
-            if let Some(p) = t.path.parent() {
-                fs::create_dir_all(p)?;
-            }
-            None
-        };
+        let saved = exists(&t.path).then(|| saved_at(&session, i, t));
         manifest.entries.push(UndoEntry {
             path: t.path.clone(),
             saved: saved.clone(),
         });
         write_manifest(&session, &manifest)?;
+        let moved = match &saved {
+            Some(to) => fs::create_dir_all(to.parent().expect("has a parent"))
+                .and_then(|()| move_path(&t.path, to))
+                .with_context(|| format!("moving {} aside", t.path.display())),
+            None => match t.path.parent() {
+                Some(p) => fs::create_dir_all(p).map_err(Into::into),
+                None => Ok(()),
+            },
+        };
+        if let Err(e) = moved {
+            // The original is still where it was.
+            manifest.entries.pop();
+            let _ = write_manifest(&session, &manifest);
+            if manifest.entries.is_empty() {
+                let _ = fs::remove_dir_all(&session);
+            }
+            return Err(e);
+        }
         let mut report = |step| rep.send(i, t, step);
-        if let Err(e) = repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
-            cancel.cancelled()
-        }) {
+        let res = claim(&t.node, &t.path).and_then(|()| {
+            repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
+                cancel.cancelled()
+            })
+        });
+        if let Err(e) = res {
             if is_stopped(&e) {
                 return stopped(&session, &manifest);
             }
@@ -382,6 +402,32 @@ fn overwrite(
         done,
         stopped: false,
     })
+}
+
+/// Takes the name `dest` for `node` before anything is written there: an
+/// empty file (created exclusively) or an empty folder, neither of which
+/// follows a link something else may have put at that name since it was
+/// found free. The restore then fills it in; see [`crate::repo::check_dest`].
+/// A link is created by the restore itself, which fails if the name is
+/// taken.
+fn claim(node: &Node, dest: &Path) -> Result<()> {
+    match node.kind {
+        NodeKind::File => {
+            fs::File::create_new(dest).with_context(|| format!("creating {}", dest.display()))?;
+        }
+        NodeKind::Dir => {
+            fs::create_dir(dest).with_context(|| format!("creating {}", dest.display()))?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// `<session>/files/<i>/<name>`: where item `i` of a step keeps what it
+/// replaced. Built from the item's number and name only; joining the
+/// original's absolute path would, on Windows, give that path itself.
+fn saved_at(session: &Path, i: usize, t: &Target) -> PathBuf {
+    session.join("files").join(i.to_string()).join(t.name())
 }
 
 fn new_session(undo_dir: Option<&Path>) -> Result<PathBuf> {
@@ -420,14 +466,27 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
 
 /// Puts back everything an undo step replaced, then removes the step.
 /// Returns the paths it put back.
+///
+/// Can be run again after failing half way: each entry leaves the manifest
+/// as it's put back, and an entry whose copy is gone (put back already, or
+/// never made) leaves its path alone rather than deleting what's there.
 fn rollback(session: &Path, m: &Manifest) -> Result<Vec<PathBuf>> {
+    let mut left = m.clone();
     let mut back = Vec::new();
-    for e in m.entries.iter().rev() {
-        remove_path(&e.path).with_context(|| format!("removing {}", e.path.display()))?;
-        if let Some(s) = &e.saved {
-            move_path(s, &e.path).with_context(|| format!("putting back {}", e.path.display()))?;
+    while let Some(e) = left.entries.last() {
+        match &e.saved {
+            Some(s) if !exists(s) => {}
+            saved => {
+                remove_path(&e.path).with_context(|| format!("removing {}", e.path.display()))?;
+                if let Some(s) = saved {
+                    move_path(s, &e.path)
+                        .with_context(|| format!("putting back {}", e.path.display()))?;
+                }
+                back.push(e.path.clone());
+            }
         }
-        back.push(e.path.clone());
+        left.entries.pop();
+        let _ = write_manifest(session, &left);
     }
     fs::remove_dir_all(session)?;
     back.reverse();
@@ -444,12 +503,16 @@ fn remove_path(p: &Path) -> io::Result<()> {
     }
 }
 
-/// Renames, or copies and removes across file systems.
+/// Renames, or copies and removes across file systems. Fails with the
+/// source untouched.
 fn move_path(from: &Path, to: &Path) -> io::Result<()> {
     match fs::rename(from, to) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
-            copy_path(from, to)?;
+            if let Err(e) = copy_path(from, to) {
+                let _ = remove_path(to);
+                return Err(e);
+            }
             remove_path(from)
         }
         Err(e) => Err(e),
@@ -462,8 +525,12 @@ fn copy_path(from: &Path, to: &Path) -> io::Result<()> {
     let m = from.symlink_metadata()?;
     if m.file_type().is_symlink() {
         #[cfg(unix)]
-        std::os::unix::fs::symlink(fs::read_link(from)?, to)?;
-        return Ok(());
+        return std::os::unix::fs::symlink(fs::read_link(from)?, to);
+        #[cfg(not(unix))]
+        return Err(io::Error::other(format!(
+            "{} is a link, and links can't be moved across drives here",
+            from.display()
+        )));
     }
     if m.is_dir() {
         fs::create_dir(to)?;

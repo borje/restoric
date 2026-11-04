@@ -599,9 +599,7 @@ impl Repo for FakeRepo {
         cancelled: &dyn Fn() -> bool,
     ) -> Result<()> {
         progress(RestoreStep::Preparing);
-        if dest.symlink_metadata().is_ok() {
-            bail!("{} already exists", dest.display());
-        }
+        super::check_dest(dest)?;
         let mut node = None;
         let mut tree = self.tree(&snap.tree)?;
         for c in parts(path.to_str().context("path must be UTF-8")?) {
@@ -622,7 +620,7 @@ impl Repo for FakeRepo {
         let total = self.size_of(&node)?;
         let mut done = 0;
         progress(RestoreStep::Bytes { done, total });
-        self.write_node(&node, dest, &mut |n| {
+        self.write_node(&node, dest, true, &mut |n| {
             done += n;
             progress(RestoreStep::Bytes { done, total });
         })
@@ -646,14 +644,24 @@ impl FakeRepo {
     }
 
     /// Writes a node (and what's under it) to `dest`, like a restore,
-    /// telling `wrote` the size of each file written.
-    fn write_node(&self, node: &Node, dest: &Path, wrote: &mut dyn FnMut(u64)) -> Result<()> {
+    /// telling `wrote` the size of each file written. The `top` node may
+    /// find its name claimed by an empty folder.
+    fn write_node(
+        &self,
+        node: &Node,
+        dest: &Path,
+        top: bool,
+        wrote: &mut dyn FnMut(u64),
+    ) -> Result<()> {
         match &node.kind {
             NodeKind::Dir => {
-                std::fs::create_dir(dest)?;
+                match std::fs::create_dir(dest) {
+                    Err(e) if top && e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                    r => r?,
+                }
                 if let Some(sub) = node.subtree {
                     for n in &self.tree(&sub)?.nodes {
-                        self.write_node(n, &dest.join(&n.name), wrote)?;
+                        self.write_node(n, &dest.join(&n.name), false, wrote)?;
                     }
                 }
             }

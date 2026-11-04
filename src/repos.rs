@@ -49,6 +49,17 @@ fn key(repo: &str) -> String {
         .collect()
 }
 
+/// The password in `location`'s URL user info (`rest:https://me:pw@host/`),
+/// if it has one.
+fn url_password(location: &str) -> Option<&str> {
+    let start = location.find("://")? + 3;
+    let rest = &location[start..];
+    let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+    let at = authority.rfind('@')?;
+    let colon = authority[..at].find(':')?;
+    Some(&authority[colon + 1..at]).filter(|pw| !pw.is_empty())
+}
+
 /// `location` with the password in a URL's user info hidden
 /// (`rest:https://me:***@host/`), for logs, messages and the screen.
 pub fn redact(location: &str) -> String {
@@ -69,6 +80,15 @@ pub fn redact(location: &str) -> String {
         &rest[..colon],
         &rest[at..]
     )
+}
+
+/// `text` with `location`'s URL password hidden wherever it appears.
+/// rustic's backend errors quote the whole URL, password included.
+pub fn scrub(text: &str, location: &str) -> String {
+    match url_password(location) {
+        Some(pw) => text.replace(pw, "***"),
+        None => text.to_string(),
+    }
 }
 
 impl ProbeCache {
@@ -451,6 +471,24 @@ mod tests {
         assert_eq!(w.opened(), []);
         assert_eq!(w.choose(&cands, "/srv", &mut cache, at(301)), None);
         assert_eq!(w.opened(), [("a".into(), true)]);
+    }
+
+    #[test]
+    fn scrubs_the_password_out_of_an_error() {
+        let location = "rest:https://me:hunter2@nas:8000/";
+        assert_eq!(
+            scrub(
+                "URL `https://me:hunter2@nas:8000/x` parsing failed",
+                location
+            ),
+            "URL `https://me:***@nas:8000/x` parsing failed"
+        );
+        assert_eq!(scrub("hunter2 hunter2", location), "*** ***");
+        assert_eq!(
+            scrub("me:hunter2 is wrong", "rest:https://me@nas/"),
+            "me:hunter2 is wrong"
+        );
+        assert_eq!(scrub("x", "rest:https://me:@nas/"), "x");
     }
 
     #[test]

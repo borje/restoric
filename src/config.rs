@@ -7,6 +7,7 @@ use anyhow::{Context, Result, bail};
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::style::Color;
 use serde::Deserialize;
+use zeroize::Zeroizing;
 
 use crate::app::Action;
 use crate::ui::fmt::expand_home;
@@ -67,15 +68,30 @@ impl RepoEntry {
 
 /// Where a repository is and how to unlock it, from one source: the flags,
 /// the environment or a `[[repo]]` block.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Access {
     pub repo: Option<String>,
     pub repo_file: Option<PathBuf>,
     /// Only from the environment (`RESTIC_PASSWORD`): there's no flag.
-    pub password: Option<String>,
+    /// Wiped when dropped, every copy of it.
+    pub password: Option<Zeroizing<String>>,
     pub password_file: Option<PathBuf>,
     pub password_command: Option<String>,
     pub no_password: bool,
+}
+
+/// Shows whether there's a password, never what it is.
+impl std::fmt::Debug for Access {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Access")
+            .field("repo", &self.repo)
+            .field("repo_file", &self.repo_file)
+            .field("password", &self.password.as_ref().map(|_| "***"))
+            .field("password_file", &self.password_file)
+            .field("password_command", &self.password_command)
+            .field("no_password", &self.no_password)
+            .finish()
+    }
 }
 
 impl Access {
@@ -424,7 +440,7 @@ tag = "photos"
         let home = Some(Path::new("/home/me"));
         let env = Access {
             repo: Some("env-repo".into()),
-            password: Some("env-pw".into()),
+            password: Some(Zeroizing::new("env-pw".into())),
             ..Access::default()
         };
         let entry = RepoEntry {
@@ -447,7 +463,7 @@ tag = "photos"
         };
         let a = resolve_access(&none, &env, Some(&bare), home);
         assert_eq!(a.repo.as_deref(), Some("entry-repo"));
-        assert_eq!(a.password.as_deref(), Some("env-pw"));
+        assert_eq!(a.password.as_deref().map(String::as_str), Some("env-pw"));
 
         // A password flag beats the entry.
         let flags = Access {
@@ -471,7 +487,7 @@ tag = "photos"
         let a = resolve_access(&flags, &env, Some(&no_pw), home);
         assert_eq!(a.repo.as_deref(), Some("flag-repo"));
         assert!(!a.no_password);
-        assert_eq!(a.password.as_deref(), Some("env-pw"));
+        assert_eq!(a.password.as_deref().map(String::as_str), Some("env-pw"));
 
         // No entry: the environment.
         let a = resolve_access(&none, &env, None, home);

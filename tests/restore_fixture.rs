@@ -171,4 +171,26 @@ fn every_option() {
         .unwrap_err();
     assert!(is_stopped(&e));
     assert!(!dest.exists());
+
+    // A name claimed with an empty file or folder is filled in; a link
+    // put at the name is refused, and nothing is written through it.
+    let claimed = f.root.join("claimed.txt");
+    fs::File::create_new(&claimed).unwrap();
+    repo.restore(&snaps[0], &a, &claimed, &mut |_| {}, &|| false)
+        .unwrap();
+    assert_eq!(fs::read(&claimed).unwrap(), b"alpha\n");
+    let claimed = f.root.join("claimed-sub");
+    fs::create_dir(&claimed).unwrap();
+    repo.restore(&snaps[0], &sub.path, &claimed, &mut |_| {}, &|| false)
+        .unwrap();
+    assert_eq!(fs::read(claimed.join("d.txt")).unwrap(), b"delta\n");
+    let victim = f.root.join("victim");
+    fs::write(&victim, "mine\n").unwrap();
+    let link = f.root.join("planted");
+    std::os::unix::fs::symlink(&victim, &link).unwrap();
+    let e = repo
+        .restore(&snaps[0], &a, &link, &mut |_| {}, &|| false)
+        .unwrap_err();
+    assert!(e.to_string().contains("already exists"), "{e:#}");
+    assert_eq!(fs::read(&victim).unwrap(), b"mine\n");
 }

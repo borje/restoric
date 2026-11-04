@@ -153,7 +153,7 @@ fn env_access() -> Access {
     Access {
         repo: var("RESTIC_REPOSITORY"),
         repo_file: var("RESTIC_REPOSITORY_FILE").map(PathBuf::from),
-        password: var("RESTIC_PASSWORD"),
+        password: var("RESTIC_PASSWORD").map(Zeroizing::new),
         password_file: var("RESTIC_PASSWORD_FILE").map(PathBuf::from),
         password_command: var("RESTIC_PASSWORD_COMMAND"),
         no_password: false,
@@ -164,7 +164,7 @@ fn open_options(a: Access) -> OpenOptions {
     OpenOptions {
         repo: a.repo,
         repo_file: a.repo_file,
-        password: a.password.map(Zeroizing::new),
+        password: a.password,
         password_file: a.password_file,
         password_command: a.password_command,
         no_password: a.no_password,
