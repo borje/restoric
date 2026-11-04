@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use jiff::tz::TimeZone;
 
 use restoric::repo::fake::FakeRepo;
-use restoric::repo::{Repo, SnapshotInfo};
+use restoric::repo::{Repo, RestoreStep, SnapshotInfo};
 use restoric::restore::{How, Places, Target, run, undo};
 use restoric::worker::Cancel;
 
@@ -30,13 +30,13 @@ fn setup() -> Setup {
     fs::write(root.join("a.txt"), "my a\n").unwrap();
     fs::write(root.join("sub/c.txt"), "my c\n").unwrap();
     let dsl = format!(
-        "root {}\nsnapshot 2026-07-01 10:00\n  write a.txt alpha\\n\n  write sub/c.txt charlie\\n\n",
+        "root {}\nsnapshot 2026-07-01 10:00\n  write a.txt alpha\\n\n  write sub/c.txt charlie\\n\n  link cur -> a.txt\n",
         root.display()
     );
     let repo = FakeRepo::parse(&dsl).unwrap();
     let snap = repo.snapshots().unwrap().remove(0);
     let places = Places {
-        restore_dir: dir.path().join("Restored"),
+        restore_dir: Some(dir.path().join("Restored")),
         undo_dir: Some(dir.path().join("undo")),
         tz: TimeZone::UTC,
     };
@@ -116,7 +116,7 @@ fn the_undo_copy_is_kept_under_the_step() {
             p.display()
         );
     }
-    assert_eq!(undo(&s.places).unwrap().len(), 2);
+    assert_eq!(undo(&s.places).unwrap().back.len(), 2);
     assert_eq!(s.read("a.txt"), "my a\n");
     assert_eq!(s.read("sub/c.txt"), "my c\n");
 }
@@ -175,7 +175,7 @@ fn a_failed_undo_can_be_retried_without_losing_what_it_put_back() {
     assert_eq!(s.read("sub/c.txt"), "my c\n");
     assert_eq!(s.read("a.txt"), "alpha\n");
 
-    let back = undo(&s.places).unwrap();
+    let back = undo(&s.places).unwrap().back;
     assert_eq!(s.read("sub/c.txt"), "my c\n", "put back once, kept");
     assert_eq!(s.read("a.txt"), "my a\n");
     assert!(back.contains(&s.root.join("a.txt")));
@@ -202,10 +202,15 @@ fn a_failed_overwrite_puts_the_original_back() {
         &Cancel::default(),
     )
     .unwrap_err();
-    assert!(format!("{err:#}").contains("b.txt"), "{err:#}");
+    let text = format!("{err:#}");
+    assert!(text.contains("b.txt"), "{text}");
+    assert!(
+        text.contains("the item before it was overwritten, and :undo puts the old version back"),
+        "{text}"
+    );
     assert_eq!(s.read("b.txt"), "my b\n");
     assert_eq!(s.read("a.txt"), "alpha\n", "the first item stays restored");
-    assert_eq!(undo(&s.places).unwrap(), [s.root.join("a.txt")]);
+    assert_eq!(undo(&s.places).unwrap().back, [s.root.join("a.txt")]);
     assert_eq!(s.read("a.txt"), "my a\n");
 }
 
@@ -225,7 +230,7 @@ fn undo_leaves_a_path_alone_when_only_a_partial_copy_was_made() {
     });
     fs::write(session.join("manifest.json"), manifest.to_string()).unwrap();
 
-    assert!(undo(&s.places).unwrap().is_empty());
+    assert!(undo(&s.places).unwrap().back.is_empty());
     assert_eq!(s.read("a.txt"), "my a\n");
     assert!(s.sessions().is_empty(), "the step is finished with");
 }
@@ -281,7 +286,7 @@ fn an_overwrite_across_file_systems_can_be_undone() {
         ]
     );
 
-    assert_eq!(undo(&s.places).unwrap().len(), 2);
+    assert_eq!(undo(&s.places).unwrap().back.len(), 2);
     assert_eq!(s.read("a.txt"), "my a\n");
     assert_eq!(s.read("sub/c.txt"), "my c\n");
     assert!(s.sessions().is_empty());
@@ -318,8 +323,109 @@ fn a_move_aside_that_cant_remove_the_original_keeps_the_copy_for_undo() {
     assert!(!session.join("files/0/sub.part").exists());
 
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
-    assert_eq!(undo(&s.places).unwrap(), [s.root.join("sub")]);
+    assert_eq!(undo(&s.places).unwrap().back, [s.root.join("sub")]);
     assert_eq!(s.read("sub/c.txt"), "my c\n");
     assert_eq!(s.read("sub/locked/f"), "keep\n");
     assert!(undo(&s.places).is_err(), "nothing left to undo");
+}
+
+/// An overwrite of a link that isn't on disk: nothing of the user's is
+/// moved aside, and the link is made by the restore itself. An empty file
+/// something else put at the name in the meantime fails the restore and
+/// stays, and the failed step leaves nothing to undo.
+#[cfg(unix)]
+#[test]
+fn a_failed_overwrite_leaves_what_something_else_put_at_a_free_name() {
+    let s = setup();
+    let planted = s.root.join("cur");
+    let plant = planted.clone();
+    let err = run(
+        &s.repo,
+        &[s.target("cur")],
+        &How::Overwrite,
+        &s.places,
+        &mut |p| {
+            if matches!(p.step, RestoreStep::Preparing) {
+                fs::write(&plant, "").unwrap();
+            }
+        },
+        &Cancel::default(),
+    )
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("cur"), "{err:#}");
+    let m = planted.symlink_metadata().expect("the planted file stays");
+    assert!(m.is_file(), "the planted file stays a file");
+    assert!(
+        s.sessions().is_empty(),
+        "nothing was overwritten: {:?}",
+        s.sessions()
+    );
+    assert!(undo(&s.places).is_err(), "nothing to undo");
+}
+
+/// A path that can't be made, because its parent is a file: nothing of
+/// the user's was at it, so there is nothing to put back, and the failed
+/// step leaves no undo step behind that every later undo would trip on.
+#[test]
+fn a_path_that_cant_be_claimed_leaves_no_undo_step() {
+    let s = setup();
+    fs::write(s.root.join("new"), "a file, not a folder\n").unwrap();
+    let mut t = s.target("a.txt");
+    t.path = s.root.join("new/a.txt");
+    let err = run(
+        &s.repo,
+        &[t],
+        &How::Overwrite,
+        &s.places,
+        &mut |_| {},
+        &Cancel::default(),
+    )
+    .unwrap_err();
+    let text = format!("{err:#}");
+    assert!(text.contains("new/a.txt"), "{text}");
+    assert!(
+        !text.contains("putting it back"),
+        "nothing to put back: {text}"
+    );
+    assert_eq!(s.read("new"), "a file, not a folder\n");
+    assert!(s.sessions().is_empty(), "{:?}", s.sessions());
+    let err = undo(&s.places).unwrap_err();
+    assert!(format!("{err:#}").contains("Nothing to undo"), "{err:#}");
+}
+
+/// Across file systems an undo copies the old version back, then removes
+/// the copy. A copy that can't be removed stays in the undo folder, and
+/// the undo says so: the user's files are back, and the old copies are
+/// still taking up room.
+#[cfg(target_os = "linux")]
+#[test]
+fn an_undo_says_which_old_copies_it_couldnt_remove() {
+    use std::os::unix::fs::PermissionsExt;
+    if restoric::repo::is_root() {
+        eprintln!("skipped: root can remove anything");
+        return;
+    }
+    let Some(s) = across_devices() else { return };
+    fs::create_dir(s.root.join("sub/locked")).unwrap();
+    fs::write(s.root.join("sub/locked/f"), "keep\n").unwrap();
+    s.overwrite(&["a.txt", "sub"]).unwrap();
+    let session = s.sessions().pop().unwrap();
+    let copy = session.join("files/1/sub");
+    let locked = copy.join("locked");
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let undone = undo(&s.places).unwrap();
+    assert_eq!(undone.back, [s.root.join("a.txt"), s.root.join("sub")]);
+    assert_eq!(s.read("a.txt"), "my a\n");
+    assert_eq!(s.read("sub/c.txt"), "my c\n");
+    assert_eq!(s.read("sub/locked/f"), "keep\n");
+    assert_eq!(undone.left.len(), 1, "{:?}", undone.left);
+    assert_eq!(undone.left[0].0, copy);
+    assert!(
+        copy.join("locked/f").exists(),
+        "the copy stays until it can be removed"
+    );
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
 }

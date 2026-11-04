@@ -486,26 +486,31 @@ impl App {
             )
         };
         let next = if self.exists_on_disk(t) {
-            format!(
-                "→ {}{slash}",
-                file_name(planned(t, &How::NextTo, &self.places))
-            )
+            let p = planned(t, &How::NextTo, &self.places).map(file_name);
+            format!("→ {}{slash}", p.unwrap_or_default())
         } else {
             format!("→ {}{slash}", show(&t.path))
         };
-        let dir = planned(t, &How::RestoreDir, &self.places);
+        // Without a restore folder the restore would refuse: say what
+        // gives one, in place of the destination.
+        let to_dir = match planned(t, &How::RestoreDir, &self.places) {
+            Some(dir) => format!("→ {}{slash}", show(&dir)),
+            None => crate::restore::NO_RESTORE_DIR.to_string(),
+        };
+        let restore_dir = match &self.places.restore_dir {
+            Some(d) => show(d),
+            None => "Restored".to_string(),
+        };
         let mut options = vec![
             first,
             ("Restore next to it".to_string(), next),
-            (
-                format!("Restore to {}/", show(&self.places.restore_dir)),
-                format!("→ {}{slash}", show(&dir)),
-            ),
+            (format!("Restore to {restore_dir}/"), to_dir),
         ];
         if is_dir {
+            let p = planned(t, &How::Tar, &self.places).map(file_name);
             options.push((
                 "Write a tar archive".to_string(),
-                format!("→ {}", file_name(planned(t, &How::Tar, &self.places))),
+                format!("→ {}", p.unwrap_or_default()),
             ));
         }
         options

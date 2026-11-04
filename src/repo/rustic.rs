@@ -163,23 +163,31 @@ impl Connection {
             Credentials::password(p.as_str())
         } else {
             let mut cred = CredentialOptions::default();
+            // The command as given and as rustic prints it: re-joined
+            // from its words, so `echo "hunter2"` comes out `echo hunter2`.
+            let mut command = Vec::new();
             if let Some(f) = &o.password_file {
                 cred = cred.password_file(f.clone());
             } else if let Some(c) = &o.password_command {
-                cred = cred.password_command(
-                    c.parse::<CommandInput>()
-                        .map_err(|e| anyhow!("bad password command: {e}"))?,
-                );
+                let parsed = c
+                    .parse::<CommandInput>()
+                    .map_err(|e| anyhow!("bad password command: {e}"))?;
+                command.extend([c.clone(), parsed.to_string()]);
+                cred = cred.password_command(parsed);
             }
             cred.credentials()
                 .map_err(|e| {
                     // A failing command is quoted in the error, and its
                     // text often holds the password (`echo hunter2`).
                     let e = err_at(&repo, e);
-                    match &o.password_command {
-                        Some(c) => anyhow!("{}", e.to_string().replace(c.as_str(), "***")),
-                        None => e,
+                    if command.is_empty() {
+                        return e;
                     }
+                    let mut text = e.to_string();
+                    for c in command.iter().filter(|c| !c.is_empty()) {
+                        text = text.replace(c.as_str(), "***");
+                    }
+                    anyhow!("{text}")
                 })?
                 .ok_or(Locked::NoPassword)?
         };
@@ -420,12 +428,14 @@ impl Repo for RusticRepo {
             }
             res
         });
-        if res.as_ref().is_err_and(super::is_stopped) {
-            let _ = match dest.symlink_metadata() {
-                Ok(m) if m.is_dir() => std::fs::remove_dir_all(dest),
-                Ok(_) => std::fs::remove_file(dest),
-                Err(_) => Ok(()),
-            };
+        // Stopped before copying. A folder at `dest` is the one rustic
+        // made for a folder (or the claimed one), and goes. A file or
+        // link there is the caller's claim, or something else's: the
+        // caller knows which, and removes its own.
+        if res.as_ref().is_err_and(super::is_stopped)
+            && dest.symlink_metadata().is_ok_and(|m| m.is_dir())
+        {
+            let _ = std::fs::remove_dir_all(dest);
         }
         res
     }

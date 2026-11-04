@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use jiff::tz::TimeZone;
 
 use restoric::repo::fake::FakeRepo;
-use restoric::repo::{Repo, SnapshotInfo, check_dest};
+use restoric::repo::{Repo, RestoreStep, SnapshotInfo, check_dest};
 use restoric::restore::{How, Places, Target, run};
 use restoric::worker::Cancel;
 
@@ -25,13 +25,13 @@ fn setup() -> Setup {
     let root = dir.path().join("work");
     fs::create_dir(&root).unwrap();
     let dsl = format!(
-        "root {}\nsnapshot 2026-07-01 10:00\n  write a.txt alpha\\n\n  write sub/c.txt charlie\\n\n",
+        "root {}\nsnapshot 2026-07-01 10:00\n  write a.txt alpha\\n\n  write sub/c.txt charlie\\n\n  link cur -> a.txt\n",
         root.display()
     );
     let repo = FakeRepo::parse(&dsl).unwrap();
     let snap = repo.snapshots().unwrap().remove(0);
     let places = Places {
-        restore_dir: dir.path().join("Restored"),
+        restore_dir: Some(dir.path().join("Restored")),
         undo_dir: Some(dir.path().join("undo")),
         tz: TimeZone::UTC,
     };
@@ -144,7 +144,12 @@ fn restores_through_a_claimed_name_come_out_right() {
     )
     .unwrap();
     assert_eq!(o.done.len(), 2);
-    let day = s.places.restore_dir.join("2026-07-01_1000");
+    let day = s
+        .places
+        .restore_dir
+        .as_ref()
+        .unwrap()
+        .join("2026-07-01_1000");
     assert_eq!(fs::read(day.join("a.txt")).unwrap(), b"alpha\n");
     assert_eq!(fs::read(day.join("sub/c.txt")).unwrap(), b"charlie\n");
     // Nothing on disk: next to it means its own place.
@@ -161,12 +166,12 @@ fn restores_through_a_claimed_name_come_out_right() {
     assert_eq!(fs::read(s.root.join("sub/c.txt")).unwrap(), b"charlie\n");
 }
 
-/// Without a home folder the default restore folder would be relative to
-/// the working directory; a restore there is refused instead.
+/// Without a home folder there is no restore folder, rather than one
+/// relative to the working directory; a restore there is refused.
 #[test]
-fn a_relative_restore_folder_is_refused() {
+fn a_restore_without_a_restore_folder_is_refused() {
     let mut s = setup();
-    s.places.restore_dir = PathBuf::from("Restored");
+    s.places.restore_dir = None;
     let err = run(
         &s.repo,
         &[s.target("a.txt")],
@@ -179,4 +184,31 @@ fn a_relative_restore_folder_is_refused() {
     assert!(format!("{err:#}").contains("restore folder"), "{err:#}");
     assert!(!std::path::Path::new("Restored").exists());
     assert!(!std::path::Path::new("Restored/2026-07-01_1000").exists());
+}
+
+/// A link is made by the restore itself, so nothing holds its name until
+/// then. An empty file something else put at that name in the meantime
+/// fails the restore, and stays: it isn't ours to remove.
+#[cfg(unix)]
+#[test]
+fn a_failed_link_restore_leaves_what_is_at_its_name() {
+    let s = setup();
+    let planted = s.root.join("cur");
+    let plant = planted.clone();
+    let err = run(
+        &s.repo,
+        &[s.target("cur")],
+        &How::NextTo,
+        &s.places,
+        &mut |p| {
+            if matches!(p.step, RestoreStep::Preparing) {
+                fs::write(&plant, "").unwrap();
+            }
+        },
+        &Cancel::default(),
+    )
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("cur"), "{err:#}");
+    let m = planted.symlink_metadata().expect("the planted file stays");
+    assert!(m.is_file(), "the planted file stays a file");
 }

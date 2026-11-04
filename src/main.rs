@@ -469,7 +469,7 @@ fn tui(
     app.keymap = config.keymap()?;
     app.start_at = view.at.clone();
     if let Some(d) = config.restore_dir(app.home.as_deref()) {
-        app.places.restore_dir = d;
+        app.places.restore_dir = Some(d);
     }
     if let Some(name) = &view.select {
         app.select_name(name.into());
@@ -517,7 +517,7 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
         jiff::tz::TimeZone::system(),
         Some(dir.clone()),
     );
-    app.places.restore_dir = dir.join("Restored");
+    app.places.restore_dir = Some(dir.join("Restored"));
     app.places.undo_dir = Some(dir.join("undo"));
     let result = Term::new()
         .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, config));

@@ -256,8 +256,11 @@ pub trait Repo: Send + Sync {
     ///
     /// Reports how far it got through `progress`. `cancelled` is asked once
     /// the restore is planned, before file contents are copied; if it says
-    /// yes, whatever was created at `dest` is removed and the error is
-    /// [`Stopped`]. Once copying has started it runs to the end.
+    /// yes, no contents are written, a folder it made at `dest` is removed,
+    /// and the error is [`Stopped`]. Once copying has started it runs to
+    /// the end. Otherwise what is at `dest` after a failure (the claimed
+    /// name, or a partial copy) is the caller's to remove: it knows what it
+    /// claimed, and so what there is its own.
     fn restore(
         &self,
         snap: &SnapshotInfo,
@@ -295,7 +298,8 @@ pub fn is_root() -> bool {
 /// follows a link something else may have put at that name since it was
 /// found free. [`Repo::restore`] then fills it in, checking with
 /// [`check_dest`] that the name is claimed or free. A link is created by
-/// the restore itself, which fails if the name is taken.
+/// the restore itself, which fails if the name is taken by then; a name
+/// taken already fails here, and whatever is at it stays.
 pub fn claim(node: &Node, dest: &Path) -> Result<()> {
     match node.kind {
         NodeKind::File => {
@@ -305,7 +309,11 @@ pub fn claim(node: &Node, dest: &Path) -> Result<()> {
         NodeKind::Dir => {
             std::fs::create_dir(dest).with_context(|| format!("creating {}", dest.display()))?;
         }
-        _ => {}
+        _ => {
+            if dest.symlink_metadata().is_ok() {
+                bail!("{} already exists", dest.display());
+            }
+        }
     }
     Ok(())
 }
@@ -322,7 +330,13 @@ pub fn check_dest(dest: &Path) -> Result<()> {
     let claimed = if m.is_file() {
         m.len() == 0
     } else if m.is_dir() {
-        std::fs::read_dir(dest).is_ok_and(|mut d| d.next().is_none())
+        // A folder that can't be read is its own error, not a name clash.
+        let read = || format!("reading {}", dest.display());
+        match std::fs::read_dir(dest).with_context(read)?.next() {
+            None => true,
+            Some(Ok(_)) => false,
+            Some(Err(e)) => return Err(e).with_context(read),
+        }
     } else {
         false
     };

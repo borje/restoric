@@ -1536,8 +1536,8 @@ impl App {
                 });
                 self.disk_changed();
             }
-            Response::Undone(paths) => {
-                self.message = Some(match paths.as_slice() {
+            Response::Undone(undone) => {
+                let mut msg = match undone.back.as_slice() {
                     [p] => format!(
                         "Put back {}.",
                         p.file_name()
@@ -1545,7 +1545,23 @@ impl App {
                             .unwrap_or_default()
                     ),
                     ps => format!("Put back {} items.", ps.len()),
-                });
+                };
+                // The user's files are back; the old copies are still
+                // taking up room in the undo folder, which only they can
+                // see to.
+                match undone.left.as_slice() {
+                    [] => {}
+                    [(p, why)] => msg.push_str(&format!(
+                        " The old copy couldn't be removed and stays at {}: {why}",
+                        p.display()
+                    )),
+                    [(p, why), ..] => msg.push_str(&format!(
+                        " {} old copies couldn't be removed and stay under {}: {why}",
+                        undone.left.len(),
+                        p.parent().and_then(Path::parent).unwrap_or(p).display()
+                    )),
+                }
+                self.message = Some(msg);
                 self.disk_changed();
             }
             Response::Exists(found) => {

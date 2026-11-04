@@ -209,9 +209,15 @@ impl Config {
         self.disk_cache_mb.unwrap_or(2048) << 20
     }
 
-    /// `restore_dir` with `~` expanded, if set.
+    /// `restore_dir` with `~` expanded, if set. `None` for a `~` path
+    /// without a home folder to expand it with: no folder, rather than one
+    /// called `~` wherever restoric was started.
     pub fn restore_dir(&self, home: Option<&Path>) -> Option<PathBuf> {
-        Some(expand_home(self.restore_dir.as_ref()?, home))
+        let d = self.restore_dir.as_ref()?;
+        if home.is_none() && (d == "~" || d.starts_with("~/")) {
+            return None;
+        }
+        Some(expand_home(d, home))
     }
 
     /// The `[keys]` overrides.
@@ -375,6 +381,9 @@ selected = "#202830"
             c.restore_dir(Some(Path::new("/home/me"))),
             Some(PathBuf::from("/home/me/Got back"))
         );
+        // Without a home folder `~` names nothing: no folder, rather than
+        // one called `~` wherever restoric was started.
+        assert_eq!(c.restore_dir(None), None);
         let keys = c.keymap().unwrap();
         assert_eq!(
             keys[&(KeyCode::Char('i'), KeyModifiers::NONE)],

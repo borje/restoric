@@ -59,14 +59,14 @@ impl Harness {
         let mut app = app;
         app.mode_switch = Some(mode_switch);
         app.now = Some("2026-10-05T12:00:00Z".parse().unwrap());
-        app.places.restore_dir = PathBuf::from("/home/bege/Restored");
+        app.places.restore_dir = Some(PathBuf::from("/home/bege/Restored"));
         let mut h = Harness {
             app,
             ctx: Ctx {
                 index: std::sync::Arc::new(index),
                 disk,
                 places: restoric::restore::Places {
-                    restore_dir: PathBuf::from("/home/bege/Restored"),
+                    restore_dir: Some(PathBuf::from("/home/bege/Restored")),
                     undo_dir: Some(std::env::temp_dir().join("restoric-test-undo")),
                     tz: TimeZone::UTC,
                 },

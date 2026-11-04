@@ -48,6 +48,16 @@ fn restore_dialog_15() {
     assert!(h.app.dialog.is_none());
 }
 
+/// Without a home folder there is no restore folder: the dialog says so
+/// where it would otherwise show the destination.
+#[test]
+fn restore_dialog_without_a_restore_folder() {
+    let mut h = Harness::new(SRC);
+    h.app.places.restore_dir = None;
+    h.at("2026-08-17 16:04").select("main.go").keys("dr");
+    insta::assert_snapshot!(h.screen(100, 34));
+}
+
 #[test]
 fn o_shows_a_file_and_the_dialog_has_three_options() {
     let mut h = Harness::new(SRC);
@@ -128,7 +138,7 @@ fn paste_overwrite_and_undo() {
     );
     let mut h = Harness::with(&dsl, root.to_str().unwrap());
     let places = restoric::restore::Places {
-        restore_dir: dir.path().join("Restored"),
+        restore_dir: Some(dir.path().join("Restored")),
         undo_dir: Some(dir.path().join("undo")),
         tz: jiff::tz::TimeZone::UTC,
     };

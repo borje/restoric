@@ -96,8 +96,9 @@ pub enum How {
 /// Where restores go and where undo data is kept.
 #[derive(Clone, Debug)]
 pub struct Places {
-    /// `~/Restored`
-    pub restore_dir: PathBuf,
+    /// `~/Restored`; `None` without a home folder to put it in (and no
+    /// `restore_dir` in the config), and then nothing is restored there.
+    pub restore_dir: Option<PathBuf>,
     /// `~/.local/share/restoric/undo`; `None` without a home folder or
     /// `XDG_DATA_HOME`, and then nothing is overwritten. Never the shared
     /// temporary folder: it would hold the user's overwritten files.
@@ -105,10 +106,15 @@ pub struct Places {
     pub tz: TimeZone,
 }
 
+/// What gives a restore folder when there is none: shown in the restore
+/// dialog in place of the destination, and in the error of a restore
+/// into it.
+pub const NO_RESTORE_DIR: &str = "set HOME, or restore_dir in config";
+
 impl Places {
     pub fn default_for(tz: TimeZone) -> Self {
         Places {
-            restore_dir: crate::dirs::home().unwrap_or_default().join("Restored"),
+            restore_dir: crate::dirs::home().map(|h| h.join("Restored")),
             undo_dir: crate::dirs::data().map(|d| d.join("undo")),
             tz,
         }
@@ -138,18 +144,19 @@ fn free(dir: &Path, base: &str, ext: &str) -> PathBuf {
 }
 
 /// Where a restore of `t` would go if something is on disk at its path,
-/// without the `-2` a clash adds. Doesn't look at the disk.
-pub fn planned(t: &Target, how: &How, places: &Places) -> PathBuf {
+/// without the `-2` a clash adds. Doesn't look at the disk. `None` for
+/// the restore folder when there is none.
+pub fn planned(t: &Target, how: &How, places: &Places) -> Option<PathBuf> {
     let st = stamp(t.snapshot.time, &places.tz);
     let parent = t.path.parent().unwrap_or(Path::new("/"));
     let name = t.name();
-    match how {
+    Some(match how {
         How::Overwrite => t.path.clone(),
         How::NextTo => parent.join(format!("{name}.{st}")),
-        How::RestoreDir => places.restore_dir.join(&st).join(&name),
+        How::RestoreDir => places.restore_dir.as_ref()?.join(&st).join(&name),
         How::Tar => parent.join(format!("{name}-{st}.tar")),
         How::Into(dir) => dir.join(&name),
-    }
+    })
 }
 
 /// What a restore did, for the message.
@@ -231,6 +238,9 @@ pub fn run(
     if *how == How::Overwrite {
         return overwrite(repo, targets, places, &mut rep, cancel);
     }
+    if *how == How::RestoreDir && places.restore_dir.is_none() {
+        bail!("no restore folder: {NO_RESTORE_DIR}");
+    }
     let mut done = Vec::new();
     for (i, t) in targets.iter().enumerate() {
         if cancel.cancelled() {
@@ -243,9 +253,6 @@ pub fn run(
         let st = stamp(t.snapshot.time, &places.tz);
         let name = t.name();
         let parent = t.path.parent().context("can't restore /")?;
-        if *how == How::RestoreDir && !places.restore_dir.is_absolute() {
-            bail!("no restore folder: set HOME, or restore_dir in the config");
-        }
         let dest = match how {
             How::NextTo if !exists(&t.path) => {
                 fs::create_dir_all(parent)?;
@@ -253,7 +260,8 @@ pub fn run(
             }
             How::NextTo => free(parent, &format!("{name}.{st}"), ""),
             How::RestoreDir => {
-                let dir = places.restore_dir.join(&st);
+                let base = places.restore_dir.as_deref().expect("checked above");
+                let dir = base.join(&st);
                 fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
                 free(&dir, &name, "")
             }
@@ -267,10 +275,22 @@ pub fn run(
         let res = if *how == How::Tar {
             write_tar(repo, t, &dest, &mut report, cancel)
         } else {
-            crate::repo::claim(&t.node, &dest)?;
-            repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {
-                cancel.cancelled()
-            })
+            match crate::repo::claim(&t.node, &dest) {
+                Ok(()) => repo.restore(&t.snapshot, &t.path, &dest, &mut report, &|| {
+                    cancel.cancelled()
+                }),
+                // Nothing of ours is at `dest`: whatever is there now was
+                // put there by something else, and stays.
+                Err(e) => return Err(e.context(format!("restoring {}", t.path.display()))),
+            }
+        };
+        // A tar archive removes itself when it fails (and nothing is at
+        // `dest` if it couldn't be created). Otherwise what's there is the
+        // claimed name, or the partial copy: nothing was there before.
+        let clean = |dest: &Path| {
+            if *how != How::Tar {
+                let _ = unclaim(&t.node, dest);
+            }
         };
         match res {
             Ok(()) => done.push(Done {
@@ -278,17 +298,14 @@ pub fn run(
                 dest,
             }),
             Err(e) if is_stopped(&e) => {
-                // The claimed name, if the restore didn't get to it.
-                let _ = remove_path(&dest);
+                clean(&dest);
                 return Ok(Outcome {
                     done,
                     stopped: true,
                 });
             }
             Err(e) => {
-                // Nothing was at `dest` before: what's there is the claimed
-                // name, or the partial copy.
-                let _ = remove_path(&dest);
+                clean(&dest);
                 return Err(e.context(format!("restoring {}", t.path.display())));
             }
         }
@@ -332,7 +349,15 @@ fn overwrite(
     cancel: &Cancel,
 ) -> Result<Outcome> {
     let stopped = |session: &Path, manifest: &Manifest| -> Result<Outcome> {
-        rollback(session, manifest)?;
+        let undone = rollback(session, manifest)?;
+        // Everything is back; a copy that stays is for the user to see
+        // to, and this is where they hear of it.
+        if let Some((copy, why)) = undone.left.first() {
+            bail!(
+                "stopped, and everything is back, but the old copy couldn't be removed and stays at {}: {why}",
+                copy.display()
+            );
+        }
         Ok(Outcome {
             done: Vec::new(),
             stopped: true,
@@ -363,7 +388,8 @@ fn overwrite(
             if manifest.entries.is_empty() {
                 remove_session(&session);
             }
-            return Err(e);
+            let e = e.context(format!("restoring {}", t.path.display()));
+            return Err(with_earlier(e, done.len()));
         }
         let moved = match &saved {
             Some(to) => fs::create_dir_all(to.parent().expect("has a parent"))
@@ -374,9 +400,11 @@ fn overwrite(
                 None => Ok(()),
             },
         };
+        let mut claimed = false;
         let res = moved.and_then(|()| {
-            let mut report = |step| rep.send(i, t, step);
             crate::repo::claim(&t.node, &t.path)?;
+            claimed = true;
+            let mut report = |step| rep.send(i, t, step);
             repo.restore(&t.snapshot, &t.path, &t.path, &mut report, &|| {
                 cancel.cancelled()
             })
@@ -386,15 +414,43 @@ fn overwrite(
                 return stopped(&session, &manifest);
             }
             let e = e.context(format!("restoring {}", t.path.display()));
-            // Put the old version back and stop. The entry's copy is whole
-            // if it's there, so this is safe whichever step failed.
-            return Err(match put_back_last(&session, &mut manifest) {
-                Ok(_) => e,
-                Err(back) => anyhow::anyhow!(
-                    "{e:#}; the old {} is kept for undo, but putting it back failed: {back:#}",
-                    t.path.display()
-                ),
-            });
+            let e = match &saved {
+                // Nothing of the user's was at the path. What's there now
+                // is ours if the name was claimed (the claimed name, or a
+                // partial copy); otherwise something else put it there,
+                // and it stays. Either way there's nothing to put back.
+                None => {
+                    if claimed {
+                        let _ = unclaim(&t.node, &t.path);
+                    }
+                    match drop_last(&session, &mut manifest) {
+                        Ok(()) => e,
+                        Err(d) => anyhow::anyhow!(
+                            "{e:#}; and the undo step still lists {}: {d:#}",
+                            t.path.display()
+                        ),
+                    }
+                }
+                // Put the old version back. The entry's copy is whole if
+                // it's there, so this is safe whichever step failed.
+                Some(_) => {
+                    let mut left = Vec::new();
+                    match put_back_last(&session, &mut manifest, &mut left) {
+                        Ok(_) => match left.first() {
+                            None => e,
+                            Some((copy, why)) => anyhow::anyhow!(
+                                "{e:#}; the old version is back, but its copy couldn't be removed and stays at {}: {why}",
+                                copy.display()
+                            ),
+                        },
+                        Err(back) => anyhow::anyhow!(
+                            "{e:#}; the old {} is kept for undo, but putting it back failed: {back:#}",
+                            t.path.display()
+                        ),
+                    }
+                }
+            };
+            return Err(with_earlier(e, done.len()));
         }
         done.push(Done {
             target: t.path.clone(),
@@ -409,6 +465,20 @@ fn overwrite(
         done,
         stopped: false,
     })
+}
+
+/// `e`, and that the `n` items of the step before the failed one were
+/// overwritten and stay so: the step is kept, and :undo puts them back.
+fn with_earlier(e: anyhow::Error, n: usize) -> anyhow::Error {
+    match n {
+        0 => e,
+        1 => anyhow::anyhow!(
+            "{e:#}; the item before it was overwritten, and :undo puts the old version back"
+        ),
+        n => anyhow::anyhow!(
+            "{e:#}; the {n} items before it were overwritten, and :undo puts the old versions back"
+        ),
+    }
 }
 
 /// `<session>/files/<i>/<name>`: where item `i` of a step keeps what it
@@ -426,6 +496,12 @@ fn new_session(undo_dir: Option<&Path>) -> Result<PathBuf> {
     let now = Timestamp::now().strftime("%Y%m%dT%H%M%S%.f").to_string();
     let session = free(undo_dir, &now, "");
     fs::create_dir(&session)?;
+    // With a manifest from the start: a step the process dies in before
+    // its first entry is then one [`undo`] finds empty and removes.
+    if let Err(e) = write_manifest(&session, &Manifest::default()) {
+        remove_session(&session);
+        return Err(e);
+    }
     Ok(session)
 }
 
@@ -441,12 +517,23 @@ fn write_manifest(session: &Path, m: &Manifest) -> Result<()> {
     Ok(())
 }
 
-/// Undoes the last overwrite. Returns the paths it put back.
+/// What an undo did.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Undone {
+    /// The paths put back.
+    pub back: Vec<PathBuf>,
+    /// Old copies that were put back but couldn't be removed from the
+    /// undo step afterwards, with why. They stay there, and the step with
+    /// them, until something removes them.
+    pub left: Vec<(PathBuf, String)>,
+}
+
+/// Undoes the last overwrite.
 ///
 /// A step with nothing left in it (put back, but its folder couldn't be
 /// removed then) is removed if it can be, and never counts as the last
 /// overwrite.
-pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
+pub fn undo(places: &Places) -> Result<Undone> {
     let read = places.undo_dir.as_deref().map(fs::read_dir);
     let mut sessions: Vec<PathBuf> = match read {
         Some(Ok(rd)) => rd
@@ -472,24 +559,25 @@ pub fn undo(places: &Places) -> Result<Vec<PathBuf>> {
 }
 
 /// Puts back everything an undo step replaced, then removes the step.
-/// Returns the paths it put back.
 ///
 /// Can be run again after failing half way: each entry leaves the manifest
 /// as it's put back, and an entry whose copy is gone (put back already, or
 /// never made) leaves its path alone rather than deleting what's there.
-fn rollback(session: &Path, m: &Manifest) -> Result<Vec<PathBuf>> {
+fn rollback(session: &Path, m: &Manifest) -> Result<Undone> {
     if m.entries.is_empty() {
         remove_session(session);
-        return Ok(Vec::new());
+        return Ok(Undone::default());
     }
-    let mut left = m.clone();
-    let mut back = Vec::new();
-    while !left.entries.is_empty() {
+    let mut todo = m.clone();
+    let mut undone = Undone::default();
+    while !todo.entries.is_empty() {
         // The last one removes the step.
-        back.extend(put_back_last(session, &mut left)?);
+        undone
+            .back
+            .extend(put_back_last(session, &mut todo, &mut undone.left)?);
     }
-    back.reverse();
-    Ok(back)
+    undone.back.reverse();
+    Ok(undone)
 }
 
 /// Removes a step nothing is left in. Everything is back by then; what
@@ -510,9 +598,13 @@ fn remove_session(session: &Path) {
 /// The copy is removed only after the manifest no longer names it, so a
 /// copy that was put back across file systems and then couldn't be
 /// removed is a leftover, never something a later undo would put back
-/// over the user's files.
-fn put_back_last(session: &Path, left: &mut Manifest) -> Result<Option<PathBuf>> {
-    let Some(e) = left.entries.last() else {
+/// over the user's files. Such a copy is added to `left`, with why.
+fn put_back_last(
+    session: &Path,
+    todo: &mut Manifest,
+    left: &mut Vec<(PathBuf, String)>,
+) -> Result<Option<PathBuf>> {
+    let Some(e) = todo.entries.last() else {
         return Ok(None);
     };
     let path = e.path.clone();
@@ -527,20 +619,53 @@ fn put_back_last(session: &Path, left: &mut Manifest) -> Result<Option<PathBuf>>
             true
         }
     };
-    let entry = left.entries.pop().expect("checked above");
-    if let Err(e) = write_manifest(session, left) {
-        left.entries.push(entry);
+    let entry = todo.entries.pop().expect("checked above");
+    if let Err(e) = write_manifest(session, todo) {
+        todo.entries.push(entry);
         return Err(e);
     }
     if let Some(s) = &saved
         && let Err(e) = remove_path(s)
     {
         tracing::warn!("leaving the undo copy {}: {e}", s.display());
+        left.push((s.clone(), e.to_string()));
     }
-    if left.entries.is_empty() {
+    if todo.entries.is_empty() {
         remove_session(session);
     }
     Ok(back.then_some(path))
+}
+
+/// Drops the last entry of `m`, one nothing was done for, from the
+/// manifest on disk, and the step with it once it's empty. Fails with the
+/// entry still in `m`.
+fn drop_last(session: &Path, m: &mut Manifest) -> Result<()> {
+    let Some(entry) = m.entries.pop() else {
+        return Ok(());
+    };
+    if let Err(e) = write_manifest(session, m) {
+        m.entries.push(entry);
+        return Err(e);
+    }
+    if m.entries.is_empty() {
+        remove_session(session);
+    }
+    Ok(())
+}
+
+/// Removes what [`claim`](crate::repo::claim) and a failed restore of
+/// `node` left at `dest`, and nothing else: the claimed file or folder
+/// (with whatever the restore put in it), or a link to the node's target.
+/// Anything else at the name was put there by something else, and stays.
+fn unclaim(node: &Node, dest: &Path) -> io::Result<()> {
+    match &node.kind {
+        NodeKind::File | NodeKind::Dir => remove_path(dest),
+        NodeKind::Symlink { target } => match fs::read_link(dest) {
+            Ok(t) if t.as_os_str() == target => fs::remove_file(dest),
+            _ => Ok(()),
+        },
+        NodeKind::Other(_) => Ok(()),
+    }
 }
 
 /// Removes a file, link or folder; never follows symlinks.
@@ -626,14 +751,49 @@ fn copy_path(from: &Path, to: &Path) -> io::Result<()> {
             let e = e?;
             copy_path(&e.path(), &to.join(e.file_name()))?;
         }
+        // The time after the entries, which writing them changed, and
+        // before the mode, which may not allow opening the folder.
+        #[cfg(unix)]
+        if let Ok(t) = m.modified() {
+            fs::File::open(to)?.set_modified(t)?;
+        }
         fs::set_permissions(to, m.permissions())?;
         return Ok(());
     }
     fs::copy(from, to)?;
     if let Ok(t) = m.modified() {
-        fs::File::options().write(true).open(to)?.set_modified(t)?;
+        set_modified(to, t, &m)?;
     }
     Ok(())
+}
+
+/// Sets the modification time of the fresh copy at `p`, which `fs::copy`
+/// has already given `m`'s mode. A read-only mode (`0o444`, every file
+/// under `.git/objects`) can't be opened for writing, so the time is set
+/// with the mode relaxed for the moment it takes, then the mode put back.
+fn set_modified(p: &Path, t: std::time::SystemTime, m: &fs::Metadata) -> io::Result<()> {
+    let open = || fs::File::options().write(true).open(p);
+    match open() {
+        Ok(f) => f.set_modified(t),
+        Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+            #[cfg(unix)]
+            let writable = {
+                use std::os::unix::fs::PermissionsExt;
+                fs::Permissions::from_mode(m.permissions().mode() | 0o200)
+            };
+            #[cfg(not(unix))]
+            let writable = {
+                let mut w = m.permissions();
+                w.set_readonly(false);
+                w
+            };
+            fs::set_permissions(p, writable)?;
+            let res = open().and_then(|f| f.set_modified(t));
+            fs::set_permissions(p, m.permissions())?;
+            res
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Reads a file node from the repository in chunks.
@@ -880,6 +1040,58 @@ mod tests {
         assert!(!exists(&dir.path().join("to.part")));
         fs::set_permissions(from.join("sub/b"), fs::Permissions::from_mode(0o644)).unwrap();
         assert_eq!(tree(&from).len(), 2);
+    }
+
+    /// A read-only file (as every object in a `.git` is) is moved across
+    /// file systems with its content, mode and time, and nothing else is
+    /// left behind.
+    #[cfg(unix)]
+    #[test]
+    fn copy_aside_keeps_a_read_only_file_as_it_was() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let from = sample(dir.path());
+        let ro = from.join("sub/b");
+        let t = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000_000);
+        fs::File::options()
+            .write(true)
+            .open(&ro)
+            .unwrap()
+            .set_modified(t)
+            .unwrap();
+        fs::set_permissions(&ro, fs::Permissions::from_mode(0o444)).unwrap();
+        let to = dir.path().join("to");
+        copy_aside(&from, &to).unwrap();
+        assert!(!exists(&from));
+        let m = to.join("sub/b").metadata().unwrap();
+        assert_eq!(m.permissions().mode() & 0o777, 0o444);
+        assert_eq!(m.modified().unwrap(), t);
+        assert_eq!(fs::read_to_string(to.join("sub/b")).unwrap(), "b\n");
+        // And back again, as an undo across file systems does it.
+        let back = dir.path().join("back");
+        place(&to, &back).unwrap();
+        assert_eq!(
+            back.join("sub/b").metadata().unwrap().modified().unwrap(),
+            t
+        );
+    }
+
+    /// A folder comes back with its own modification time, not the time
+    /// of the copy: tools that compare trees by it would otherwise see
+    /// every folder as changed.
+    #[cfg(unix)]
+    #[test]
+    fn copy_fresh_keeps_a_folders_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = sample(dir.path());
+        let t = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000_000);
+        for p in [from.join("sub"), from.clone()] {
+            fs::File::open(&p).unwrap().set_modified(t).unwrap();
+        }
+        let to = dir.path().join("to");
+        copy_fresh(&from, &to).unwrap();
+        assert_eq!(to.join("sub").metadata().unwrap().modified().unwrap(), t);
+        assert_eq!(to.metadata().unwrap().modified().unwrap(), t);
     }
 
     /// A copy never goes over something that's already at `to`, and a

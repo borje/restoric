@@ -31,7 +31,7 @@ fn setup() -> Setup {
     let repo = FakeRepo::parse(&dsl).unwrap();
     let snap = repo.snapshots().unwrap().remove(0);
     let places = Places {
-        restore_dir: dir.path().join("Restored"),
+        restore_dir: Some(dir.path().join("Restored")),
         undo_dir: Some(dir.path().join("undo")),
         tz: TimeZone::UTC,
     };
@@ -130,7 +130,12 @@ fn stopped_copies_keep_finished_items() {
     .unwrap();
     assert!(o.stopped);
     assert_eq!(o.done.len(), 1);
-    let day = s.places.restore_dir.join("2026-07-01_1000");
+    let day = s
+        .places
+        .restore_dir
+        .as_ref()
+        .unwrap()
+        .join("2026-07-01_1000");
     assert_eq!(names(&day), ["a.txt"], "the partial sub/ is removed");
 }
 

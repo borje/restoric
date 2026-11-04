@@ -268,7 +268,7 @@ pub enum Response {
     },
     /// The restore failed; what it had done is cleaned up.
     RestoreFailed(String),
-    Undone(Vec<PathBuf>),
+    Undone(restore::Undone),
     Exists(Vec<(PathBuf, bool)>),
     Pager {
         name: String,
@@ -492,7 +492,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                 }
             }
             Request::Undo => match restore::undo(&ctx.places) {
-                Ok(paths) => send(Response::Undone(paths)),
+                Ok(undone) => send(Response::Undone(undone)),
                 Err(e) => send(Response::Error(format!("{e:#}"))),
             },
             Request::Exists { paths } => {

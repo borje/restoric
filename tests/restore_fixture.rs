@@ -47,7 +47,7 @@ fn every_option() {
     snaps.sort_by_key(|s| s.time);
     let src = f.src();
     let places = Places {
-        restore_dir: f.root.join("Restored"),
+        restore_dir: Some(f.root.join("Restored")),
         undo_dir: Some(f.root.join("undo")),
         tz: TimeZone::UTC,
     };
@@ -59,7 +59,7 @@ fn every_option() {
     let t = target(&repo, &snaps[0], &a);
     assert_eq!(
         planned(&t, &How::NextTo, &places),
-        src.join(format!("a.txt.{st0}"))
+        Some(src.join(format!("a.txt.{st0}")))
     );
     let done = go(&repo, std::slice::from_ref(&t), How::NextTo, &places).unwrap();
     assert_eq!(done[0].dest, src.join(format!("a.txt.{st0}")));
@@ -83,7 +83,7 @@ fn every_option() {
     // A folder into the restore folder.
     let sub = target(&repo, &snaps[0], &src.join("sub"));
     let done = go(&repo, std::slice::from_ref(&sub), How::RestoreDir, &places).unwrap();
-    let dir = places.restore_dir.join(&st0).join("sub");
+    let dir = places.restore_dir.as_ref().unwrap().join(&st0).join("sub");
     assert_eq!(done[0].dest, dir);
     assert_eq!(fs::read(dir.join("c.txt")).unwrap(), b"charlie\n");
     assert_eq!(fs::read(dir.join("d.txt")).unwrap(), b"delta\n");
@@ -116,7 +116,7 @@ fn every_option() {
     // Overwrite a file, then undo: the original bytes come back.
     go(&repo, std::slice::from_ref(&t), How::Overwrite, &places).unwrap();
     assert_eq!(fs::read(&a).unwrap(), b"alpha\n");
-    assert_eq!(undo(&places).unwrap(), std::slice::from_ref(&a));
+    assert_eq!(undo(&places).unwrap().back, std::slice::from_ref(&a));
     assert_eq!(fs::read(&a).unwrap(), b"alpha 2\n");
     assert!(undo(&places).is_err(), "nothing left to undo");
 
