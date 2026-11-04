@@ -42,6 +42,21 @@ fn hide_command(text: &str, given: &str, parsed: &CommandInput) -> String {
     out
 }
 
+/// `c` as a command. A parse error (an unbalanced quote, say) quotes the
+/// whole text, and with it any password in it: the text as given is
+/// hidden, as a failing command's is.
+fn parse_command(c: &str) -> Result<CommandInput> {
+    c.parse::<CommandInput>().map_err(|e| {
+        let text = e.to_string();
+        let shown = if c.is_empty() {
+            text
+        } else {
+            text.replace(c, "***")
+        };
+        anyhow!("bad password command: {shown}")
+    })
+}
+
 /// Names the cache's backend version: a new rustic_core starts a new cache.
 pub const BACKEND: &str = "rustic_core 0.13.0";
 
@@ -187,9 +202,7 @@ impl Connection {
             if let Some(f) = &o.password_file {
                 cred = cred.password_file(f.clone());
             } else if let Some(c) = &o.password_command {
-                let parsed = c
-                    .parse::<CommandInput>()
-                    .map_err(|e| anyhow!("bad password command: {e}"))?;
+                let parsed = parse_command(c)?;
                 cred = cred.password_command(parsed.clone());
                 command = Some((c.as_str(), parsed));
             }
@@ -554,6 +567,13 @@ mod tests {
             ),
             "password command `pass` failed: pass: restic/nas is not in the password store"
         );
+    }
+
+    #[test]
+    fn a_password_command_that_doesnt_parse_is_hidden_from_the_error() {
+        let e = parse_command("echo \"hunter2").unwrap_err().to_string();
+        assert!(e.starts_with("bad password command: "), "{e}");
+        assert!(!e.contains("hunter2") && e.contains("***"), "{e}");
     }
 
     #[test]

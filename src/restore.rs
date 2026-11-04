@@ -398,7 +398,9 @@ fn overwrite(
     cancel: &Cancel,
 ) -> Result<Outcome> {
     let stopped = |session: &Path, manifest: &Manifest| -> Result<Outcome> {
-        let undone = rollback(session, manifest)?;
+        // What couldn't be put back is still in the step, for :undo.
+        let undone = rollback(session, manifest)
+            .context("stopped, but putting the old versions back failed; :undo tries again")?;
         // Everything is back: a stop, whatever copies stay.
         Ok(Outcome {
             done: Vec::new(),
@@ -642,8 +644,10 @@ fn rollback(session: &Path, m: &Manifest) -> Result<Undone> {
 }
 
 /// Removes a step nothing is left in. Everything is back by then; what
-/// can stop this is a copy that couldn't be removed, which stays as a
-/// leftover the next undo tries again.
+/// can stop this is a copy that couldn't be removed, which stays. A later
+/// [`undo`] removes the step again if its manifest is still there, and
+/// never looks at it otherwise: the copy is named in [`Undone::left`] for
+/// the user to see to.
 fn remove_session(session: &Path) {
     if let Err(e) = fs::remove_dir_all(session) {
         tracing::warn!("leaving the undo step {}: {e}", session.display());

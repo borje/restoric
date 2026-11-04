@@ -81,11 +81,12 @@ pub struct Access {
 }
 
 /// Shows whether there's a password, never what it is; nor the command
-/// that gives it, which often has it in its text (`echo hunter2`).
+/// that gives it, which often has it in its text (`echo hunter2`); nor
+/// the one in the repository's URL.
 impl std::fmt::Debug for Access {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Access")
-            .field("repo", &self.repo)
+            .field("repo", &self.repo.as_deref().map(crate::repos::redact))
             .field("repo_file", &self.repo_file)
             .field("password", &self.password.as_ref().map(|_| "***"))
             .field("password_file", &self.password_file)
@@ -520,5 +521,18 @@ tag = "photos"
         // No entry: the environment.
         let a = resolve_access(&none, &env, None, home).unwrap();
         assert_eq!(a, env);
+    }
+
+    #[test]
+    fn debug_shows_no_password() {
+        let a = Access {
+            repo: Some("rest:https://me:hunter2@nas/".into()),
+            password: Some(Zeroizing::new("secret".into())),
+            password_command: Some("echo secret".into()),
+            ..Access::default()
+        };
+        let d = format!("{a:?}");
+        assert!(!d.contains("hunter2") && !d.contains("secret"), "{d}");
+        assert!(d.contains("me:***@nas"), "{d}");
     }
 }

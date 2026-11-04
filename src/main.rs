@@ -519,8 +519,14 @@ fn demo(view: &ViewArgs, config: &Config) -> Result<()> {
     );
     app.places.restore_dir = Some(dir.join("Restored"));
     app.places.undo_dir = Some(dir.join("undo"));
+    // Everything the demo writes stays in its folder: not the user's
+    // restore_dir, which `tui` would otherwise put in place of it.
+    let config = Config {
+        restore_dir: None,
+        ..config.clone()
+    };
     let result = Term::new()
-        .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, config));
+        .and_then(|mut term| tui(&mut term, index, Arc::new(RealDisk), app, view, &config));
     drop(tmp);
     result.map(|_| ())
 }

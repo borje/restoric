@@ -121,6 +121,19 @@ fn the_undo_copy_is_kept_under_the_step() {
     assert_eq!(s.read("sub/c.txt"), "my c\n");
 }
 
+/// Puts a folder's permissions back when dropped, so that a failed
+/// assertion doesn't leave a tree the temporary folder can't remove.
+#[cfg(unix)]
+struct Unlock(PathBuf);
+
+#[cfg(unix)]
+impl Drop for Unlock {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o755));
+    }
+}
+
 fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
     let mut v = Vec::new();
     for e in fs::read_dir(dir).unwrap() {
@@ -308,6 +321,7 @@ fn a_move_aside_that_cant_remove_the_original_keeps_the_copy_for_undo() {
     fs::create_dir(&locked).unwrap();
     fs::write(locked.join("f"), "keep\n").unwrap();
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+    let _unlock = Unlock(locked.clone());
 
     let err = s.overwrite(&["sub"]).unwrap_err();
     let text = format!("{err:#}");
@@ -413,8 +427,11 @@ fn an_undo_says_which_old_copies_it_couldnt_remove() {
     let copy = session.join("files/1/sub");
     let locked = copy.join("locked");
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+    let _unlock = Unlock(locked.clone());
 
     let undone = undo(&s.places).unwrap();
+    // The copy put back has the locked folder too.
+    let _unlock_back = Unlock(s.root.join("sub/locked"));
     assert_eq!(undone.back, [s.root.join("a.txt"), s.root.join("sub")]);
     assert_eq!(s.read("a.txt"), "my a\n");
     assert_eq!(s.read("sub/c.txt"), "my c\n");
@@ -425,9 +442,6 @@ fn an_undo_says_which_old_copies_it_couldnt_remove() {
         copy.join("locked/f").exists(),
         "the copy stays until it can be removed"
     );
-
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
-    fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
 }
 
 /// A step whose manifest names a path nothing was at, from a process that
@@ -503,28 +517,27 @@ fn a_stopped_overwrite_reports_the_old_copies_it_couldnt_remove() {
                 let session = s.sessions().pop().unwrap();
                 let l = session.join("files/1/sub/locked");
                 fs::set_permissions(&l, fs::Permissions::from_mode(0o555)).unwrap();
-                locked = Some(l);
+                locked = Some(Unlock(l));
                 stop.cancel();
             }
         },
         &cancel,
     )
     .unwrap();
+    // The copy put back has the locked folder too.
+    let _unlock_back = Unlock(s.root.join("sub/locked"));
     assert!(o.stopped);
     assert!(o.done.is_empty());
     assert_eq!(s.read("a.txt"), "my a\n");
     assert_eq!(s.read("sub/c.txt"), "my c\n");
     assert_eq!(s.read("sub/locked/f"), "keep\n");
-    let locked = locked.unwrap();
+    let locked = locked.expect("the second item was reached");
     assert_eq!(o.left.len(), 1, "{:?}", o.left);
-    assert_eq!(o.left[0].0, locked.parent().unwrap());
+    assert_eq!(o.left[0].0, locked.0.parent().unwrap());
     assert!(
-        locked.join("f").exists(),
+        locked.0.join("f").exists(),
         "the copy stays until it can be removed"
     );
-
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
-    fs::set_permissions(s.root.join("sub/locked"), fs::Permissions::from_mode(0o755)).unwrap();
 }
 
 /// A step for a link at a free name, from a process that died after
