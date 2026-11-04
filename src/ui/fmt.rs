@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use anyhow::{Context, Result};
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use unicode_width::UnicodeWidthStr;
@@ -74,19 +75,22 @@ pub fn ago(d: SignedDuration) -> String {
 }
 
 /// Whether `p` is `~` or under it: a path only a home folder can expand.
-pub fn in_home(p: &str) -> bool {
+fn in_home(p: &str) -> bool {
     p == "~" || p.starts_with("~/")
 }
 
-/// `p` with a leading `~` replaced by `home`, when there is one.
-pub fn expand_home(p: &str, home: Option<&Path>) -> PathBuf {
-    match home {
-        Some(h) if in_home(p) => match p.get(2..) {
-            Some(rest) => h.join(rest),
-            None => h.to_path_buf(),
-        },
-        _ => PathBuf::from(p),
+/// `p` with a leading `~` replaced by `home`. A `~` path without a home
+/// folder to expand it with is an error that names it: never a folder
+/// called `~` wherever restoric was started.
+pub fn expand_home(p: &str, home: Option<&Path>) -> Result<PathBuf> {
+    if !in_home(p) {
+        return Ok(PathBuf::from(p));
     }
+    let h = home.with_context(|| format!("{p} needs HOME set to expand its ~"))?;
+    Ok(match p.get(2..) {
+        Some(rest) => h.join(rest),
+        None => h.to_path_buf(),
+    })
 }
 
 pub fn width(s: &str) -> usize {
@@ -203,14 +207,17 @@ mod tests {
         let home = Path::new("/home/bege");
         assert_eq!(path(Path::new("/home/bege/dev"), Some(home)), "~/dev");
         assert_eq!(path(Path::new("/etc"), Some(home)), "/etc");
-        assert_eq!(
-            expand_home("~/x", Some(home)),
-            PathBuf::from("/home/bege/x")
-        );
-        assert_eq!(expand_home("/x", Some(home)), PathBuf::from("/x"));
-        assert_eq!(expand_home("~", Some(home)), home);
-        assert_eq!(expand_home("~x", Some(home)), PathBuf::from("~x"));
-        assert_eq!(expand_home("~/x", None), PathBuf::from("~/x"));
+        let expand = |p, home| expand_home(p, home).unwrap();
+        assert_eq!(expand("~/x", Some(home)), PathBuf::from("/home/bege/x"));
+        assert_eq!(expand("/x", Some(home)), PathBuf::from("/x"));
+        assert_eq!(expand("~", Some(home)), home);
+        assert_eq!(expand("~x", Some(home)), PathBuf::from("~x"));
+        assert_eq!(expand("~x", None), PathBuf::from("~x"));
+        // Without a home folder `~` names nothing: an error that says so.
+        for p in ["~", "~/x"] {
+            let err = expand_home(p, None).unwrap_err().to_string();
+            assert!(err.contains(p) && err.contains("HOME"), "{err}");
+        }
         assert!(in_home("~") && in_home("~/x") && !in_home("~x"));
     }
 

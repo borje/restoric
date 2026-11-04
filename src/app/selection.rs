@@ -415,7 +415,13 @@ impl App {
         if text.is_empty() {
             return;
         }
-        let dir = fmt::expand_home(text, self.home.as_deref());
+        let dir = match fmt::expand_home(text, self.home.as_deref()) {
+            Ok(dir) => dir,
+            Err(e) => {
+                self.message = Some(format!("{e:#}. Give the full path."));
+                return;
+            }
+        };
         let dir = if dir.is_absolute() {
             dir
         } else {

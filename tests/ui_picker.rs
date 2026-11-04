@@ -388,3 +388,33 @@ fn restore_into_a_directory() {
     h.keys("p").key(KeyCode::Enter);
     assert_eq!(std::fs::read(out.join("a.txt-2")).unwrap(), b"one\n");
 }
+
+/// A `~` path typed at the `restore to:` prompt without a home folder to
+/// expand it with is refused, with a message: never a folder called `~`.
+#[test]
+fn a_home_path_at_the_prompt_needs_a_home_folder() {
+    let pick = Pick {
+        host: "dev-vm".into(),
+        path: PathBuf::from("/srv/data"),
+        repo: None,
+    };
+    let mut h = after_pick(&pick);
+    h.app.home = None;
+    h.select("etc").keys("yp");
+    h.app.input.as_mut().unwrap().text = "~/got-back".into();
+    h.app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        !h.app
+            .outbox
+            .iter()
+            .any(|r| matches!(r, Request::Restore { .. })),
+        "{:?}",
+        h.app.outbox
+    );
+    assert!(h.app.restoring.is_none());
+    assert_eq!(
+        h.app.message.as_deref(),
+        Some("~/got-back needs HOME set to expand its ~. Give the full path.")
+    );
+    insta::assert_snapshot!(h.screen(100, 12));
+}

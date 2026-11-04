@@ -320,7 +320,7 @@ fn start(
         })
     };
     if flags.has_repo() || config.repo.is_empty() {
-        return direct(resolve_access(&flags, &env, None, home));
+        return direct(resolve_access(&flags, &env, None, home)?);
     }
     let cands = candidates(view, config);
     let cache_path = ProbeCache::default_path();
@@ -331,7 +331,7 @@ fn start(
     let now = jiff::Timestamp::now();
     if let [e] = config.repo.as_slice() {
         // Nothing to choose from: open it and remember what it holds.
-        let a = resolve_access(&flags, &env, Some(e), home);
+        let a = resolve_access(&flags, &env, Some(e), home)?;
         let c = connect(open_options(a), &e.repository)?;
         cache.record(&e.repository, &c.snapshots()?, now);
         save_cache(cache_path.as_deref(), &cache);
@@ -360,7 +360,7 @@ fn start(
             if probing && tty {
                 eprint!("\rchecking {}…\x1b[K", repos::redact(&e.repository));
             }
-            let o = open_options(resolve_access(&flags, &env, Some(e), home));
+            let o = open_options(resolve_access(&flags, &env, Some(e), home)?);
             // Probing reads repositories that may not hold the folder: not
             // worth a password prompt each.
             let c = if probing {
@@ -397,7 +397,7 @@ fn start(
             entry: Some(i),
             location: repos::redact(&config.repo[i].repository),
         }),
-        None if env.has_repo() => direct(resolve_access(&flags, &env, None, home)),
+        None if env.has_repo() => direct(resolve_access(&flags, &env, None, home)?),
         None => Ok(Start::Repos),
     }
 }
@@ -667,7 +667,7 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
                     save_cache(cache_path.as_deref(), &cache);
                     return Ok(snaps);
                 }
-                let o = open_options(resolve_access(&flags, &env, Some(e), home.as_deref()));
+                let o = open_options(resolve_access(&flags, &env, Some(e), home.as_deref())?);
                 let c = match Connection::open(&o) {
                     Err(err) if askable(&err) => term.suspended(|| ask_open(o, &e.repository))?,
                     r => r,

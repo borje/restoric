@@ -359,8 +359,9 @@ struct UndoEntry {
 enum Claimed {
     File,
     Dir,
-    /// A link to this target.
-    Link(PathBuf),
+    /// A link to this target, as text: a target that isn't UTF-8 is kept
+    /// (and matched) in its lossy form, so that the step can be written.
+    Link(String),
     /// Something restoric doesn't restore: the name was only found free.
     Nothing,
 }
@@ -370,7 +371,7 @@ impl Claimed {
         match &node.kind {
             NodeKind::File => Claimed::File,
             NodeKind::Dir => Claimed::Dir,
-            NodeKind::Symlink { target } => Claimed::Link(PathBuf::from(target)),
+            NodeKind::Symlink { target } => Claimed::Link(target.to_string_lossy().into_owned()),
             NodeKind::Other(_) => Claimed::Nothing,
         }
     }
@@ -718,7 +719,7 @@ fn unclaim(c: &Claimed, dest: &Path) -> io::Result<bool> {
     match c {
         Claimed::File | Claimed::Dir => remove_path(dest),
         Claimed::Link(target) => match fs::read_link(dest) {
-            Ok(t) if t == *target => fs::remove_file(dest).map(|()| true),
+            Ok(t) if t.to_string_lossy() == *target => fs::remove_file(dest).map(|()| true),
             _ => Ok(false),
         },
         Claimed::Nothing => Ok(false),
@@ -1063,6 +1064,48 @@ mod tests {
         fs::write(from.join("a"), "a\n").unwrap();
         fs::write(from.join("sub/b"), "b\n").unwrap();
         from
+    }
+
+    /// A link whose target isn't UTF-8 can be recorded in a step (the
+    /// manifest is JSON), and undo removes that link and no other.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_to_a_non_utf8_target_is_recorded_and_removed() {
+        use std::os::unix::ffi::OsStrExt;
+        let target = std::ffi::OsStr::from_bytes(b"a\xff");
+        let node = Node {
+            name: "cur".into(),
+            kind: NodeKind::Symlink {
+                target: target.to_owned(),
+            },
+            size: 0,
+            mode: None,
+            uid: None,
+            gid: None,
+            mtime: None,
+            content: Vec::new(),
+            subtree: None,
+            raw: crate::repo::Id([0; 32]),
+        };
+        let claimed = Claimed::of(&node);
+        let m = Manifest {
+            entries: vec![UndoEntry {
+                path: PathBuf::from("/x/cur"),
+                saved: None,
+                claimed: Some(claimed.clone()),
+            }],
+        };
+        serde_json::to_vec(&m).expect("a step with the link can be written");
+
+        let dir = tempfile::tempdir().unwrap();
+        let cur = dir.path().join("cur");
+        std::os::unix::fs::symlink("other", &cur).unwrap();
+        assert!(!unclaim(&claimed, &cur).unwrap(), "another link stays");
+        assert!(cur.symlink_metadata().is_ok());
+        fs::remove_file(&cur).unwrap();
+        std::os::unix::fs::symlink(target, &cur).unwrap();
+        assert!(unclaim(&claimed, &cur).unwrap());
+        assert!(cur.symlink_metadata().is_err());
     }
 
     #[test]

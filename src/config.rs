@@ -10,7 +10,7 @@ use serde::Deserialize;
 use zeroize::Zeroizing;
 
 use crate::app::Action;
-use crate::ui::fmt::{expand_home, in_home};
+use crate::ui::fmt::expand_home;
 use crate::ui::theme::Theme;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -122,13 +122,14 @@ impl Access {
 /// Combines the sources. The repository comes from a flag, then `entry`
 /// (the `[[repo]]` that holds the folder), then the environment. The
 /// password comes from a flag, then `entry` if it gave the repository and
-/// says how to unlock it, then the environment.
+/// says how to unlock it, then the environment. Fails for a `~` password
+/// file without a home folder to expand it with.
 pub fn resolve_access(
     flags: &Access,
     env: &Access,
     entry: Option<&RepoEntry>,
     home: Option<&Path>,
-) -> Access {
+) -> Result<Access> {
     let entry = entry.filter(|_| !flags.has_repo());
     let mut a = match entry {
         Some(e) => Access {
@@ -149,13 +150,18 @@ pub fn resolve_access(
     if flags.has_password() {
         a = a.password_from(flags);
     } else if let Some(e) = entry.filter(|e| e.has_password()) {
-        a.password_file = e.password_file.as_deref().map(|f| expand_home(f, home));
+        a.password_file = e
+            .password_file
+            .as_deref()
+            .map(|f| expand_home(f, home))
+            .transpose()
+            .context("password_file in the config")?;
         a.password_command = e.password_command.clone();
         a.no_password = e.insecure_no_password;
     } else {
         a = a.password_from(env);
     }
-    a
+    Ok(a)
 }
 
 fn hosts_of(h: &Option<Hosts>) -> Vec<String> {
@@ -210,17 +216,14 @@ impl Config {
     }
 
     /// `restore_dir` with `~` expanded, if set. A `~` path without a home
-    /// folder to expand it with is an error that names it: not a folder
-    /// called `~` wherever restoric was started, and not silently no
-    /// folder either, with a hint to set `restore_dir` when it is set.
+    /// folder to expand it with is an error that names it: not silently
+    /// no folder, with a hint to set `restore_dir` when it is set.
     pub fn restore_dir(&self, home: Option<&Path>) -> Result<Option<PathBuf>> {
-        let Some(d) = self.restore_dir.as_ref() else {
-            return Ok(None);
-        };
-        if home.is_none() && in_home(d) {
-            bail!("restore_dir = {d:?} in the config needs HOME set to expand its ~");
-        }
-        Ok(Some(expand_home(d, home)))
+        self.restore_dir
+            .as_deref()
+            .map(|d| expand_home(d, home))
+            .transpose()
+            .context("restore_dir in the config")
     }
 
     /// The `[keys]` overrides.
@@ -387,7 +390,7 @@ selected = "#202830"
         // Without a home folder `~` names nothing: an error that says so,
         // rather than a folder called `~` wherever restoric was started,
         // or no folder and a hint to set restore_dir.
-        let err = c.restore_dir(None).unwrap_err().to_string();
+        let err = format!("{:#}", c.restore_dir(None).unwrap_err());
         assert!(err.contains("~/Got back") && err.contains("HOME"), "{err}");
         let keys = c.keymap().unwrap();
         assert_eq!(
@@ -469,17 +472,24 @@ tag = "photos"
         let none = Access::default();
 
         // The entry's repository and password beat the environment's.
-        let a = resolve_access(&none, &env, Some(&entry), home);
+        let a = resolve_access(&none, &env, Some(&entry), home).unwrap();
         assert_eq!(a.repo.as_deref(), Some("entry-repo"));
         assert_eq!(a.password, None);
         assert_eq!(a.password_file, Some(PathBuf::from("/home/me/pw")));
+        // A ~ password file without a home folder is an error, not a file
+        // called ~/pw wherever restoric was started.
+        let err = format!(
+            "{:#}",
+            resolve_access(&none, &env, Some(&entry), None).unwrap_err()
+        );
+        assert!(err.contains("~/pw") && err.contains("HOME"), "{err}");
 
         // An entry that doesn't say how to unlock it takes the environment's.
         let bare = RepoEntry {
             repository: "entry-repo".into(),
             ..RepoEntry::default()
         };
-        let a = resolve_access(&none, &env, Some(&bare), home);
+        let a = resolve_access(&none, &env, Some(&bare), home).unwrap();
         assert_eq!(a.repo.as_deref(), Some("entry-repo"));
         assert_eq!(a.password.as_deref().map(String::as_str), Some("env-pw"));
 
@@ -488,7 +498,7 @@ tag = "photos"
             password_command: Some("pass x".into()),
             ..Access::default()
         };
-        let a = resolve_access(&flags, &env, Some(&entry), home);
+        let a = resolve_access(&flags, &env, Some(&entry), home).unwrap();
         assert_eq!(a.repo.as_deref(), Some("entry-repo"));
         assert_eq!(a.password_command.as_deref(), Some("pass x"));
         assert_eq!(a.password_file, None);
@@ -502,13 +512,13 @@ tag = "photos"
             insecure_no_password: true,
             ..entry.clone()
         };
-        let a = resolve_access(&flags, &env, Some(&no_pw), home);
+        let a = resolve_access(&flags, &env, Some(&no_pw), home).unwrap();
         assert_eq!(a.repo.as_deref(), Some("flag-repo"));
         assert!(!a.no_password);
         assert_eq!(a.password.as_deref().map(String::as_str), Some("env-pw"));
 
         // No entry: the environment.
-        let a = resolve_access(&none, &env, None, home);
+        let a = resolve_access(&none, &env, None, home).unwrap();
         assert_eq!(a, env);
     }
 }
