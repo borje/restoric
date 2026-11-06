@@ -7,11 +7,16 @@
 # It drives `restoric demo`, which runs against the sample project in
 # tests/fixtures/project.dsl, so the result depends only on the installed
 # binary, not on any repository or clock.
+#
+# The icons need both fonts installed where vhs runs: JetBrains Mono and
+# Symbols Nerd Font Mono (NerdFontsSymbolsOnly from the nerd-fonts releases).
+# Without them vhs draws boxes and says nothing.
 
 Output docs/demo.gif
 
 Set Shell bash
 Set FontSize 14
+Set FontFamily "JetBrains Mono, Symbols Nerd Font Mono"
 Set Width 1040
 Set Height 580
 Set Padding 12
@@ -20,7 +25,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
 Env TZ UTC
 
-Type "restoric demo --no-icons" Sleep 400ms Enter
+Type "restoric demo" Sleep 400ms Enter
 Sleep 2.5s
 
 # Move to main.go and step through the snapshots where it changed.
