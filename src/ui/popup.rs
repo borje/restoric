@@ -261,20 +261,31 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
     let Some(d) = &app.dialog else { return };
     let t = g.theme.clone();
     let (cols, rows) = (g.cols(), g.rows());
-    let w = 78.min(cols.saturating_sub(2));
+    let tg = &d.target;
+    let from = format!("from {}", tg.path.display());
+    let options = app.dialog_options(d);
+    // Wide enough for every path, up to the screen: the paths are what
+    // the user checks before restoring.
+    let need = options
+        .iter()
+        .map(|(_, detail)| 43 + fmt::width(detail))
+        .chain([6 + fmt::width(&from)])
+        .max()
+        .unwrap_or(0) as u16;
+    let w = need.max(78).min(cols.saturating_sub(2));
     let plan = match d.confirm {
         true => fmt::wrap(&plan_text(app), w.saturating_sub(6) as usize),
         false => Vec::new(),
     };
+    let n = options.len() as u16;
     let h = if d.confirm {
-        14 + plan.len().max(1) as u16
+        n + 10 + plan.len().max(1) as u16
     } else {
-        14
+        n + 8
     };
     let x = (cols - w) / 2;
     let y = ((rows.saturating_sub(h)) / 2).saturating_sub(1);
     g.rbox(x, y, w, h, "Restore", t.bold);
-    let tg = &d.target;
     let mut name = tg.name();
     if tg.node.is_dir() {
         name.push('/');
@@ -290,9 +301,8 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
         t.text,
     );
     g.put(c, y + 2, &tg.snapshot.id.0.short(), t.accent);
-    let from = format!("from {}", tg.path.display());
-    g.put(x + 3, y + 3, &fmt::fit(&from, (w - 6) as usize), t.dim);
-    for (k, (label, detail)) in app.dialog_options(d).iter().enumerate() {
+    g.put(x + 3, y + 3, &fmt::fit_middle(&from, (w - 6) as usize), t.dim);
+    for (k, (label, detail)) in options.iter().enumerate() {
         let r = y + 5 + k as u16;
         let on = d.sel == k;
         g.put(x + 3, r, &format!("{} ", k + 1), t.dim);
@@ -304,14 +314,14 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
             if on { t.accent.patch(t.bold) } else { t.dim },
         );
         g.put_to(x + 9, r, label, if on { t.bold } else { t.text }, x + 39);
-        g.put(x + 40, r, &fmt::fit(detail, (w - 43) as usize), t.dim);
+        g.put(x + 40, r, &fmt::fit_middle(detail, (w - 43) as usize), t.dim);
         g.hit(x + 1, x + w - 1, r, Action::DialogOption(k));
     }
     if d.confirm {
         let msg = "This replaces what is on disk now. Press ⏎ again to confirm.";
-        g.put_to(x + 3, y + 10, msg, t.warn, x + w - 1);
+        g.put_to(x + 3, y + 6 + n, msg, t.warn, x + w - 1);
         for (k, l) in plan.iter().enumerate() {
-            g.put_to(x + 3, y + 11 + k as u16, l, t.text, x + w - 1);
+            g.put_to(x + 3, y + 7 + n + k as u16, l, t.text, x + w - 1);
         }
     }
     let by = y + h - 2;
@@ -323,7 +333,7 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
         Action::DialogRestore,
     );
     g.put_act(x + 17, by, "[ Cancel ]", t.dim, Action::DialogCancel);
-    g.put(x + w - 29, by, "j k choose  ⏎ restore  esc", t.dim);
+    g.put(x + w - 36, by, "j k choose  ⏎ restore  esc cancel", t.dim);
 }
 
 /// A y/n popup: before overwriting, and before stopping a restore.

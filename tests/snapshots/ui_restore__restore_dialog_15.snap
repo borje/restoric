@@ -1,5 +1,6 @@
 ---
 source: tests/ui_restore.rs
+assertion_line: 44
 expression: "h.screen(100, 34)"
 ---
  restoric  main.go  Aug 17 16:04  →  on disk                                                  +4 −0
@@ -11,20 +12,20 @@ expression: "h.screen(100, 34)"
          9  + // signals
         10  + // serve
         11  + // shutdown
-        12 ╭─ Restore ──────────────────────────────────────────────────────────────────╮
-           │                                                                            │
-           │  main.go  @ Aug 17 16:04  4ad09572                                         │
-           │  from /home/bege/dev/project/src/main.go                                   │
-           │                                                                            │
-           │  1 ( ) Overwrite original             ~/dev/project/src/main.go            │
-           │  2 (•) Restore next to it             → main.go.2026-08-17_1604            │
-           │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-17_1604/main.…  │
-           │                                                                            │
-           │                                                                            │
-           │                                                                            │
-           │                                                                            │
-           │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
-           ╰────────────────────────────────────────────────────────────────────────────╯
+        12  + // unsaved edit
+          ╭─ Restore ───────────────────────────────────────────────────────────────────╮
+          │                                                                             │
+          │  main.go  @ Aug 17 16:04  4ad09572                                          │
+          │  from /home/bege/dev/project/src/main.go                                    │
+          │                                                                             │
+          │  1 ( ) Overwrite original             ~/dev/project/src/main.go             │
+          │  2 (•) Restore next to it             → main.go.2026-08-17_1604             │
+          │  3 ( ) Restore to ~/Restored/         → ~/Restored/2026-08-17_1604/main.go  │
+          │                                                                             │
+          │  [ Restore ]   [ Cancel ]                j k choose  ⏎ restore  esc cancel  │
+          ╰─────────────────────────────────────────────────────────────────────────────╯
+
+
 
 
 

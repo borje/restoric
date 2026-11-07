@@ -1,5 +1,6 @@
 ---
 source: tests/ui_restore.rs
+assertion_line: 58
 expression: "h.screen(100, 34)"
 ---
  restoric  main.go  Aug 17 16:04  →  on disk                                                  +4 −0
@@ -11,7 +12,8 @@ expression: "h.screen(100, 34)"
          9  + // signals
         10  + // serve
         11  + // shutdown
-        12 ╭─ Restore ──────────────────────────────────────────────────────────────────╮
+        12  + // unsaved edit
+           ╭─ Restore ──────────────────────────────────────────────────────────────────╮
            │                                                                            │
            │  main.go  @ Aug 17 16:04  4ad09572                                         │
            │  from /home/bege/dev/project/src/main.go                                   │
@@ -20,11 +22,10 @@ expression: "h.screen(100, 34)"
            │  2 (•) Restore next to it             → main.go.2026-08-17_1604            │
            │  3 ( ) Restore to Restored/           set HOME, or restore_dir in config   │
            │                                                                            │
-           │                                                                            │
-           │                                                                            │
-           │                                                                            │
-           │  [ Restore ]   [ Cancel ]                      j k choose  ⏎ restore  esc  │
+           │  [ Restore ]   [ Cancel ]               j k choose  ⏎ restore  esc cancel  │
            ╰────────────────────────────────────────────────────────────────────────────╯
+
+
 
 
 
