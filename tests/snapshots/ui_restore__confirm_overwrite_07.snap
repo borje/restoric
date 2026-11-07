@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 35
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
@@ -18,11 +17,11 @@ expression: "h.screen(100, 34)"
    ┄ 2 unchanged ┄    │  Replace 2 items on disk with the version from Sep   │
  Sep 02 20:16 ~1      │  09 19:23? The current version is kept for :undo.    │
    ┄ 2 unchanged ┄    │                                                      │
- Aug 22 11:59 ~2−1    │  On disk: 2 changed. Writes 2 files, 197 B.          │
-   ┄ 1 unchanged ┄    │                                                      │
- Aug 17 16:04 +1~1    │  [y] Overwrite   [n] Cancel                          │
-   ┄ 1 unchanged ┄    ╰──────────────────────────────────────────────────────╯
- Aug 10 15:44 ~1      │                                        │
+ Aug 22 11:59 ~2−1    │  ~ 2 replaced                                        │
+   ┄ 1 unchanged ┄    │  Writes 2 files, 197 B.                              │
+ Aug 17 16:04 +1~1    │                                                      │
+   ┄ 1 unchanged ┄    │  [y] Overwrite   [n] Cancel                          │
+ Aug 10 15:44 ~1      ╰──────────────────────────────────────────────────────╯
  Aug 07 08:15 +1      │                                        │
  Aug 03 16:19 +1~1    │                                        │
    ┄ 1 unchanged ┄    │                                        │

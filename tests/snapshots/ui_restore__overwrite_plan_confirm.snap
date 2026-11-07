@@ -1,20 +1,19 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 380
 expression: "h.screen(100, 16)"
 ---
- restoric  ~/data
- on disk  +1~1−1      ╭─ Overwrite? ─────────────────────────────────────────╮
-▶Jul 01 10:00 +3      │                                                      │
-                      │  Replace photos/ on disk with the version from Jul   │                    +
+ restoric  ~/data     ╭─ Overwrite? ─────────────────────────────────────────╮
+ on disk  +1~1−1      │                                                      │
+▶Jul 01 10:00 +3      │  Replace photos/ on disk with the version from Jul   │
                       │  01 10:00? The current version is kept for :undo.    │                    +
                       │                                                      │                    +
-                      │  On disk: 1 changed, 1 missing come back, 1 not in   │
-                      │  that version go to :undo. Writes 3 files, 12 B.     │
+                      │  ~ 1 replaced                                        │                    +
+                      │  + 1 brought back                                    │
+                      │  − 1 moved to :undo  (not in that version)           │
+                      │  Writes 3 files, 12 B.                               │
                       │                                                      │
                       │  [y] Overwrite   [n] Cancel                          │
                       ╰──────────────────────────────────────────────────────╯
-                      │                                        │
                       │                                        │
                       │                                        │
                       │                                        │

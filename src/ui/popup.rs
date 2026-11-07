@@ -1,6 +1,8 @@
 //! Popups: which-key, messages, help, snapshot details.
 
-use super::{Grid, TOP, fmt};
+use ratatui::style::Style;
+
+use super::{Grid, TOP, Theme, fmt};
 use crate::app::selection::Confirm;
 use crate::app::{Action, App, View};
 use crate::repo::SnapshotInfo;
@@ -249,11 +251,41 @@ pub fn info(app: &App, g: &mut Grid) {
     g.put_to(x + 3, y + h - 2, hint, t.dim, end);
 }
 
-/// What the overwrite being confirmed would change, or that it's being
-/// worked out.
-fn plan_text(app: &App) -> String {
-    app.plan()
-        .map_or("Checking what differs on disk…".into(), |p| p.describe())
+/// What the overwrite being confirmed would change, one coloured line
+/// per outcome, or that it's being worked out.
+fn plan_lines(app: &App, t: &Theme) -> Vec<Vec<(String, Style)>> {
+    let Some(p) = app.plan() else {
+        return vec![vec![("Checking what differs on disk…".into(), t.dim)]];
+    };
+    let c = p.differs;
+    let mut lines: Vec<Vec<(String, Style)>> = [
+        (c.changed, "~", "replaced", t.changed, ""),
+        (c.deleted, "+", "brought back", t.added, ""),
+        (c.added, "−", "moved to :undo", t.deleted, "  (not in that version)"),
+    ]
+    .into_iter()
+    .filter(|(n, ..)| *n > 0)
+    .map(|(n, sign, verb, style, note)| {
+        vec![(format!("{sign} {n} {verb}"), style), (note.to_string(), t.dim)]
+    })
+    .collect();
+    if lines.is_empty() {
+        lines.push(vec![("Nothing on disk differs, by size and time.".into(), t.dim)]);
+    }
+    let s = if p.files == 1 { "" } else { "s" };
+    lines.push(vec![(
+        format!("Writes {} file{s}, {}.", p.files, fmt::size(p.bytes)),
+        t.text,
+    )]);
+    lines
+}
+
+/// Writes styled parts from (x, y), stopping before `end`.
+fn put_line(g: &mut Grid, x: u16, y: u16, parts: &[(String, Style)], end: u16) {
+    let mut c = x;
+    for (s, style) in parts {
+        c = g.put_to(c, y, s, *style, end);
+    }
 }
 
 /// The restore dialog.
@@ -274,7 +306,7 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
         .unwrap_or(0) as u16;
     let w = need.max(78).min(cols.saturating_sub(2));
     let plan = match d.confirm {
-        true => fmt::wrap(&plan_text(app), w.saturating_sub(6) as usize),
+        true => plan_lines(app, &t),
         false => Vec::new(),
     };
     let n = options.len() as u16;
@@ -321,7 +353,7 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
         let msg = "This replaces what is on disk now. Press ⏎ again to confirm.";
         g.put_to(x + 3, y + 6 + n, msg, t.warn, x + w - 1);
         for (k, l) in plan.iter().enumerate() {
-            g.put_to(x + 3, y + 7 + n + k as u16, l, t.text, x + w - 1);
+            put_line(g, x + 3, y + 7 + n + k as u16, l, x + w - 1);
         }
     }
     let by = y + h - 2;
@@ -364,10 +396,13 @@ pub fn confirm(app: &App, g: &mut Grid) {
             "[n] Keep going",
         ),
     };
-    let mut lines = fmt::wrap(&text, 50);
+    let mut lines: Vec<Vec<(String, Style)>> = fmt::wrap(&text, 50)
+        .into_iter()
+        .map(|l| vec![(l, t.text)])
+        .collect();
     if matches!(c, Confirm::Overwrite { .. }) {
-        lines.push(String::new());
-        lines.extend(fmt::wrap(&plan_text(app), 50));
+        lines.push(Vec::new());
+        lines.extend(plan_lines(app, &t));
     }
     let w = 56.min(g.cols());
     let h = lines.len() as u16 + 5;
@@ -375,7 +410,7 @@ pub fn confirm(app: &App, g: &mut Grid) {
     let y = ((g.rows().saturating_sub(h)) / 2).saturating_sub(2);
     g.rbox(x, y, w, h, title, t.warn);
     for (k, l) in lines.iter().enumerate() {
-        g.put(x + 3, y + 2 + k as u16, l, t.text);
+        put_line(g, x + 3, y + 2 + k as u16, l, x + w - 1);
     }
     let by = y + h - 2;
     let nx = g.put_act(x + 3, by, yes, t.warn, Action::ConfirmYes) + 3;

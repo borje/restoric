@@ -42,32 +42,6 @@ pub struct Plan {
     pub bytes: u64,
 }
 
-impl Plan {
-    /// `On disk: 3 changed, 2 missing come back, 1 not in that version
-    /// goes to :undo. Writes 4812 files, 1.2G.`
-    pub fn describe(&self) -> String {
-        let c = self.differs;
-        let mut parts = Vec::new();
-        if c.changed > 0 {
-            parts.push(format!("{} changed", c.changed));
-        }
-        if c.deleted > 0 {
-            parts.push(format!("{} missing come back", c.deleted));
-        }
-        if c.added > 0 {
-            parts.push(format!("{} not in that version go to :undo", c.added));
-        }
-        let differs = if parts.is_empty() {
-            "Nothing on disk differs from it, by size and time.".to_string()
-        } else {
-            format!("On disk: {}.", parts.join(", "))
-        };
-        let s = if self.files == 1 { "" } else { "s" };
-        let size = crate::ui::fmt::size(self.bytes);
-        format!("{differs} Writes {} file{s}, {size}.", self.files)
-    }
-}
-
 impl Target {
     pub fn name(&self) -> String {
         self.path
