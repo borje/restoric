@@ -61,7 +61,12 @@ pub fn message(app: &App, g: &mut Grid) {
     let w = 50.min(g.cols().saturating_sub(4));
     let lines = fmt::wrap(text, w.saturating_sub(4) as usize);
     let h = lines.len() as u16 + 2;
-    let (x, y) = (g.cols().saturating_sub(w + 1), TOP);
+    // Bottom right, above the status bar: usually empty, and clear of the
+    // preview header that says which version is shown.
+    let (x, y) = (
+        g.cols().saturating_sub(w + 1),
+        g.rows().saturating_sub(h + 1).max(TOP),
+    );
     g.rbox(x, y, w, h, "", t.bold);
     for (k, l) in lines.iter().enumerate() {
         g.put(x + 2, y + 1 + k as u16, l, t.text);
