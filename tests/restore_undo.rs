@@ -123,10 +123,10 @@ fn the_undo_copy_is_kept_under_the_step() {
 
 /// Puts a folder's permissions back when dropped, so that a failed
 /// assertion doesn't leave a tree the temporary folder can't remove.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 struct Unlock(PathBuf);
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 impl Drop for Unlock {
     fn drop(&mut self) {
         use std::os::unix::fs::PermissionsExt;
