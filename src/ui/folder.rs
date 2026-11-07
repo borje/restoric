@@ -5,9 +5,10 @@ use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 
 use super::{Grid, TOP, fmt, icons, panes, preview};
-use crate::app::{Action, App, Row};
+use crate::app::{Action, App, Row, Track};
 use crate::index::folder::Counts;
 use crate::index::listing::Delta;
+use crate::index::timeline::ChangeKind;
 
 /// Writes `+1~3−1` (parts joined by `gap`) at (x, y), stopping before `end`.
 pub fn put_counts(g: &mut Grid, x: u16, y: u16, c: &Counts, gap: &str, end: u16) -> u16 {
@@ -49,6 +50,23 @@ enum VRow {
     Fold { from: usize, to: usize },
 }
 
+/// The Versions column's rows, newest first, made as they're read so a
+/// draw builds only the ones on screen.
+fn vrows(s: &Track) -> impl Iterator<Item = VRow> + '_ {
+    let versions = s.points.iter().enumerate().rev();
+    let versions = versions.filter(|(_, p)| p.kind != ChangeKind::Deleted);
+    std::iter::once(VRow::Now).chain(versions.flat_map(move |(k, p)| {
+        let v = p.index;
+        // Up to the next change point of any kind.
+        let next = s.points.get(k + 1).map_or(s.set.len(), |p| p.index);
+        let fold = (next > v + 1).then_some(VRow::Fold {
+            from: v + 1,
+            to: next - 1,
+        });
+        fold.into_iter().chain(std::iter::once(VRow::Version(v)))
+    }))
+}
+
 pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let p = panes(g.cols());
@@ -67,22 +85,6 @@ pub fn draw(app: &App, g: &mut Grid) {
         ));
         match app.state() {
             Some(s) if s.loaded() => {
-                let mut rows = vec![VRow::Now];
-                for &v in s.versions().iter().rev() {
-                    let next = s
-                        .points
-                        .iter()
-                        .map(|p| p.index)
-                        .find(|&x| x > v)
-                        .unwrap_or(s.set.len());
-                    if next > v + 1 {
-                        rows.push(VRow::Fold {
-                            from: v + 1,
-                            to: next - 1,
-                        });
-                    }
-                    rows.push(VRow::Version(v));
-                }
                 let on = |r: &VRow| match r {
                     VRow::Now => app.on_disk(),
                     VRow::Version(v) => *v == i,
@@ -92,11 +94,14 @@ pub fn draw(app: &App, g: &mut Grid) {
                     let n = &s.set[v];
                     !n.label.is_empty() || n.description.is_some()
                 };
-                let sr = rows.iter().position(on).unwrap_or(0);
+                // ponytail: finding the selected row still walks every version
+                // (no allocation); cache row positions in Track if that shows.
+                let sr = vrows(s).position(|r| on(&r)).unwrap_or(0);
                 let off = sr
                     .saturating_sub(height / 2)
-                    .min(rows.len().saturating_sub(height));
-                for (k, row) in rows.iter().skip(off).take(height).enumerate() {
+                    .min(vrows(s).count().saturating_sub(height));
+                for (k, row) in vrows(s).skip(off).take(height).enumerate() {
+                    let row = &row;
                     let y = TOP + k as u16;
                     let here = on(row);
                     match row {
