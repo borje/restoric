@@ -4,7 +4,7 @@ expression: "h.screen(100, 20)"
 ---
  restoric  dev-vm:~/dev/trading
  on disk  = latest    │ ○ orders.csv                    7 B    │ trading.log · v2/2      ⇥ content
-▶Oct 08 09:03 ~1      │ ≡ trading.log                  15 B  ~ │ changed here · + new line · − remo…
+▶Oct 08 09:03 ~1      │ ≡ trading.log                  15 B  ~ │ changed here
  Oct 06 08:04 +2      │                                        │
                       │                                        │   1  started
                       │                                        │   2+ bought

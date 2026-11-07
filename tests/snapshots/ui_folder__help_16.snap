@@ -1,19 +1,18 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 73
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 │
-▶Sep 27 08:52╭─ Help ─────────────────────────────────────────────────────────────────╮
-   ┄ 2 unchan│                                                                        │
- Sep 20 20:35│  Folder view                                                           │
-   ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
- Sep 13 20:51│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
-   ┄ 1 unchan│  H L                    older / newer change in this folder, then disk │
- Sep 09 19:23│  [ ]   { }              every snapshot / changes of the selected item  │
-   ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+   ┄ 2 unchan╭─ Help ─────────────────────────────────────────────────────────────────╮
+▶Sep 27 08:52│                                                                        │
+   ┄ 2 unchan│  Folder view                                                           │
+ Sep 20 20:35│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
+   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+ Sep 13 20:51│  H L                    older / newer change in this folder, then disk │
+   ┄ 1 unchan│  [ ]   { }              every snapshot / changes of the selected item  │
+ Sep 09 19:23│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+   ┄ 1 unchan│  +  −                   preview margin: new line / lines removed above │
  Sep 06 18:03│  on disk                files now vs the last backup, by size or time  │
    ┄ 2 unchan│  ␣  v                   select / visual select                         │
  Sep 02 20:16│  y  p  P                yank, restore next to it, overwrite            │

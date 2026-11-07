@@ -75,6 +75,7 @@ const HELP: &[(&str, &str)] = &[
     ("H L", "older / newer change in this folder, then disk"),
     ("[ ]   { }", "every snapshot / changes of the selected item"),
     ("⇥  J K", "preview: content or diff vs disk, scroll"),
+    ("+  −", "preview margin: new line / lines removed above"),
     ("on disk", "files now vs the last backup, by size or time"),
     ("␣  v", "select / visual select"),
     ("y  p  P", "yank, restore next to it, overwrite"),

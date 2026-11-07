@@ -381,7 +381,7 @@ pub fn folder_view(app: &App, g: &mut Grid, x0: u16, x1: u16, y0: u16, y1: u16) 
                 let here = Some(r.from) == sp;
                 let has_prev = tr.runs[..k].iter().any(|r| r.exists);
                 let sub = if here && has_prev {
-                    "changed here · + new line · − removed".to_string()
+                    "changed here".to_string()
                 } else if here {
                     "new in this snapshot".to_string()
                 } else {

@@ -4,7 +4,7 @@ expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ main.go · v7/7 · 108 B  ⇥ vs disk
-   ┄ 2 unchanged ┄    │ ▸ api/                                 │ changed here · + new line · − remo…
+   ┄ 2 unchanged ┄    │ ▸ api/                                 │ changed here
  Sep 27 08:52 ~1      │ ▸ models/                              │
    ┄ 2 unchanged ┄    │ ◇ config.go                    89 B    │ ┄ line 9
  Sep 20 20:35 ~1      │ ◇ main.go                     108 B  ~ │   // signals
