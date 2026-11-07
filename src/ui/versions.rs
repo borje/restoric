@@ -2,8 +2,7 @@
 //! file, newest first, with deleted periods as their own rows.
 
 use super::preview::{Source, content, head};
-use super::timeline::{self, Axis, TrackRow};
-use super::{Grid, fmt};
+use super::{Grid, TOP, fmt};
 use crate::app::{Action, App, VersionsView};
 use crate::diff;
 use crate::index::fingerprint;
@@ -40,42 +39,15 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let Some(track) = app.tracks.get(&v.path).filter(|t| t.loaded()) else {
-        g.put(1, 5, "indexing…", t.dim);
+        g.put(1, TOP, "indexing…", t.dim);
         return;
     };
     let runs: Vec<_> = track.runs.iter().rev().copied().collect();
     // On disk, a file that was never backed up has no runs.
     let sel = runs.get(v.sel).copied();
-    let centre = sel.map_or(track.set.len().saturating_sub(1), |s| s.from);
-
-    // Timeline: the file's changes.
-    if let Some(axis) = Axis::new(&track.set, centre, app.zoom, cols) {
-        let (change, exists) = timeline::track_row(&track.set, Some(track));
-        let row = TrackRow {
-            change,
-            exists,
-            on: "●",
-            style: t.text,
-            live: app.live.get(&v.path).map(|c| !c.is_empty()),
-            label: name.clone(),
-            label_style: t.bold,
-            outer: None,
-        };
-        timeline::draw(
-            g,
-            &axis,
-            app.zoom,
-            if v.disk { None } else { sel.map(|s| s.from) },
-            app.base
-                .and_then(|b| track.set.iter().position(|s| s.id == b)),
-            &row,
-            &app.tz,
-            &Action::GoSnapshot,
-        );
-    }
 
     // The table.
-    let top = 5;
+    let top = TOP;
     let (l1, preview) = if cols >= 100 {
         (47, true)
     } else if cols >= 80 {

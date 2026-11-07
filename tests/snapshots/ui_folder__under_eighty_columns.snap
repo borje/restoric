@@ -1,12 +1,9 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 52
 expression: "h.screen(70, 24)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026                  Sep                  on disk
-  ●· · ● ○○· ● ○ ○· ● ·○ ··  ●·●·●·○· ·○··○· ·  ┊ ● main.go  ○ src/
-                               ▲                             − 1× +
-
    ..
  ▸ api/                                                            ~1
  ▸ models/
@@ -15,6 +12,10 @@ expression: "h.screen(70, 24)"
  ◇ main.go                                                   96 B  ~
  ◇ server.go                                                 30 B  +
  ◇ util.go                                                   94 B
+
+
+
+
 
 
 

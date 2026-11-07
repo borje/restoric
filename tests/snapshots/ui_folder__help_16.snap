@@ -1,38 +1,39 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 73
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ api/  ○ src/
-             ╭─ Help ─────────────────────────────────────────────────────────────────╮    − 1× +
-             │                                                                        │
- on disk  ~1 │  Folder view                                                           │
+ on disk  ~1          │   ..                                   │ api/
+   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+▶Sep 27 08:52╭─ Help ─────────────────────────────────────────────────────────────────╮
+   ┄ 2 unchan│                                                                        │
+ Sep 20 20:35│  Folder view                                                           │
    ┄ 2 unchan│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
-▶Sep 27 08:52│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
-   ┄ 2 unchan│  H L                    older / newer change in this folder, then disk │
- Sep 20 20:35│  [ ]   { }              every snapshot / changes of the selected item  │
-   ┄ 2 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
- Sep 13 20:51│  on disk                files now vs the last backup, by size or time  │
-   ┄ 1 unchan│  ␣  v                   select / visual select                         │
- Sep 09 19:23│  y  p  P                yank, restore next to it, overwrite            │
-   ┄ 1 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
- Sep 06 18:03│  i  S  b                snapshot details / folder sizes / pin as base  │
-   ┄ 2 unchan│  cc cd cf               copy snapshot:path, folder, name               │
- Sep 02 20:16│  / n N   f              search / next, previous / filter               │
-   ┄ 2 unchan│  .  zd   zi zo          show deleted items / zoom timeline             │
- Aug 22 11:59│  zn  zc                 hide not backed up (on disk) / unchanged       │
-   ┄ 1 unchan│  gh   3H 5j             backup root / counts with motions              │
- Aug 17 16:04│                                                                        │
+ Sep 13 20:51│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+   ┄ 1 unchan│  H L                    older / newer change in this folder, then disk │
+ Sep 09 19:23│  [ ]   { }              every snapshot / changes of the selected item  │
+   ┄ 1 unchan│  ⇥  J K                 preview: content or diff vs disk, scroll       │
+ Sep 06 18:03│  on disk                files now vs the last backup, by size or time  │
+   ┄ 2 unchan│  ␣  v                   select / visual select                         │
+ Sep 02 20:16│  y  p  P                yank, restore next to it, overwrite            │
+   ┄ 2 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
+ Aug 22 11:59│  i  S  b                snapshot details / folder sizes / pin as base  │
+   ┄ 1 unchan│  cc cd cf               copy snapshot:path, folder, name               │
+ Aug 17 16:04│  / n N   f              search / next, previous / filter               │
+   ┄ 1 unchan│  .  zd                  show deleted items                             │
+ Aug 10 15:44│  zn  zc                 hide not backed up (on disk) / unchanged       │
+ Aug 07 08:15│  gh   3H 5j             backup root / counts with motions              │
+ Aug 03 16:19│                                                                        │
    ┄ 1 unchan│  Commands                                                              │
- Aug 10 15:44│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
- Aug 07 08:15│  :find NAME   s         search every snapshot for a name               │
- Aug 03 16:19│  :latest :oldest :undo                                                 │
-   ┄ 1 unchan│  :set strict / bytes    count every change / only content              │
- Jul 28 15:59│                                                                        │
- Jul 26 11:57│  Diff  ]c [c or n N changes · c vs disk · p vs previous · b vs base    │
- Jul 24 12:16│  Press any key to close                                                │
-   ┄ 2 unchan╰────────────────────────────────────────────────────────────────────────╯
- Jul 14 09:00 +7      │                                        │
+ Jul 28 15:59│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
+ Jul 26 11:57│  :find NAME   s         search every snapshot for a name               │
+ Jul 24 12:16│  :latest :oldest :undo                                                 │
+   ┄ 2 unchan│  :set strict / bytes    count every change / only content              │
+ Jul 14 09:00│                                                                        │
+             │  Diff  ]c [c or n N changes · c vs disk · p vs previous · b vs base    │
+             │  Press any key to close                                                │
+             ╰────────────────────────────────────────────────────────────────────────╯
+                      │                                        │
                       │   2 deleted · . to show                │
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help

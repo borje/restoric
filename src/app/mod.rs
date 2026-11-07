@@ -253,8 +253,6 @@ pub enum Action {
     Find,
     NextMatch,
     PrevMatch,
-    ZoomIn,
-    ZoomOut,
     /// A click on a find result: select it, or go there if selected.
     ClickFound(usize),
     /// A click on a restore dialog option: select it, or restore if selected.
@@ -294,8 +292,6 @@ impl Action {
                 | Action::PrevHunk
                 | Action::NextMatch
                 | Action::PrevMatch
-                | Action::ZoomIn
-                | Action::ZoomOut
         )
     }
 }
@@ -438,7 +434,6 @@ pub struct App {
     /// `i`: the details popup, of whichever snapshot is on screen.
     pub info: bool,
     pub message: Option<String>,
-    pub zoom: u32,
     /// Set once the user moves in time, so the start-up jump doesn't override it.
     moved: bool,
     pub quit: bool,
@@ -561,7 +556,6 @@ impl App {
             help: false,
             info: false,
             message: None,
-            zoom: 1,
             moved: false,
             quit: false,
             outbox: Vec::new(),
@@ -1850,7 +1844,6 @@ impl App {
                 self.start_input(InputKind::Command, "find ");
                 return true;
             }
-            Action::ZoomIn | Action::ZoomOut => return self.zoom_by(a == Action::ZoomIn),
             Action::DialogOption(k) => {
                 if let Some(d) = &mut self.dialog {
                     if d.sel == k {
@@ -2205,8 +2198,6 @@ impl App {
             | Action::ConfirmYes
             | Action::ConfirmNo
             | Action::Find
-            | Action::ZoomIn
-            | Action::ZoomOut
             | Action::Leave => unreachable!("handled above"),
             Action::TogglePreview => self.toggle_preview(),
             Action::Scroll(n) => self.scroll_by(n),
@@ -2332,7 +2323,7 @@ impl App {
                 }
             }
             Action::GoSnapshot(j) => {
-                // A click on the timeline selects the version holding it.
+                // Going to a snapshot selects the version holding it.
                 if let Some(t) = self.tracks.get(&v.path)
                     && let Some((k, _)) = run_at(&t.runs, j)
                 {
@@ -2595,45 +2586,6 @@ impl App {
             }
             .into(),
         );
-    }
-
-    /// The zoom levels: 1×, 2×, 4×, … until no two snapshots share a column.
-    fn max_zoom(&self) -> u32 {
-        let set = self.set();
-        let secs: Vec<i64> = set.iter().map(|s| s.time.as_second()).collect();
-        let span = secs.last().zip(secs.first()).map_or(0, |(b, a)| b - a);
-        let gap = secs
-            .windows(2)
-            .map(|w| w[1] - w[0])
-            .filter(|&g| g > 0)
-            .min();
-        let width = 74i64;
-        let need = match gap {
-            Some(g) if span > 0 => (span / (g * width)).max(1),
-            _ => 1,
-        };
-        (need as u32).next_power_of_two().clamp(8, 4096)
-    }
-
-    fn zoom_by(&mut self, zoom_in: bool) -> bool {
-        let next = if zoom_in {
-            self.zoom * 2
-        } else {
-            self.zoom / 2
-        };
-        if next < 1 || next > self.max_zoom() {
-            self.message = Some(
-                if zoom_in {
-                    "Fully zoomed in."
-                } else {
-                    "Fully zoomed out."
-                }
-                .into(),
-            );
-            return false;
-        }
-        self.zoom = next;
-        true
     }
 
     /// `:find NAME`: search every snapshot from the backup root.

@@ -1,16 +1,17 @@
 ---
 source: tests/ui_nav.rs
+assertion_line: 65
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ○ ● ○  · ○   ○  ○·    ○ ·  ● ·  ·    ○· ·●·○ · ○ ·  ·●  · ·● ·  ·  ┊ ○ config.go  ○ src/
-                                                                      ▲                    − 1× +
-
  on disk  ~1          │   ..                                   │ config.go · v5/5        ⇥ content
    ┄ 2 unchanged ┄    │ ◇ config.go                       96 B │ unchanged since Sep 20 20:35
 ▶Sep 27 08:52 ~1      │                                        │
+   ┄ 2 unchanged ┄    │                                        │   3  type Config struct {
+ Sep 20 20:35 ~1      │                                        │   4    Port int
    ┄ 2 unchanged ┄    │                                        │   5  }
- Sep 20 20:35 ~1      │                                        │   6  // defaults
-   ┄ 2 unchanged ┄    │                                        │   7  // timeouts
+ Sep 13 20:51 ~2      │                                        │   6  // defaults
+   ┄ 1 unchanged ┄    │                                        │   7  // timeouts
+ Sep 09 19:23 ~1      │                                        │   8  // listen address
+   ┄ 1 unchanged ┄    │                                        │   9+ // tls
  NOR  Sep 27 08:52  c177b849  src/ ~1  filter "co"                        Sep 20 20:35  1/1  ? help

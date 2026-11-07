@@ -21,8 +21,6 @@ pub struct Theme {
     pub strike: Modifier,
     /// Background of the selected row.
     pub selected: Style,
-    /// The selected snapshot's cell on the timeline.
-    pub marker: Style,
     pub status_bar: Style,
     pub badge: Style,
     /// The DIFF, SEL and VIS badges.
@@ -54,7 +52,6 @@ impl Theme {
                 code: plain,
                 strike: Modifier::CROSSED_OUT,
                 selected: plain.add_modifier(Modifier::REVERSED),
-                marker: plain.add_modifier(Modifier::REVERSED),
                 status_bar: plain,
                 badge: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
                 badge_blue: plain.add_modifier(Modifier::REVERSED | Modifier::BOLD),
@@ -80,7 +77,6 @@ impl Theme {
             code: fg(Color::Cyan),
             strike: Modifier::CROSSED_OUT,
             selected: Style::default().bg(Color::DarkGray),
-            marker: fg(Color::Yellow).add_modifier(Modifier::BOLD),
             status_bar: Style::default(),
             badge: Style::default()
                 .bg(Color::Yellow)

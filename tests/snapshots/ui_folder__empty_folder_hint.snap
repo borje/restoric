@@ -1,14 +1,15 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 509
 expression: "h.screen(100, 14)"
 ---
  restoric  /r/void
-  Jul 2026                                                                     on disk
-  ●                                                                           ┊ · void/
-  ▲                                                                                        − 1× +
-
  on disk  = latest    │   ..                                   │ Parent folder
 ▶Jul 14 09:00 +1      │   empty                                │ /r/
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
                       │                                        │
                       │                                        │
                       │                                        │

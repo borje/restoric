@@ -6,13 +6,13 @@ pub mod diffview;
 pub mod findview;
 pub mod fmt;
 pub mod folder;
+pub mod header;
 pub mod icons;
 pub mod picker;
 pub mod popup;
 pub mod preview;
 pub mod statusbar;
 pub mod theme;
-pub mod timeline;
 pub mod versions;
 
 use ratatui::buffer::Buffer;
@@ -152,7 +152,7 @@ pub fn panes(cols: u16) -> Panes {
 }
 
 /// First row of the panes.
-pub const TOP: u16 = 5;
+pub const TOP: u16 = 1;
 
 /// Draws the whole screen and returns where things can be clicked.
 pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits {
@@ -169,12 +169,11 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
     app.page = (g.rows() - TOP - 1) as usize;
     match app.view.clone() {
         View::Folder => {
-            timeline::header(app, &mut g);
-            timeline::draw_folder(app, &mut g);
+            header::draw(app, &mut g);
             folder::draw(app, &mut g);
         }
         View::Versions(v) => {
-            timeline::header(app, &mut g);
+            header::draw(app, &mut g);
             versions::draw(app, &mut g, &v);
         }
         View::Diff(d) => diffview::draw(app, &mut g, &d),

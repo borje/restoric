@@ -309,7 +309,25 @@ fn snapshot_info() {
     assert_eq!(label(&h).as_deref(), Some(""));
 }
 
-/// A click on a timeline dot keeps the details open on that snapshot;
+const FOLDED_LABEL: &str = "
+host bege-laptop
+root /home/bege/data
+snapshot 2026-07-01 10:00
+  write a.txt one\\n
+  write b.txt two\\n
+snapshot 2026-07-02 10:00 label=checkpoint
+snapshot 2026-07-03 10:00
+  write a.txt one more\\n
+";
+
+/// A `▵` marks Versions-column rows, folds too, that hold a labelled snapshot.
+#[test]
+fn versions_column_markers() {
+    let mut h = Harness::with(FOLDED_LABEL, "/home/bege/data");
+    insta::assert_snapshot!(h.screen(100, 8));
+}
+
+/// A click on a Versions-column row keeps the details open on that snapshot;
 /// a click anywhere else closes them.
 #[test]
 fn snapshot_info_follows_clicks() {

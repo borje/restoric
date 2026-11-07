@@ -1,12 +1,9 @@
 ---
 source: tests/ui_restore.rs
+assertion_line: 28
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              on disk
-  ○        ○ ○ ○    ○   ○  ○     ○    ○         ○   ●·● · ○ ·  ·○  · ·● ·  ·  ┊ ○ server.go  ○ src/
-                                                      ▲                                    − 1× +
-
  on disk  ~1          │   ..                     ╭────────────────────────────────────────────────╮
    ┄ 2 unchanged ┄    │ ▸ api/                   │ Yanked 2 items from Sep 09 19:23. p restores   │
  Sep 27 08:52 ~1      │ ▸ models/                │ next to the original, P overwrites.            │
@@ -34,5 +31,9 @@ expression: "h.screen(100, 34)"
  Jul 24 12:16 ~1      │                                        │
    ┄ 2 unchanged ┄    │                                        │
  Jul 14 09:00 +7      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
                       │   2 deleted · . to show                │
  NOR  Sep 09 19:23  811fc3af  src/ ~1  2 yanked                           Sep 06 18:03  5/6  ? help

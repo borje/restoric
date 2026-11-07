@@ -1,16 +1,17 @@
 ---
 source: tests/ui_restore.rs
+assertion_line: 121
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ api/  ○ src/
-                                                                      ▲                    − 1× +
-
- on disk  ~1          │   ..                                   ┃ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 ┃
-▶Sep 27 08:52 ~1      │ ▸ models/                              ┃ ◇ handlers.go
-   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    ┃ ◇ middleware.go
- Sep 20 20:35 ~1      │ ◇ main.go                     108 B    ┃ ◇ routes.go
+ on disk  ~1          │   ..                                   │ api/
+   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+▶Sep 27 08:52 ~1      │ ▸ models/                              │ ◇ handlers.go
+   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │ ◇ middleware.go
+ Sep 20 20:35 ~1      │ ◇ main.go                     108 B    │ ◇ routes.go
    ┄ 2 unchanged ┄    │ ◇ server.go                    42 B  ~ │
+ Sep 13 20:51 ~2      │ ◇ util.go                     104 B    │
+   ┄ 1 unchanged ┄    │                                        │
+ Sep 09 19:23 ~1      │                                        │
+   ┄ 1 unchanged ┄    │   2 deleted · . to show                │
  :fo█                                        sep 1 · 2026-09-01 · yesterday · 3d · find NAME · undo

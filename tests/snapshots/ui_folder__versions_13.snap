@@ -1,12 +1,9 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 163
 expression: "h.screen(100, 34)"
 ---
  restoric  Versions  ~/dev/project/src/main.go                           7 versions in 32 snapshots
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ● · ·  · ●   ·  ··    ● ·  · ·  ·    ●· ·●·● · · ·  ··  · ·· ·  ·  ┊ ● main.go
-                                                      ▲                                    − 1× +
-
  VERSION         SIZE  SNAPSHOTS  VS DISK       │main.go · Sep 09 19:23                  ⇥ content
  on disk        124 B                           │kept in 11 snapshots · 811fc3af
 ▶Sep 09 19:23   108 B  11 snaps   +1 −0         │
@@ -21,6 +18,10 @@ expression: "h.screen(100, 34)"
                                                 │  9  // signals
                                                 │ 10  // serve
                                                 │ 11+ // shutdown
+                                                │
+                                                │
+                                                │
+                                                │
                                                 │
                                                 │
                                                 │

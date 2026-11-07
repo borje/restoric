@@ -48,13 +48,9 @@ fn view_action(view: &View, prefix: Option<char>, k: &KeyEvent) -> Option<Action
         },
         View::Versions(_) => match (prefix, k.code) {
             (None, KeyCode::Char('p')) => Some(DiffPrevious),
-            (Some('z'), KeyCode::Char('i')) => Some(ZoomIn),
-            (Some('z'), KeyCode::Char('o')) => Some(ZoomOut),
             _ => None,
         },
         View::Folder => match (prefix, k.code) {
-            (Some('z'), KeyCode::Char('i')) => Some(ZoomIn),
-            (Some('z'), KeyCode::Char('o')) => Some(ZoomOut),
             (None, KeyCode::Char('/')) => Some(Search),
             (None, KeyCode::Char('f')) => Some(FilterInput),
             (None, KeyCode::Char('s')) => Some(Find),

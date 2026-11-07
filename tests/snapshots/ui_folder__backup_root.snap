@@ -1,12 +1,9 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 59
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ○  ○ ○ ○  · ○   ○  ○·    ○ ·  ○ ·  ●    ○· ·○·○ · ○ ·  ·○  · ·● ·  ·  ┊ ○ docs/  ○ project/
-                                                                      ▲                    − 1× +
-
  on disk  ~1          │ ▾ docs/                                │ docs/
    ┄ 2 unchanged ┄    │ ▸ scripts/                             │
 ▶Sep 27 08:52 ~1      │ ▸ src/                              ~1 │ ¶ notes.md
@@ -35,4 +32,8 @@ expression: "h.screen(100, 34)"
  Jul 24 12:16 ~1      │                                        │
  Jul 20 12:00 ~1      │                                        │
    ┄ 1 unchanged ┄    │                                        │
+ Jul 14 09:00 +11     │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
  NOR  Sep 27 08:52  c177b849  project/ ~1                                               1/5  ? help

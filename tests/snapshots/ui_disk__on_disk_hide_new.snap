@@ -1,12 +1,9 @@
 ---
 source: tests/ui_disk.rs
+assertion_line: 329
 expression: s
 ---
  restoric  ~/dev/project/src
-  Jul 2026        Aug                         Sep                              on disk
-  ● ·   ·  ○ ○ ●  · ●   ○  ○·    ○ ·  ○ ·  ·    ○· ·●·○ · ○ ·  ·○  · ·○ ·  ·  ┊ ● api/  ○ src/
-                                                                                ▲          − 1× +
-
 ▶on disk  +3~1−1      │   ..                                   │ api/
    ┄ 2 unchanged ┄    │ ▾ api/                                 │
  Sep 27 08:52 ~1      │ ▸ models/                           +1 │ ◇ handlers.go
@@ -33,6 +30,10 @@ expression: s
  Jul 26 11:57 ~1      │                                        │
  Jul 24 12:16 ~1      │                                        │
    ┄ 2 unchanged ┄    │                                        │
- Jul 14 09:00 +7      │   2 not backed up · zn to show         │
+ Jul 14 09:00 +7      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │   2 not backed up · zn to show         │
                       │   2 deleted · . to show                │
  NOR  on disk  vs Oct 02  src/ +3 ~1 −1                                                 1/6  ? help

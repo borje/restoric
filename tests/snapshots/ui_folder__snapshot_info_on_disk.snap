@@ -1,15 +1,16 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 295
 expression: "h.screen(100, 14)"
 ---
  restoric  ~/data
-  Jul 2026                                                                     on disk
-  ●                                                                        ●  ┊ ● a.txt  ○ data/
-                                                                           ▵    ▲          − 1× +
+▶on disk  = latest    │ ≡ a.txt                            9 B │ a.txt · on disk · 9 B   ⇥ content
+ Jul 02 10:00 +1~1   ▵│ ≡ b.txt                            4 B │ unchanged since Jul 02 10:00
+ Jul 01 10:00 +2      │ ≡ c.txt                            6 B │
         ╭─ Snapshot ───────────────────────────────────────────────────────────────────────╮
-▶on disk│                                                                                  │ontent
- Jul 02 │  on disk       not a snapshot: H goes back to the newest                         │0
- Jul 01 │                                                                                  │
+        │                                                                                  │
+        │  on disk       not a snapshot: H goes back to the newest                         │
+        │                                                                                  │
         │  H L [ ] move · any other key closes                                             │
         ╰──────────────────────────────────────────────────────────────────────────────────╯
                       │                                        │

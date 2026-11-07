@@ -3,7 +3,6 @@
 use ratatui::style::Style;
 
 use super::theme::Theme;
-use super::timeline::Axis;
 use super::{Grid, fmt};
 use crate::app::cmdline::InputKind;
 use crate::app::{Action, App, Restoring, View};
@@ -186,12 +185,6 @@ pub fn draw(app: &App, g: &mut Grid) {
                 && a > 0
             {
                 mid.push((format!(" +{} new or changed", fmt::size(a)), t.added));
-            }
-        }
-        if let Some(axis) = Axis::new(&set, i, app.zoom, cols) {
-            let share = axis.share(i);
-            if share > 1 {
-                mid.push((format!("  {share} in column · zi"), t.dim));
             }
         }
     }

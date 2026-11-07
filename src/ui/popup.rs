@@ -16,8 +16,6 @@ fn which(view: &View, prefix: char) -> &'static [(&'static str, &'static str, Ac
             ("zd", "show / hide deleted", Action::ToggleDeleted),
             ("zn", "hide / show not backed up", Action::HideNew),
             ("zc", "hide / show unchanged", Action::ChangesOnly),
-            ("zi", "zoom timeline in", Action::ZoomIn),
-            ("zo", "zoom timeline out", Action::ZoomOut),
         ],
         (_, 'c') => &[
             ("cc", "copy snapshot:path", Action::Copy('c')),
@@ -82,7 +80,7 @@ const HELP: &[(&str, &str)] = &[
     ("i  S  b", "snapshot details / folder sizes / pin as base"),
     ("cc cd cf", "copy snapshot:path, folder, name"),
     ("/ n N   f", "search / next, previous / filter"),
-    (".  zd   zi zo", "show deleted items / zoom timeline"),
+    (".  zd", "show deleted items"),
     ("zn  zc", "hide not backed up (on disk) / unchanged"),
     ("gh   3H 5j", "backup root / counts with motions"),
     ("", ""),

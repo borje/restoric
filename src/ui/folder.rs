@@ -88,6 +88,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                     VRow::Version(v) => *v == i,
                     VRow::Fold { from, to } => (*from..=*to).contains(&i),
                 };
+                let noted = |v: usize| {
+                    let n = &s.set[v];
+                    !n.label.is_empty() || n.description.is_some()
+                };
                 let sr = rows.iter().position(on).unwrap_or(0);
                 let off = sr
                     .saturating_sub(height / 2)
@@ -122,7 +126,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                             }
                             let label = format!("┄ {} unchanged ┄", to - from + 1);
                             let style = if here { t.accent } else { t.dim2 };
-                            g.put_to(v0 + 3, y, &label, style, v1 + 1);
+                            g.put_to(v0 + 3, y, &label, style, v1);
+                            if (*from..=*to).any(noted) {
+                                g.put(v1, y, "▵", t.dim);
+                            }
                             g.hit(v0, v1 + 1, y, Action::GoSnapshot(*to));
                         }
                         VRow::Version(v) => {
@@ -133,7 +140,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                             let date = fmt::time(s.set[*v].time, &app.tz, app.clock());
                             g.put(v0 + 1, y, &date, if here { t.bold } else { t.text });
                             if let Some(c) = s.counts.get(v) {
-                                put_counts(g, v0 + 14, y, c, "", v1 + 1);
+                                put_counts(g, v0 + 14, y, c, "", v1);
+                            }
+                            if noted(*v) {
+                                g.put(v1, y, "▵", t.dim);
                             }
                             g.hit(v0, v1 + 1, y, Action::GoSnapshot(*v));
                         }

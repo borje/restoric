@@ -1,0 +1,13 @@
+---
+source: tests/ui_folder.rs
+assertion_line: 329
+expression: "h.screen(100, 8)"
+---
+ restoric  ~/data
+ on disk  = latest    │ ≡ a.txt                         9 B  ~ │ a.txt · v2/2 · 9 B      ⇥ content
+▶Jul 03 10:00 ~1      │ ≡ b.txt                         4 B    │ changed here · + new line · − remo…
+   ┄ 1 unchanged ┄   ▵│                                        │
+ Jul 01 10:00 +2      │                                        │   1+ one more
+                      │                                        │
+                      │                                        │
+ NOR  Jul 03 10:00  6bcffe2f  data/ ~1                                    Jul 03 10:00  1/2  ? help

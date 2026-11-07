@@ -1,12 +1,13 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 382
 expression: "h.screen(100, 8)"
 ---
  restoric  ~/data
-  Jul 2026                                                                     on disk
-  ●                                                                        ●  ┊ · a.txt  ○ data/
-  ▲                                                                        ▵               − 1× +
-
- Jul 02 10:00 +1~1    │ ≡ a.txt                         4 B  + │ a.txt · v1/2 · 4 B      ⇥ content
-▶Jul 01 10:00 +2      │ ≡ b.txt                         4 B  + │ new in this snapshot
+ on disk  = latest    │ ≡ a.txt                         4 B  + │ a.txt · v1/2 · 4 B      ⇥ content
+ Jul 02 10:00 +1~1   ▵│ ≡ b.txt                         4 B  + │ new in this snapshot
+▶Jul 01 10:00 +2      │                                        │
+                      │                                        │   1  one
+                      │                                        │
+                      │                                        │
  NOR  Jul 01 10:00  a4e1ae87  data/ +2                                    Jul 01 10:00  1/2  ? help

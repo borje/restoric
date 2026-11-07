@@ -1,4 +1,4 @@
-//! Search, filter, the command line, find and zoom.
+//! Search, filter, the command line and find.
 
 mod common;
 
@@ -141,19 +141,6 @@ fn dates() {
     assert_eq!(when(&h), "Jul 14 09:00");
     command(&mut h, "latest");
     assert_eq!(when(&h), "Oct 02 12:21");
-}
-
-#[test]
-fn zoom() {
-    let mut h = Harness::new(SRC);
-    h.keys("zi");
-    assert_eq!(h.app.zoom, 2);
-    h.keys("zizi");
-    insta::assert_snapshot!(h.screen(100, 12));
-    h.keys("zozozo");
-    assert_eq!(h.app.zoom, 1);
-    h.keys("zo");
-    assert_eq!(h.app.message.as_deref(), Some("Fully zoomed out."));
 }
 
 #[test]

@@ -231,6 +231,10 @@ impl Config {
     pub fn keymap(&self) -> Result<HashMap<(KeyCode, KeyModifiers), Action>> {
         let mut out = HashMap::new();
         for (name, key) in &self.keys {
+            // ponytail: the timeline and its zoom are gone; old configs still load.
+            if matches!(name.as_str(), "zoom_in" | "zoom_out") {
+                continue;
+            }
             let action = action_named(name).with_context(|| {
                 format!(
                     "unknown action \"{name}\" in [keys]. Actions: {}",
@@ -314,8 +318,6 @@ const ACTIONS: &[(&str, Action)] = &[
     ("next_match", Action::NextMatch),
     ("prev_match", Action::PrevMatch),
     ("command", Action::CommandLine),
-    ("zoom_in", Action::ZoomIn),
-    ("zoom_out", Action::ZoomOut),
     ("help", Action::Help),
     ("info", Action::Info),
     ("sizes", Action::Sizes),
@@ -428,6 +430,12 @@ selected = "#202830"
         assert!(bad("[keys]\nopen = \"Hyper\"").contains("isn't a key"));
         assert!(bad("[colors]\naccent = \"chartreuse!\"").contains("isn't a colour"));
         assert_eq!(Config::default().hosts(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn old_zoom_keys_still_load() {
+        let c: Config = toml::from_str("[keys]\nzoom_in = \"+\"\nzoom_out = \"-\"").unwrap();
+        assert!(c.keymap().unwrap().is_empty());
     }
 
     #[test]

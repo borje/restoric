@@ -1,14 +1,15 @@
 ---
 source: tests/ui_folder.rs
+assertion_line: 97
 expression: "ui::text(&buf)"
 ---
  restoric  /home/bege/dev/project/src                                                     indexing…
-  Jul 2026        Aug                         Sep                              on disk
-  · ·   ·  · · ·  · ·   ·  ··    · ·  · ·  ·    ·· ···· · · ·  ··  · ·· ·  ●  ┊ · src/
-                                                                           ▲               − 1× +
-
  indexing…            │   ..                                   │
                       │   loading…                             │
+                      │                                        │
+                      │                                        │
+                      │                                        │
+                      │                                        │
                       │                                        │
                       │                                        │
                       │                                        │
