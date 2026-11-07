@@ -120,7 +120,8 @@ pub fn draw(app: &App, g: &mut Grid) {
                                     put_counts(g, c, y, lc, "", v1 + 1);
                                 }
                                 Some(_) => {
-                                    g.put(c, y, "= latest", t.dim);
+                                    let same = if p.compact { "=" } else { "= latest" };
+                                    g.put_to(c, y, same, t.dim, v1 + 1);
                                 }
                                 None => {
                                     g.put(c, y, "…", t.dim);

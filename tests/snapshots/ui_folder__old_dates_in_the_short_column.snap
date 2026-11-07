@@ -1,0 +1,14 @@
+---
+source: tests/ui_folder.rs
+expression: "h.screen(70, 10)"
+---
+ restoric  ~/data
+ on disk =      │ ≡ a.txt                                      4 B  +
+ Sep 20  ~1     │
+▶Jan '25 +1     │
+                │
+                │
+                │
+                │
+                │
+ NOR  Jan 15  2025 · 20mo ago  445a0e7e  data/ +1         1/1  ? help

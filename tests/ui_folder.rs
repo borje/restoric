@@ -601,6 +601,8 @@ snapshot 2026-09-20 10:00
     let mut h = Harness::with(dsl, "/home/bege/data");
     h.keys("H");
     insta::assert_snapshot!(h.screen(100, 10));
+    // The short column has no room for the time: Jan '25.
+    insta::assert_snapshot!("old_dates_in_the_short_column", h.screen(70, 10));
 }
 
 /// kitty draws a Nerd Font icon two cells wide only when a written space
