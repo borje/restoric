@@ -153,7 +153,7 @@ fn took(d: jiff::SignedDuration) -> String {
 /// A snapshot's details, as label and value rows `vw` columns wide.
 fn info_rows(app: &App, s: &SnapshotInfo, vw: usize) -> Vec<(&'static str, String)> {
     let mut rows: Vec<(&'static str, String)> = vec![
-        ("snapshot", s.id.to_string()),
+        ("snapshot", s.id.0.short()),
         (
             "time",
             s.time
@@ -227,7 +227,7 @@ pub fn info(app: &App, g: &mut Grid) {
         return;
     }
     let t = g.theme.clone();
-    let w = 84.min(g.cols().saturating_sub(4));
+    let w = 72.min(g.cols().saturating_sub(4));
     let vw = w.saturating_sub(20) as usize;
     let (title, rows) = match app.info_snapshot() {
         Some((s, n, total)) => (format!("Snapshot {n}/{total}"), info_rows(app, &s, vw)),
@@ -253,7 +253,7 @@ pub fn info(app: &App, g: &mut Grid) {
         let style = if *k == "snapshot" { t.accent } else { t.text };
         g.put_to(x + 17, r, &fmt::fit(v, vw), style, end);
     }
-    let hint = "H L [ ] move · any other key closes";
+    let hint = "H L [ ] move · cc copy full id · any other key closes";
     g.put_to(x + 3, y + h - 2, hint, t.dim, end);
 }
 

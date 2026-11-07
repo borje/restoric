@@ -447,6 +447,8 @@ pub struct App {
     pub help: bool,
     /// `i`: the details popup, of whichever snapshot is on screen.
     pub info: bool,
+    /// A `c` pressed in the details popup: a second one copies the id.
+    pub info_c: bool,
     pub message: Option<String>,
     /// Set once the user moves in time, so the start-up jump doesn't override it.
     moved: bool,
@@ -572,6 +574,7 @@ impl App {
             prefix: None,
             help: false,
             info: false,
+            info_c: false,
             message: None,
             moved: false,
             quit: false,

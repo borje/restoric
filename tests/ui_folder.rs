@@ -14,7 +14,7 @@ use ratatui::crossterm::event::{
 use ratatui::layout::Rect;
 
 use common::{Harness, PROJECT, SRC};
-use restoric::app::{Action, App, View};
+use restoric::app::{Action, App, Effect, View};
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::ui;
@@ -358,6 +358,13 @@ fn snapshot_info() {
     h.keys("L");
     assert!(h.app.info && place(&h).is_none());
     insta::assert_snapshot!("snapshot_info_on_disk", h.screen(100, 14));
+    // cc copies the full id and keeps the popup open.
+    h.keys("[cc");
+    assert!(h.app.info);
+    let id = h.app.info_snapshot().unwrap().0.id.to_string();
+    assert_eq!(id.len(), 64);
+    assert!(matches!(h.app.effects.pop(), Some(Effect::Clipboard(t)) if t == id));
+    h.keys("L");
     h.keys("j");
     assert!(!h.app.info);
     h.keys("i");

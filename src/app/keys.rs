@@ -181,6 +181,20 @@ impl App {
         if k.kind == KeyEventKind::Release {
             return;
         }
+        // `cc` in the details popup copies the full snapshot id.
+        if self.info && k.code == KeyCode::Char('c') && k.modifiers.is_empty() {
+            if std::mem::take(&mut self.info_c)
+                && let Some((s, _, _)) = self.info_snapshot()
+            {
+                let id = s.id.to_string();
+                self.message = Some(format!("Copied {id}"));
+                self.effects.push(super::Effect::Clipboard(id));
+            } else {
+                self.info_c = true;
+            }
+            return;
+        }
+        self.info_c = false;
         // Help and messages close on any key; details on any key that
         // doesn't move in time.
         if self.help || (self.info && !self.keeps_info(&k)) {
