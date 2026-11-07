@@ -1,6 +1,5 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 65
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
@@ -14,4 +13,4 @@ expression: "h.screen(100, 12)"
    ┄ 1 unchanged ┄    │                                        │   7  // timeouts
  Sep 09 19:23 ~1      │                                        │   8  // listen address
    ┄ 1 unchanged ┄    │                                        │   9+ // tls
- NOR  Sep 27 08:52  c177b849  src/ ~1  filter "co"                        Sep 20 20:35  1/1  ? help
+ NOR  Sep 27 08:52  c177b849  src/ ~1  filter "co"               modified Sep 20 20:35  1/1  ? help

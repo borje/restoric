@@ -36,7 +36,7 @@ pub fn draw(app: &App, g: &mut Grid) {
     if app.dialog.is_some() {
         let c = g.put(0, r, " RST ", t.badge_red) + 1;
         let mid = vec![("choose where the restored copy goes".to_string(), t.dim)];
-        finish(app, g, c, mid, Vec::new());
+        finish(app, g, c, mid, Vec::new(), None);
         return;
     }
     if let View::Find(f) = &app.view {
@@ -47,7 +47,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         )];
         let n = f.results.len();
         let pos = format!("{}/{n}", if n > 0 { f.sel + 1 } else { 0 });
-        finish(app, g, c, mid, vec![(pos, t.text, None)]);
+        finish(app, g, c, mid, vec![(pos, t.text, None)], None);
         return;
     }
     if let View::Diff(d) = &app.view {
@@ -66,7 +66,7 @@ pub fn draw(app: &App, g: &mut Grid) {
             .map(|p| (p, t.text, None))
             .into_iter()
             .collect();
-        finish(app, g, c, mid, right);
+        finish(app, g, c, mid, right, None);
         return;
     }
     let c = if app.visual.is_some() {
@@ -86,7 +86,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         } else if let Some(tr) = app.tracks.get(&v.path).filter(|t| t.loaded()) {
             right.push((format!("{}/{}", v.sel + 1, tr.runs.len()), t.text, None));
         }
-        finish(app, g, c, mid, right);
+        finish(app, g, c, mid, right, None);
         return;
     }
     let set = app.set();
@@ -204,17 +204,11 @@ pub fn draw(app: &App, g: &mut Grid) {
         mid.push((format!("  {marked} marked"), t.accent));
     }
 
-    if let Some(e) = app.selected()
-        && !e.is_dir()
-        && !e.is_deleted()
-        && let Some(m) = e.node.mtime
-    {
-        right.push((
-            format!("{}  ", fmt::time(m, &app.tz, app.clock())),
-            t.dim,
-            None,
-        ));
-    }
+    let modified = app
+        .selected()
+        .filter(|e| !e.is_dir() && !e.is_deleted())
+        .and_then(|e| e.node.mtime)
+        .map(|m| (format!("modified {}  ", fmt::time(m, &app.tz, app.clock())), t.dim));
     let rows = app.rows().len();
     let below_root = app.folder != app.root;
     let (pos, total) = if below_root {
@@ -225,33 +219,50 @@ pub fn draw(app: &App, g: &mut Grid) {
     if matches!(app.listing(), Some(Some(_))) {
         right.push((format!("{pos}/{total}"), t.text, None));
     }
-    finish(app, g, c, mid, right);
+    finish(app, g, c, mid, right, modified);
 }
 
 /// The middle parts from column `c`, as many as fit, then the right parts,
-/// the pending count or prefix, and `? help`.
+/// the pending count or prefix, and `? help`. `spare` goes first on the
+/// right when everything in the middle still fits beside it. While a
+/// restore runs, its progress gets the room and the right is only `? help`.
 fn finish(
     app: &App,
     g: &mut Grid,
     mut c: u16,
     mid: Vec<(String, Style)>,
     mut right: Vec<(String, Style, Option<Action>)>,
+    spare: Option<(String, Style)>,
 ) {
     let t = g.theme.clone();
     let (cols, r) = (g.cols(), g.rows() - 1);
+    let restoring = app.restoring.as_ref().filter(|_| app.dialog.is_none());
+    if restoring.is_some() {
+        right.clear();
+    }
     right.push(("  ? help".into(), t.dim2, Some(Action::Help)));
-    let rlen: u16 = right.iter().map(|(s, _, _)| fmt::width(s) as u16).sum();
     let pending = format!(
         "{}{}",
         app.count,
         app.prefix.map(String::from).unwrap_or_default()
     );
     let plen = fmt::width(&pending) as u16;
+    let width = |right: &[(String, Style, Option<Action>)]| -> u16 {
+        right.iter().map(|(s, _, _)| fmt::width(s) as u16).sum()
+    };
+    let mid_w: u16 = mid.iter().map(|(s, _)| fmt::width(s) as u16).sum();
+    if let Some((s, style)) = spare.filter(|_| restoring.is_none()) {
+        let w = fmt::width(&s) as u16;
+        if c + mid_w + w + width(&right) + plen + 3 <= cols {
+            right.insert(0, (s, style, None));
+        }
+    }
+    let rlen = width(&right);
 
     let limit = cols.saturating_sub(rlen + plen + 3);
-    let mid = match &app.restoring {
-        Some(rs) if app.dialog.is_none() => restoring(rs, &t, limit.saturating_sub(c) as usize),
-        _ => mid,
+    let mid = match restoring {
+        Some(rs) => restoring_parts(rs, &t, limit.saturating_sub(c) as usize),
+        None => mid,
     };
     for (s, style) in mid {
         if c + fmt::width(&s) as u16 > limit {
@@ -278,8 +289,8 @@ fn finish(
 
 /// The middle of the status bar while restoring, in `w` cells:
 /// `restoring 2/5 src/  ━━━━━━──────  35%  1.2M / 3.4M  esc stop`.
-/// Short of room, `esc stop` goes first, then the bar shrinks.
-fn restoring(rs: &Restoring, t: &Theme, w: usize) -> Vec<(String, Style)> {
+/// Short of room the bar shrinks, then goes; `esc stop` stays.
+fn restoring_parts(rs: &Restoring, t: &Theme, w: usize) -> Vec<(String, Style)> {
     let name = rs.name();
     if rs.stopping {
         return vec![(format!("stopping after {name}…"), t.warn)];
@@ -299,10 +310,7 @@ fn restoring(rs: &Restoring, t: &Theme, w: usize) -> Vec<(String, Style)> {
     let tail = format!("  {pct}%  {} / {}", fmt::size(done), fmt::size(total));
     let used: usize = head.iter().map(|(s, _)| fmt::width(s)).sum::<usize>() + fmt::width(&tail);
     let stop = "  esc stop";
-    let (bar, with_stop) = match w.saturating_sub(used + 2) {
-        n if n >= 16 + stop.len() => (16, true),
-        n => (n.min(16), false),
-    };
+    let bar = w.saturating_sub(used + 2 + stop.len()).min(16);
     if bar >= 4 {
         let filled = (bar as u64 * pct / 100) as usize;
         head.push(("  ".to_string(), t.text));
@@ -310,8 +318,6 @@ fn restoring(rs: &Restoring, t: &Theme, w: usize) -> Vec<(String, Style)> {
         head.push(("─".repeat(bar - filled), t.dim2));
     }
     head.push((tail, t.text));
-    if with_stop {
-        head.push((stop.to_string(), t.dim2));
-    }
+    head.push((stop.to_string(), t.dim2));
     head
 }

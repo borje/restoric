@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 458
 expression: "h.screen(100, 10)"
 ---
  restoric  ~/data
@@ -12,4 +11,4 @@ expression: "h.screen(100, 10)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Jan 15  2025  445a0e7e  data/ +1                                    Jan 15  2025  1/1  ? help
+ NOR  Jan 15  2025  445a0e7e  data/ +1                           modified Jan 15  2025  1/1  ? help

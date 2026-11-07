@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 28
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
@@ -36,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                                        │
                       │                                        │
                       │   2 deleted · . to show                │
- NOR  Sep 09 19:23  811fc3af  src/ ~1  2 yanked                           Sep 06 18:03  5/6  ? help
+ NOR  Sep 09 19:23  811fc3af  src/ ~1  2 yanked                  modified Sep 06 18:03  5/6  ? help

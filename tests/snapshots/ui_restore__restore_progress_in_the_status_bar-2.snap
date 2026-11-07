@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 225
 expression: "h.screen(100, 34)"
 ---
  restoric  Versions  ~/dev/project/src/server.go                         2 versions in 32 snapshots
@@ -36,4 +35,4 @@ expression: "h.screen(100, 34)"
                                                 │
                                                 │
                                                 │
- NOR  restoring api/  ━━━━━───────────  37%  3.0M / 8.0M  esc stop                      2/2  ? help
+ NOR  restoring api/  ━━━━━───────────  37%  3.0M / 8.0M  esc stop                           ? help

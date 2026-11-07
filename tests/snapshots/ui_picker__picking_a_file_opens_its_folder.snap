@@ -1,6 +1,5 @@
 ---
 source: tests/ui_picker.rs
-assertion_line: 282
 expression: "h.screen(100, 20)"
 ---
  restoric  dev-vm:~/dev/trading
@@ -22,4 +21,4 @@ expression: "h.screen(100, 20)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Oct 08 09:03  4f05cd40  trading/ ~1                                 Oct 08 09:03  2/2  ? help
+ NOR  Oct 08 09:03  4f05cd40  trading/ ~1                        modified Oct 08 09:03  2/2  ? help

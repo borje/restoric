@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 93
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
@@ -14,4 +13,4 @@ expression: "h.screen(100, 12)"
  Sep 06 18:03 +1~3−1  │                                        │
    ┄ 2 unchanged ┄    │                                        │
  Sep 02 20:16 ~1      │   2 deleted · . to show                │
- VIS  Sep 09 19:23  811fc3af  src/ ~1  3 marked                           Sep 06 18:03  5/6  ? help
+ VIS  Sep 09 19:23  811fc3af  src/ ~1  3 marked                  modified Sep 06 18:03  5/6  ? help

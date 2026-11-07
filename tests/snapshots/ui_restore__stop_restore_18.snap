@@ -1,6 +1,5 @@
 ---
 source: tests/ui_restore.rs
-assertion_line: 246
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
@@ -36,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                                        │
                       │                                        │
                       │   2 deleted · . to show                │
- NOR  restoring config.go  ━━━━────────────  25%  1 B / 4 B  esc stop     Sep 09 19:23  4/6  ? help
+ NOR  restoring config.go  ━━━━────────────  25%  1 B / 4 B  esc stop                        ? help
