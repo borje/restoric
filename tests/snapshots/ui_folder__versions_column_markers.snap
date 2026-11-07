@@ -5,7 +5,7 @@ expression: "h.screen(100, 8)"
  restoric  ~/data
  on disk  = latest    │ ≡ a.txt                         9 B  ~ │ a.txt · v2/2 · 9 B      ⇥ content
 ▶Jul 03 10:00 ~1      │ ≡ b.txt                         4 B    │ changed here
-   ┄ 2 unchanged ┄   ▵│                                        │
+  ┄ 2 snapshots · 1d ▵│                                        │
  Jul 01 10:00 +2      │                                        │   1+ one more
                       │                                        │
                       │                                        │

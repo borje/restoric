@@ -1,19 +1,18 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 80
 expression: "h.screen(100, 14)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ config.go · v5/5        ⇥ content
-   ┄ 2 unchanged ┄    │ ▸ api/                                 │ unchanged since Sep 20 20:35
+  ┄ 2 snapshots · 5d  │ ▸ api/                                 │ unchanged since Sep 20 20:35
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │
-   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │   1  package main
+  ┄ 2 snapshots · 4d  │ ◇ config.go                    96 B    │   1  package main
  Sep 20 20:35 ~1      │ ◇ main.go                     108 B    │   2
-   ┄ 2 unchanged ┄    │ ◇ server.go                    42 B  ~ │   3  type Config struct {
+  ┄ 2 snapshots · 4d  │ ◇ server.go                    42 B  ~ │   3  type Config struct {
  Sep 13 20:51 ~2      │ ◇ util.go                     104 B    │   4    Port int
-   ┄ 1 unchanged ┄    │                                        │   5  }
+  ┄ 1 snapshot · 1d   │                                        │   5  }
  Sep 09 19:23 ~1      │                                        │   6  // defaults
-   ┄ 1 unchanged ┄    │                                        │   7  // timeouts
+  ┄ 1 snapshot · 1d   │                                        │   7  // timeouts
  Sep 06 18:03 +1~3−1  │                                        │   8  // listen address
-   ┄ 2 unchanged ┄    │   2 deleted · . to show                │   9+ // tls
+  ┄ 2 snapshots · 3d  │   2 deleted · . to show                │   9+ // tls
  /.go█                                             type to search this folder · ⏎ keep · esc cancel

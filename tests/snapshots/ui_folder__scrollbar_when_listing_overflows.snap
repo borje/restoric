@@ -1,15 +1,14 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 500
 expression: "h.screen(100, 10)"
 ---
  restoric  ~/dev/project
  on disk  ~1          │ ▾ docs/                                │ docs/
-   ┄ 2 unchanged ┄    │ ▸ scripts/                             │
+  ┄ 2 snapshots · 5d  │ ▸ scripts/                             │
 ▶Sep 27 08:52 ~1      │ ▸ src/                              ~1 │ ¶ notes.md
-   ┄ 2 unchanged ┄    │ ○ go.mod                      27 B     │
+  ┄ 2 snapshots · 4d  │ ○ go.mod                      27 B     │
  Sep 20 20:35 ~1      │ ¶ README.md                   15 B     │
-   ┄ 2 unchanged ┄    │                                        │
+  ┄ 2 snapshots · 4d  │                                        │
  Sep 13 20:51 ~2      │                                        │
-   ┄ 1 unchanged ┄    │                                        │
+  ┄ 1 snapshot · 1d   │                                        │
  NOR  Sep 27 08:52  c177b849  project/ ~1                                               1/5  ? help

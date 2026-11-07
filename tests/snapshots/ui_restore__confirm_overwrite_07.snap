@@ -4,31 +4,31 @@ expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ server.go · v1/2        ⇥ content
-   ┄ 2 unchanged ┄    │ ▸ api/                                 │ unchanged since Sep 06 18:03
+  ┄ 2 snapshots · 5d  │ ▸ api/                                 │ unchanged since Sep 06 18:03
  Sep 27 08:52 ~1      │ ▸ models/                              │
-   ┄ 2 unchanged ┄    │ ◇ config.go                    89 B    │   1  package main
+  ┄ 2 snapshots · 4d  │ ◇ config.go                    89 B    │   1  package main
  Sep 20 20:35 ~1      │ ◇ main.go                     108 B  ~ │   2
-   ┄ 2 unchanged ┄    │ ◇ server.go                    30 B    │   3  func serve() {}
+  ┄ 2 snapshots · 4d  │ ◇ server.go                    30 B    │   3  func serve() {}
  Sep 13 20:51 ~2      │ ◇ util.go                      94 B    │
-   ┄ 1 unchanged ┄    │                                        │
+  ┄ 1 snapshot · 1d   │                                        │
 ▶Sep 09 19:23 ~1      │                                        │
-   ┄ 1 unchanged ┄    ╭─ Overwrite? ─────────────────────────────────────────╮
+  ┄ 1 snapshot · 1d   ╭─ Overwrite? ─────────────────────────────────────────╮
  Sep 06 18:03 +1~3−1  │                                                      │
-   ┄ 2 unchanged ┄    │  Replace 2 items on disk with the version from Sep   │
+  ┄ 2 snapshots · 3d  │  Replace 2 items on disk with the version from Sep   │
  Sep 02 20:16 ~1      │  09 19:23? The current version is kept for :undo.    │
-   ┄ 2 unchanged ┄    │                                                      │
+  ┄ 2 snapshots · 6d  │                                                      │
  Aug 22 11:59 ~2−1    │  ~ 2 replaced                                        │
-   ┄ 1 unchanged ┄    │  Writes 2 files, 197 B.                              │
+  ┄ 1 snapshot · 2d   │  Writes 2 files, 197 B.                              │
  Aug 17 16:04 +1~1    │                                                      │
-   ┄ 1 unchanged ┄    │  [y] Overwrite   [n] Cancel                          │
+  ┄ 1 snapshot · 1d   │  [y] Overwrite   [n] Cancel                          │
  Aug 10 15:44 ~1      ╰──────────────────────────────────────────────────────╯
  Aug 07 08:15 +1      │                                        │
  Aug 03 16:19 +1~1    │                                        │
-   ┄ 1 unchanged ┄    │                                        │
+  ┄ 1 snapshot · 2d   │                                        │
  Jul 28 15:59 ~1      │                                        │
  Jul 26 11:57 ~1      │                                        │
  Jul 24 12:16 ~1      │                                        │
-   ┄ 2 unchanged ┄    │                                        │
+  ┄ 2 snapshots · 6d  │                                        │
  Jul 14 09:00 +7      │                                        │
                       │                                        │
                       │                                        │

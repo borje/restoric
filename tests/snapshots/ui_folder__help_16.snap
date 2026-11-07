@@ -4,31 +4,31 @@ expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ api/
-   ┄ 2 unchan╭─ Help ─────────────────────────────────────────────────────────────────╮
+  ┄ 2 snapsho╭─ Help ─────────────────────────────────────────────────────────────────╮
 ▶Sep 27 08:52│                                                                        │
-   ┄ 2 unchan│  Folder view                                                           │
+  ┄ 2 snapsho│  Folder view                                                           │
  Sep 20 20:35│  j k  gg G  C-d C-u     move, top, bottom, half page                   │
-   ┄ 2 unchan│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
+  ┄ 2 snapsho│  h l  ← →  ⏎            parent / open (a file opens its versions)      │
  Sep 13 20:51│  H L                    older / newer change in this folder, then disk │
-   ┄ 1 unchan│  [ ]   { }              every snapshot / changes of the selected item  │
+  ┄ 1 snapsho│  [ ]   { }              every snapshot / changes of the selected item  │
  Sep 09 19:23│  ⇥  J K                 preview: content or diff vs disk, scroll       │
-   ┄ 1 unchan│  +  −                   preview margin: new line / lines removed above │
+  ┄ 1 snapsho│  +  −                   preview margin: new line / lines removed above │
  Sep 06 18:03│  on disk                files now vs the last backup, by size or time  │
-   ┄ 2 unchan│  ␣  v                   select / visual select                         │
+  ┄ 2 snapsho│  ␣  v                   select / visual select                         │
  Sep 02 20:16│  y  p  P                yank, restore next to it, overwrite            │
-   ┄ 2 unchan│  r  d  o                restore options / full-screen diff / $PAGER    │
+  ┄ 2 snapsho│  r  d  o                restore options / full-screen diff / $PAGER    │
  Aug 22 11:59│  i  S  b                snapshot details / folder sizes / pin as base  │
-   ┄ 1 unchan│  cc cd cf               copy snapshot:path, folder, name               │
+  ┄ 1 snapsho│  cc cd cf               copy snapshot:path, folder, name               │
  Aug 17 16:04│  / n N   f              search / next, previous / filter               │
-   ┄ 1 unchan│  .  zd                  show deleted items                             │
+  ┄ 1 snapsho│  .  zd                  show deleted items                             │
  Aug 10 15:44│  zn  zc                 hide not backed up (on disk) / unchanged       │
  Aug 07 08:15│  gh   3H 5j             backup root / counts with motions              │
  Aug 03 16:19│                                                                        │
-   ┄ 1 unchan│  Commands                                                              │
+  ┄ 1 snapsho│  Commands                                                              │
  Jul 28 15:59│  :sep 1  :2026-09-01    jump to a date (:yesterday :3d :2w)            │
  Jul 26 11:57│  :find NAME   s         search every snapshot for a name               │
  Jul 24 12:16│  :latest :oldest :undo                                                 │
-   ┄ 2 unchan│  :set strict / bytes    count every change / only content              │
+  ┄ 2 snapsho│  :set strict / bytes    count every change / only content              │
  Jul 14 09:00│                                                                        │
              │  Diff  ]c [c or n N changes · c vs disk · p vs previous · b vs base    │
              │  Press any key to close                                                │

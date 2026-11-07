@@ -4,55 +4,55 @@ expression: "screens.join(\"\\n\\n\")"
 ---
  restoric  ~/dev/project/src
  on disk  …           │   ..                                   │ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+  ┄ 2 snapshots · 5d  │ ▾ api/                                 │
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │ ◇ handlers.go
-   ┄ 2 unchanged ┄    │ ◇ config.go              ╭────────────────────────────────────────────────╮
+  ┄ 2 snapshots · 4d  │ ◇ config.go              ╭────────────────────────────────────────────────╮
  Sep 20 20:35 ~1      │ ◇ main.go                │ Put back config.go. The old copy couldn't be   │
-   ┄ 2 unchanged ┄    │ ◇ server.go              │ removed and stays at                           │
+  ┄ 2 snapshots · 4d  │ ◇ server.go              │ removed and stays at                           │
  Sep 13 20:51 ~2      │ ◇ util.go                │ ~/.local/share/restoric/undo/20260909T192300.0 │
-   ┄ 1 unchanged ┄    │                          │ 00/files/0/config.go: Permission denied (os    │
+  ┄ 1 snapshot · 1d   │                          │ 00/files/0/config.go: Permission denied (os    │
  Sep 09 19:23 ~1      │                          │ error 13)                                      │
-   ┄ 1 unchanged ┄    │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
+  ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
 
 
  restoric  ~/dev/project/src
  on disk  …           │   ..                                   │ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+  ┄ 2 snapshots · 5d  │ ▾ api/                                 │
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │ ◇ handlers.go
-   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │ ◇ middleware.go
+  ┄ 2 snapshots · 4d  │ ◇ config.go                    96 B    │ ◇ middleware.go
  Sep 20 20:35 ~1      │ ◇ main.go                ╭────────────────────────────────────────────────╮
-   ┄ 2 unchanged ┄    │ ◇ server.go              │ Put back 2 items. 2 old copies couldn't be     │
+  ┄ 2 snapshots · 4d  │ ◇ server.go              │ Put back 2 items. 2 old copies couldn't be     │
  Sep 13 20:51 ~2      │ ◇ util.go                │ removed and stay under                         │
-   ┄ 1 unchanged ┄    │                          │ ~/.local/share/restoric/undo/20260909T192300.0 │
+  ┄ 1 snapshot · 1d   │                          │ ~/.local/share/restoric/undo/20260909T192300.0 │
  Sep 09 19:23 ~1      │                          │ 00: Permission denied (os error 13)            │
-   ┄ 1 unchanged ┄    │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
+  ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
 
 
  restoric  ~/dev/project/src
  on disk  …           │   ..                                   │ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+  ┄ 2 snapshots · 5d  │ ▾ api/                                 │
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │ ◇ handlers.go
-   ┄ 2 unchanged ┄    │ ◇ config.go                    96 B    │ ◇ middleware.go
+  ┄ 2 snapshots · 4d  │ ◇ config.go                    96 B    │ ◇ middleware.go
  Sep 20 20:35 ~1      │ ◇ main.go                     108 B    │ ◇ routes.go
-   ┄ 2 unchanged ┄    │ ◇ server.go                    42 B  ~ │
+  ┄ 2 snapshots · 4d  │ ◇ server.go                    42 B  ~ │
  Sep 13 20:51 ~2      │ ◇ util.go                     104 B    │
-   ┄ 1 unchanged ┄    │                          ╭────────────────────────────────────────────────╮
+  ┄ 1 snapshot · 1d   │                          ╭────────────────────────────────────────────────╮
  Sep 09 19:23 ~1      │                          │ Nothing was left to put back.                  │
-   ┄ 1 unchanged ┄    │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
+  ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
 
 
  restoric  ~/dev/project/src
  on disk  …           │   ..                                   │ api/
-   ┄ 2 unchanged ┄    │ ▾ api/                                 │
+  ┄ 2 snapshots · 5d  │ ▾ api/                                 │
 ▶Sep 27 08:52 ~1      │ ▸ models/                              │ ◇ handlers.go
-   ┄ 2 unchanged ┄    │ ◇ config.go              ╭────────────────────────────────────────────────╮
+  ┄ 2 snapshots · 4d  │ ◇ config.go              ╭────────────────────────────────────────────────╮
  Sep 20 20:35 ~1      │ ◇ main.go                │ Stopped · nothing was overwritten. The old     │
-   ┄ 2 unchanged ┄    │ ◇ server.go              │ copy couldn't be removed and stays at          │
+  ┄ 2 snapshots · 4d  │ ◇ server.go              │ copy couldn't be removed and stays at          │
  Sep 13 20:51 ~2      │ ◇ util.go                │ ~/.local/share/restoric/undo/20260909T192300.0 │
-   ┄ 1 unchanged ┄    │                          │ 00/files/0/config.go: Permission denied (os    │
+  ┄ 1 snapshot · 1d   │                          │ 00/files/0/config.go: Permission denied (os    │
  Sep 09 19:23 ~1      │                          │ error 13)                                      │
-   ┄ 1 unchanged ┄    │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
+  ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
  NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help

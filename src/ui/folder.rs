@@ -142,11 +142,21 @@ pub fn draw(app: &App, g: &mut Grid) {
                                 g.put(v0 + 1, y, &date, t.bold);
                                 g.put_to(v0 + counts_at, y, &format!("= ·{n}"), t.dim, v1);
                             } else {
-                                let label = match p.compact {
-                                    true => format!("┄ {n} ┄"),
-                                    false => format!("┄ {n} unchanged ┄"),
+                                // How many, and for how long nothing changed:
+                                // from the version below to the last of them.
+                                let quiet = fmt::span(
+                                    s.set[*to].time.duration_since(s.set[from - 1].time),
+                                );
+                                let one = if n == 1 { "snapshot" } else { "snapshots" };
+                                let long = format!("┄ {n} {one} · {quiet}");
+                                let label = if p.compact {
+                                    format!("┄ {n} · {quiet}")
+                                } else if fmt::width(&long) <= (v1 - v0 - 2) as usize {
+                                    long
+                                } else {
+                                    format!("┄ {n} snaps · {quiet}")
                                 };
-                                g.put_to(v0 + 3, y, &label, t.dim2, v1);
+                                g.put_to(v0 + 2, y, &label, t.dim2, v1);
                             }
                             // A click goes to the newest labelled snapshot, if any.
                             let labelled = (*from..=*to).rev().find(|&j| noted(j));

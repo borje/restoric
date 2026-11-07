@@ -4,25 +4,25 @@ expression: "h.screen(70, 24)"
 ---
  restoric  ~/dev/project/src
  on disk ~1     │   ..
-   ┄ 2 ┄        │ ▸ api/                                           ~1
+  ┄ 2 · 5d      │ ▸ api/                                           ~1
  Sep 27  ~1     │ ▸ models/
-   ┄ 2 ┄        │ ◇ config.go                                89 B  ~
+  ┄ 2 · 4d      │ ◇ config.go                                89 B  ~
  Sep 20  ~1     │ ◇ legacy.go                                62 B  −
-   ┄ 2 ┄        │ ◇ main.go                                  96 B  ~
+  ┄ 2 · 4d      │ ◇ main.go                                  96 B  ~
  Sep 13  ~2     │ ◇ server.go                                30 B  +
-   ┄ 1 ┄        │ ◇ util.go                                  94 B
+  ┄ 1 · 1d      │ ◇ util.go                                  94 B
  Sep 09  ~1     │
-   ┄ 1 ┄        │
+  ┄ 1 · 1d      │
 ▶Sep 06  +1~3−1 │
-   ┄ 2 ┄        │
+  ┄ 2 · 3d      │
  Sep 02  ~1     │
-   ┄ 2 ┄        │
+  ┄ 2 · 6d      │
  Aug 22  ~2−1   │
-   ┄ 1 ┄        │
+  ┄ 1 · 2d      │
  Aug 17  +1~1   │
-   ┄ 1 ┄        │
+  ┄ 1 · 1d      │
  Aug 10  ~1     │
  Aug 07  +1     │
  Aug 03  +1~1   │
-   ┄ 1 ┄        │   1 deleted · . to show
+  ┄ 1 · 2d      │   1 deleted · . to show
  NOR  Sep 06 18:03  7ff3fd58  src/ +1 ~3 −1               5/7  ? help

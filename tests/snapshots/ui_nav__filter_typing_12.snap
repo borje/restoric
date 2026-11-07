@@ -1,17 +1,16 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 62
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..                                   │ config.go · v5/5        ⇥ content
-   ┄ 2 unchanged ┄    │ ◇ config.go                       96 B │ unchanged since Sep 20 20:35
+  ┄ 2 snapshots · 5d  │ ◇ config.go                       96 B │ unchanged since Sep 20 20:35
 ▶Sep 27 08:52 ~1      │                                        │
-   ┄ 2 unchanged ┄    │                                        │   3  type Config struct {
+  ┄ 2 snapshots · 4d  │                                        │   3  type Config struct {
  Sep 20 20:35 ~1      │                                        │   4    Port int
-   ┄ 2 unchanged ┄    │                                        │   5  }
+  ┄ 2 snapshots · 4d  │                                        │   5  }
  Sep 13 20:51 ~2      │                                        │   6  // defaults
-   ┄ 1 unchanged ┄    │                                        │   7  // timeouts
+  ┄ 1 snapshot · 1d   │                                        │   7  // timeouts
  Sep 09 19:23 ~1      │                                        │   8  // listen address
-   ┄ 1 unchanged ┄    │                                        │   9+ // tls
+  ┄ 1 snapshot · 1d   │                                        │   9+ // tls
  filter: co█                                                    type to filter · ⏎ keep · esc clear

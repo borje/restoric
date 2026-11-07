@@ -81,6 +81,20 @@ pub fn ago(d: SignedDuration) -> String {
     }
 }
 
+/// A length of time in at most 4 cells: `45m`, `6h`, `7d`, `3w`, `5mo`, `2y`.
+pub fn span(d: SignedDuration) -> String {
+    let m = d.as_secs().max(0) / 60;
+    let (h, days) = (m / 60, m / 1440);
+    match days {
+        _ if m < 60 => format!("{m}m"),
+        0 => format!("{h}h"),
+        1..14 => format!("{days}d"),
+        14..60 => format!("{}w", days / 7),
+        60..730 => format!("{}mo", days / 30),
+        _ => format!("{}y", days / 365),
+    }
+}
+
 /// Whether `p` is `~` or under it: a path only a home folder can expand.
 fn in_home(p: &str) -> bool {
     p == "~" || p.starts_with("~/")
@@ -234,5 +248,16 @@ mod tests {
         assert_eq!(ago(SignedDuration::from_mins(7)), "7 min ago");
         assert_eq!(ago(SignedDuration::from_hours(3)), "3 h ago");
         assert_eq!(ago(SignedDuration::from_hours(50)), "2 d ago");
+    }
+
+    #[test]
+    fn span_fits_four_cells() {
+        let h = |n: i64| SignedDuration::from_hours(n);
+        assert_eq!(span(SignedDuration::from_mins(45)), "45m");
+        assert_eq!(span(h(6)), "6h");
+        assert_eq!(span(h(24 * 7)), "7d");
+        assert_eq!(span(h(24 * 21)), "3w");
+        assert_eq!(span(h(24 * 150)), "5mo");
+        assert_eq!(span(h(24 * 365 * 3)), "3y");
     }
 }
