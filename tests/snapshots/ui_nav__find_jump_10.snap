@@ -1,6 +1,5 @@
 ---
 source: tests/ui_nav.rs
-assertion_line: 46
 expression: "h.screen(100, 34)"
 ---
  restoric  ~/dev/project/src
@@ -15,7 +14,7 @@ expression: "h.screen(100, 34)"
  Sep 09 19:23 ~1      │                                        │
    ┄ 1 unchanged ┄    │                                        │
  Sep 06 18:03 +1~3−1  │                                        │
-▶  ┄ 2 unchanged ┄    │                                        │
+▶Sep 05 22:40 = ·2    │                                        │
  Sep 02 20:16 ~1      │                                        │
    ┄ 2 unchanged ┄    │                                        │
  Aug 22 11:59 ~2−1    │                                        │

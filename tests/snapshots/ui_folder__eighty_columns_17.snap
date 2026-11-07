@@ -1,11 +1,10 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 41
 expression: "h.screen(80, 34)"
 ---
  restoric  ~/dev/project/src
  on disk  ~1          │   ..
-▶  ┄ 2 unchanged ┄    │ ▸ api/
+▶Oct 02 12:21 = ·2    │ ▸ api/
  Sep 27 08:52 ~1      │ ▸ models/
    ┄ 2 unchanged ┄    │ ◇ config.go                                        96 B
  Sep 20 20:35 ~1      │ ◇ main.go                                         108 B

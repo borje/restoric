@@ -129,15 +129,25 @@ pub fn draw(app: &App, g: &mut Grid) {
                             g.hit(v0, v1 + 1, y, Action::GoDisk);
                         }
                         VRow::Fold { from, to } => {
+                            let n = to - from + 1;
                             if here {
+                                // The snapshot the cursor is on, unchanged
+                                // from the version below: `Oct 02 12:21  = ·2`.
+                                g.fill(y, v0, v1, t.selected);
                                 g.put(v0, y, "▶", t.accent);
+                                let date = match p.compact {
+                                    true => fmt::short(s.set[i].time, &app.tz, app.clock()),
+                                    false => fmt::time(s.set[i].time, &app.tz, app.clock()),
+                                };
+                                g.put(v0 + 1, y, &date, t.bold);
+                                g.put_to(v0 + counts_at, y, &format!("= ·{n}"), t.dim, v1);
+                            } else {
+                                let label = match p.compact {
+                                    true => format!("┄ {n} ┄"),
+                                    false => format!("┄ {n} unchanged ┄"),
+                                };
+                                g.put_to(v0 + 3, y, &label, t.dim2, v1);
                             }
-                            let label = match p.compact {
-                                true => format!("┄ {} ┄", to - from + 1),
-                                false => format!("┄ {} unchanged ┄", to - from + 1),
-                            };
-                            let style = if here { t.accent } else { t.dim2 };
-                            g.put_to(v0 + 3, y, &label, style, v1);
                             // A click goes to the newest labelled snapshot, if any.
                             let labelled = (*from..=*to).rev().find(|&j| noted(j));
                             if labelled.is_some() {
