@@ -35,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                          │ Jumped to Sep 05 22:40, the last snapshot that │
                       │                          │ has legacy.go                                  │
                       │   1 deleted · . to show  ╰────────────────────────────────────────────────╯
- NOR  Sep 05 22:40  f7eae1d9  unchanged since Sep 02             modified Jul 14 09:00  4/6  ? help
+ NOR  Sep 05 22:40 · 4w ago  f7eae1d9  unchanged since Sep 02    modified Jul 14 09:00  4/6  ? help

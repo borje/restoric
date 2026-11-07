@@ -1,6 +1,5 @@
 ---
 source: tests/ui_picker.rs
-assertion_line: 307
 expression: "h.screen(100, 34)"
 ---
  restoric  dev-vm:/srv/data
@@ -36,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Sep 01 10:00  314436b3  data/ ~1                                                  1/3  ? help
+ NOR  Sep 01 10:00 · 4w ago  314436b3  data/ ~1                                         1/3  ? help

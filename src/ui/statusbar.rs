@@ -110,6 +110,8 @@ pub fn draw(app: &App, g: &mut Grid) {
             }
         }
     };
+    // ` · 2mo ago`: how long before now a snapshot was taken.
+    let ago = |time| format!(" · {} ago", fmt::span(app.clock().duration_since(time)));
     // What the listing compares with, when it's a pinned base (`b`).
     let base = app.base.and_then(|b| app.snapshot(b)).map(|b| {
         let vs = format!("vs {} (base)", fmt::time(b.time, &app.tz, app.clock()));
@@ -128,6 +130,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                 format!("vs {}", fmt::day(s.time, &app.tz, app.clock())),
                 t.dim,
             ));
+            mid.push((ago(s.time), t.dim));
             mid.push(("  ".into(), t.text));
         }
         match (app.live.get(&app.folder), set.last()) {
@@ -146,6 +149,7 @@ pub fn draw(app: &App, g: &mut Grid) {
     } else {
         if let Some(s) = set.get(i) {
             mid.push((fmt::time(s.time, &app.tz, app.clock()), t.bold));
+            mid.push((ago(s.time), t.dim));
             mid.push(("  ".into(), t.text));
             mid.push((s.id.0.short(), t.accent));
             mid.push(("  ".into(), t.text));

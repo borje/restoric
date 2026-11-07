@@ -35,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                                        │ │ G    bottom (no prefix)        │
                       │                                        │ ╰────────────────────────────────╯
                       │   2 deleted · . to show                │
- NOR  Sep 27 08:52  c177b849  src/ ~1                                                g  1/6  ? help
+ NOR  Sep 27 08:52 · 8d ago  c177b849  src/ ~1                                       g  1/6  ? help

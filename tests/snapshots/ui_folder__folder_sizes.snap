@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 393
 expression: "h.screen(100, 12)"
 ---
  restoric  ~/Bilder
@@ -14,4 +13,4 @@ expression: "h.screen(100, 12)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Jul 02 10:00  34157dda  Bilder/ +1 ~2  9 B +5 B new or changed                    1/6  ? help
+ NOR  Jul 02 10:00 · 3mo ago  34157dda  Bilder/ +1 ~2  9 B +5 B new or changed          1/6  ? help

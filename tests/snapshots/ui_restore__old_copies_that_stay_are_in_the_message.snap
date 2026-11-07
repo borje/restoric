@@ -13,7 +13,7 @@ expression: "screens.join(\"\\n\\n\")"
   ┄ 1 snapshot · 1d   │                          │ 00/files/0/config.go: Permission denied (os    │
  Sep 09 19:23 ~1      │                          │ error 13)                                      │
   ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
- NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+ NOR  Sep 27 08:52 · 8d ago  c177b849  src/ ~1                                          1/6  ? help
 
 
  restoric  ~/dev/project/src
@@ -27,7 +27,7 @@ expression: "screens.join(\"\\n\\n\")"
   ┄ 1 snapshot · 1d   │                          │ ~/.local/share/restoric/undo/20260909T192300.0 │
  Sep 09 19:23 ~1      │                          │ 00: Permission denied (os error 13)            │
   ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
- NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+ NOR  Sep 27 08:52 · 8d ago  c177b849  src/ ~1                                          1/6  ? help
 
 
  restoric  ~/dev/project/src
@@ -41,7 +41,7 @@ expression: "screens.join(\"\\n\\n\")"
   ┄ 1 snapshot · 1d   │                          ╭────────────────────────────────────────────────╮
  Sep 09 19:23 ~1      │                          │ Nothing was left to put back.                  │
   ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
- NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+ NOR  Sep 27 08:52 · 8d ago  c177b849  src/ ~1                                          1/6  ? help
 
 
  restoric  ~/dev/project/src
@@ -55,4 +55,4 @@ expression: "screens.join(\"\\n\\n\")"
   ┄ 1 snapshot · 1d   │                          │ 00/files/0/config.go: Permission denied (os    │
  Sep 09 19:23 ~1      │                          │ error 13)                                      │
   ┄ 1 snapshot · 1d   │   2 deleted · . to show  ╰────────────────────────────────────────────────╯
- NOR  Sep 27 08:52  c177b849  src/ ~1                                                   1/6  ? help
+ NOR  Sep 27 08:52 · 8d ago  c177b849  src/ ~1                                          1/6  ? help

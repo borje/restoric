@@ -35,4 +35,4 @@ expression: "h.screen(100, 34)"
                       │                                        │ │ zc   hide / show unchanged     │
                       │                                        │ ╰────────────────────────────────╯
                       │   2 deleted · . to show                │
- NOR  Sep 09 19:23  811fc3af  src/ ~1                         z  modified Sep 09 19:23  4/6  ? help
+ NOR  Sep 09 19:23 · 3w ago  811fc3af  src/ ~1                z  modified Sep 09 19:23  4/6  ? help

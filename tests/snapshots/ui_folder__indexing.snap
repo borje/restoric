@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 97
 expression: "ui::text(&buf)"
 ---
  restoric  /home/bege/dev/project/src                                                     indexing…
@@ -14,4 +13,4 @@ expression: "ui::text(&buf)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Oct 02 12:21  fc0971c5                                                                 ? help
+ NOR  Oct 02 12:21 · 5w ago  fc0971c5                                                        ? help

@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 370
 expression: "h.screen(100, 14)"
 ---
  restoric  ~/Bilder
@@ -16,4 +15,4 @@ expression: "h.screen(100, 14)"
                       │                                        │
                       │                                        │
                       │   3 unchanged · zc to show             │
- NOR  Jul 02 10:00  34157dda  Bilder/ +1 ~2                                             1/3  ? help
+ NOR  Jul 02 10:00 · 3mo ago  34157dda  Bilder/ +1 ~2                                   1/3  ? help

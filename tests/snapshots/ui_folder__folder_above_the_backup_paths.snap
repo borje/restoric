@@ -1,6 +1,5 @@
 ---
 source: tests/ui_folder.rs
-assertion_line: 226
 expression: "h.screen(100, 20)"
 ---
  restoric  ~/trading
@@ -22,4 +21,4 @@ expression: "h.screen(100, 20)"
                       │                                        │
                       │                                        │
                       │                                        │
- NOR  Sep 02 10:00  afde6ef6  trading/ ~1                                               1/1  ? help
+ NOR  Sep 02 10:00 · 4w ago  afde6ef6  trading/ ~1                                      1/1  ? help
