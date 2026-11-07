@@ -227,3 +227,20 @@ disk
     command(&mut h, "set nobytes");
     assert_eq!((versions(&h), on_disk(&h)), (3, Some(1)));
 }
+
+/// Every view draws, or says it can't, at any height.
+#[test]
+fn tiny_terminals_dont_panic() {
+    let mut h = Harness::new(SRC);
+    h.keys("slegacy").key(KeyCode::Enter);
+    let mut v = Harness::new(SRC);
+    v.select("main.go").keys("l");
+    let mut d = Harness::new(SRC);
+    d.select("main.go").keys("d");
+    for rows in 1..10 {
+        h.screen(100, rows);
+        v.screen(100, rows);
+        d.screen(100, rows);
+    }
+    assert!(h.screen(100, 5).contains("too small"));
+}

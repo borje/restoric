@@ -188,3 +188,13 @@ fn q_after_the_picker_goes_back_to_it() {
     h.keys(":q").key(KeyCode::Enter);
     assert!(h.app.quit && !h.app.to_picker);
 }
+
+/// `G` scrolls the diff to its last line, whatever the terminal height.
+#[test]
+fn bottom_shows_the_last_line() {
+    let mut h = Harness::with(&long_file(), "/home/bege/data");
+    h.select("long.txt").keys("lp");
+    h.screen(100, 20);
+    h.keys("G");
+    assert!(h.screen(100, 20).contains("line 394"));
+}

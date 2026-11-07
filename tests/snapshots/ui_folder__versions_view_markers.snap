@@ -1,0 +1,13 @@
+---
+source: tests/ui_folder.rs
+assertion_line: 336
+expression: "h.screen(100, 8)"
+---
+ restoric  Versions  ~/data/a.txt                                         2 versions in 4 snapshots
+ VERSION         SIZE  SNAPSHOTS  VS DISK       │a.txt · Jul 01 10:00                    ⇥ content
+ on disk          9 B                           │kept in 3 snapshots · a4e1ae87
+ Jul 03 10:00     9 B  1 snap     identical     │
+▶Jul 01 10:00     4 B  3 snaps    +1 −1       b▵│  1  one
+                                                │
+                                                │
+ NOR  ~/data/a.txt                                                                      2/2  ? help

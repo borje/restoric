@@ -99,7 +99,7 @@ Vim keys and arrows, meaning what they mean in yazi where they can. Press `?` fo
 | `:set strict` `:set bytes` | Count every change / only content (`:set nostrict`, `:set nobytes` go back) |
 | `q` | Back one level: from the folder view, to the picker if restoric started there, else quit (`Ctrl-c` and `:q` always quit) |
 
-The mouse works too: click rows, the breadcrumb and the arrows.
+The mouse works too: click rows, the breadcrumb and `? help`.
 
 ## Config
 

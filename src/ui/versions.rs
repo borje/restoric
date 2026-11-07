@@ -97,6 +97,20 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         let n = run.snapshots();
         let snaps = format!("{n} snap{}", if n > 1 { "s" } else { "" });
         g.put(23, y, &snaps, t.dim);
+        // `b`: the pinned base is in this run; `▵`: a labelled snapshot is.
+        let snaps = &track.set[run.from..=run.to];
+        let mut end = l1 + 1;
+        if snaps
+            .iter()
+            .any(|s| !s.label.is_empty() || s.description.is_some())
+        {
+            g.put(l1, y, "▵", t.dim);
+            end = l1;
+        }
+        if app.base.is_some_and(|b| snaps.iter().any(|s| s.id == b)) {
+            g.put(l1 - 1, y, "b", t.accent.patch(t.bold));
+            end = l1 - 1;
+        }
         if !run.exists {
             g.put(14, y, "deleted", t.deleted);
             continue;
@@ -111,8 +125,8 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
                 g.put(34, y, "identical", t.added);
             }
             Some(Some((a, d))) => {
-                let c = g.put_to(34, y, &format!("+{a}"), t.added, l1 + 1);
-                g.put_to(c + 1, y, &format!("−{d}"), t.deleted, l1 + 1);
+                let c = g.put_to(34, y, &format!("+{a}"), t.added, end);
+                g.put_to(c + 1, y, &format!("−{d}"), t.deleted, end);
             }
             Some(None) => {
                 g.put(34, y, "binary", t.dim);

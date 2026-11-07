@@ -271,7 +271,11 @@ impl App {
         match m.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let a = hits.at(m.column, m.row);
-                let moves = matches!(a, Some(Action::GoSnapshot(_) | Action::GoDisk));
+                // Clicking the selected version opens its diff: not a move.
+                let moves = match (&a, &self.view) {
+                    (Some(Action::ClickVersion(k)), View::Versions(v)) => *k != v.sel || v.disk,
+                    _ => matches!(a, Some(Action::GoSnapshot(_) | Action::GoDisk)),
+                };
                 if self.help || (self.info && !moves) {
                     self.help = false;
                     self.info = false;

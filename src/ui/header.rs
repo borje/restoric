@@ -1,16 +1,14 @@
 //! The header: row 0.
 
-use ratatui::style::Style;
-
 use super::{Grid, fmt};
 use crate::app::{Action, App, View};
 
-/// Row 0: `restoric`, the breadcrumb, and the version or indexing progress.
+/// Row 0: `restoric`, the breadcrumb, and the version count or indexing progress.
 pub fn draw(app: &App, g: &mut Grid) {
     let t = g.theme.clone();
     let cols = g.cols();
     let mut c = g.put(1, 0, "restoric", t.accent.patch(t.bold)) + 2;
-    let mut right: Vec<(String, Style, Option<Action>)> = Vec::new();
+    let mut right = None;
 
     if let View::Versions(v) = &app.view {
         c = g.put(c, 0, "Versions  ", t.bold);
@@ -18,11 +16,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         if let Some(tr) = app.tracks.get(&v.path).filter(|t| t.loaded()) {
             let n = tr.runs.iter().filter(|r| r.exists).count();
             let s = if n == 1 { "" } else { "s" };
-            right.push((
-                format!("{n} version{s} in {} snapshots", tr.set.len()),
-                t.dim,
-                None,
-            ));
+            right = Some(format!("{n} version{s} in {} snapshots", tr.set.len()));
         }
     } else {
         // The backup root is one part; folders below it are one part each.
@@ -53,18 +47,16 @@ pub fn draw(app: &App, g: &mut Grid) {
                     Some((d, n)) => format!("indexing {d}/{n}"),
                     None => "indexing…".to_string(),
                 };
-                right.push((p, t.dim, None));
+                right = Some(p);
             }
             _ => {}
         }
     }
 
-    let len: usize = right.iter().map(|(s, _, _)| fmt::width(s)).sum();
-    let mut rc = (cols as usize).saturating_sub(1 + len).max(c as usize + 1) as u16;
-    for (s, style, a) in right {
-        rc = match a {
-            Some(a) => g.put_act(rc, 0, &s, style, a),
-            None => g.put(rc, 0, &s, style),
-        };
+    if let Some(r) = right {
+        let x = (cols as usize)
+            .saturating_sub(1 + fmt::width(&r))
+            .max(c as usize + 1);
+        g.put(x as u16, 0, &r, t.dim);
     }
 }

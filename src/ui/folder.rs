@@ -127,10 +127,12 @@ pub fn draw(app: &App, g: &mut Grid) {
                             let label = format!("┄ {} unchanged ┄", to - from + 1);
                             let style = if here { t.accent } else { t.dim2 };
                             g.put_to(v0 + 3, y, &label, style, v1);
-                            if (*from..=*to).any(noted) {
+                            // A click goes to the newest labelled snapshot, if any.
+                            let labelled = (*from..=*to).rev().find(|&j| noted(j));
+                            if labelled.is_some() {
                                 g.put(v1, y, "▵", t.dim);
                             }
-                            g.hit(v0, v1 + 1, y, Action::GoSnapshot(*to));
+                            g.hit(v0, v1 + 1, y, Action::GoSnapshot(labelled.unwrap_or(*to)));
                         }
                         VRow::Version(v) => {
                             if here {
@@ -140,7 +142,8 @@ pub fn draw(app: &App, g: &mut Grid) {
                             let date = fmt::time(s.set[*v].time, &app.tz, app.clock());
                             g.put(v0 + 1, y, &date, if here { t.bold } else { t.text });
                             if let Some(c) = s.counts.get(v) {
-                                put_counts(g, v0 + 14, y, c, "", v1);
+                                let end = if noted(*v) { v1 } else { v1 + 1 };
+                                put_counts(g, v0 + 14, y, c, "", end);
                             }
                             if noted(*v) {
                                 g.put(v1, y, "▵", t.dim);

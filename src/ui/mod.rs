@@ -162,11 +162,16 @@ pub fn draw(app: &mut App, buf: &mut Buffer, area: Rect, theme: &Theme) -> Hits 
         theme,
         hits: Hits::default(),
     };
-    if g.rows() < TOP + 3 || g.cols() < 40 {
+    // The find and versions views put 3 rows above their lists.
+    if g.rows() < 6 || g.cols() < 40 {
         g.put(0, 0, "restoric: the terminal is too small", theme.text);
         return g.hits;
     }
-    app.page = (g.rows() - TOP - 1) as usize;
+    // Rows of the pane being scrolled: the diff starts a row lower.
+    app.page = match app.view {
+        View::Diff(_) => g.rows() - 3,
+        _ => g.rows() - TOP - 1,
+    } as usize;
     match app.view.clone() {
         View::Folder => {
             header::draw(app, &mut g);

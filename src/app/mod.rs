@@ -889,7 +889,7 @@ impl App {
         }
     }
 
-    fn want_live(&mut self, path: &Path, item: bool) {
+    fn want_live(&mut self, path: &Path) {
         // A disk listing on its way brings the counts with it.
         let listing = Pending::Listing(Version::Disk, None, path.to_path_buf());
         if !self.live.contains_key(path) && !self.pending.contains(&listing) {
@@ -899,7 +899,7 @@ impl App {
                 Request::Live {
                     set,
                     path: path.to_path_buf(),
-                    item,
+                    item: false,
                 },
             );
         }
@@ -996,7 +996,7 @@ impl App {
         self.want_track(&folder, false);
         // Before the counts: a disk listing brings them with it.
         self.want_listing(&folder, self.snap);
-        self.want_live(&folder, false);
+        self.want_live(&folder);
         self.want_counts(&folder);
         if self.set().is_empty() {
             return;
@@ -1098,7 +1098,6 @@ impl App {
             if e.is_dir() {
                 self.want_disk_listing(&path);
             }
-            self.want_live(&path, true);
             if e.is_dir() || e.node.kind != NodeKind::File {
                 return;
             }
@@ -1111,7 +1110,6 @@ impl App {
             }
             return;
         }
-        self.want_live(&path, true);
         let s = self.entry_snapshot(&e);
         let snap_id = self.set().get(s).map(|x| x.id);
         if e.is_dir() {
@@ -1150,7 +1148,6 @@ impl App {
     fn ensure_versions(&mut self, v: &VersionsView) {
         let path = v.path.clone();
         self.want_track(&path, false);
-        self.want_live(&path, true);
         self.want_disk(&path);
         let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
             return;
@@ -2320,15 +2317,6 @@ impl App {
                 }
                 if !up(self, &mut disk) {
                     return false;
-                }
-            }
-            Action::GoSnapshot(j) => {
-                // Going to a snapshot selects the version holding it.
-                if let Some(t) = self.tracks.get(&v.path)
-                    && let Some((k, _)) = run_at(&t.runs, j)
-                {
-                    disk = false;
-                    sel = t.runs.len() - 1 - k;
                 }
             }
             Action::Open | Action::Diff | Action::DiffPrevious if disk => {

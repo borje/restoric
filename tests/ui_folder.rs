@@ -316,6 +316,7 @@ snapshot 2026-07-01 10:00
   write a.txt one\\n
   write b.txt two\\n
 snapshot 2026-07-02 10:00 label=checkpoint
+snapshot 2026-07-02 12:00
 snapshot 2026-07-03 10:00
   write a.txt one more\\n
 ";
@@ -325,6 +326,45 @@ snapshot 2026-07-03 10:00
 fn versions_column_markers() {
     let mut h = Harness::with(FOLDED_LABEL, "/home/bege/data");
     insta::assert_snapshot!(h.screen(100, 8));
+    // The fold's click goes to its labelled snapshot, not its newest.
+    let area = Rect::new(0, 0, 100, 8);
+    let hits = ui::draw(
+        &mut h.app,
+        &mut Buffer::empty(area),
+        area,
+        &Theme::new(false),
+    );
+    let goes = |j| hits.areas.iter().any(|(_, a)| *a == Action::GoSnapshot(j));
+    assert!(goes(1) && !goes(2));
+    // In a file's versions, `▵` on the labelled run and `b` on the base's.
+    h.at("2026-07-01 10:00").keys("b").select("a.txt").keys("l");
+    insta::assert_snapshot!("versions_view_markers", h.screen(100, 8));
+}
+
+/// Counts that fill the Versions column to its edge are shown whole.
+#[test]
+fn versions_column_fits_long_counts() {
+    let gone: String = (0..345)
+        .map(|k| format!("  write f{k}.txt x\\n\n"))
+        .collect();
+    let rm: String = (0..345).map(|k| format!("  rm f{k}.txt\n")).collect();
+    let dsl = format!(
+        "root /home/bege/data\nsnapshot 2026-07-01 10:00\n  write a.txt a\\n\n  write b.txt b\\n\n{gone}\
+         snapshot 2026-07-02 10:00\n  write a.txt aa\\n\n  write b.txt bb\\n\n  write c.txt c\\n\n{rm}"
+    );
+    let mut h = Harness::with(&dsl, "/home/bege/data");
+    assert!(h.screen(100, 8).contains("+1~2−345"));
+}
+
+/// Selecting an item doesn't walk it on disk: only the folder's counts show.
+#[test]
+fn selecting_asks_no_disk_counts() {
+    let mut h = Harness::new(SRC);
+    h.select("api").screen(100, 20);
+    h.select("main.go").screen(100, 20);
+    let item = |n: &str| PathBuf::from(SRC).join(n);
+    assert!(!h.app.live.contains_key(&item("api")));
+    assert!(!h.app.live.contains_key(&item("main.go")));
 }
 
 /// A click on a Versions-column row keeps the details open on that snapshot;
@@ -361,6 +401,14 @@ fn snapshot_info_follows_clicks() {
     assert!(h.app.info);
     assert_eq!(h.app.info_snapshot().map(|(_, n, _)| n), Some(1));
     click(&mut h, None);
+    assert!(!h.app.info);
+    // In the versions view, a click on another version follows it; one on
+    // the selected version (which opens its diff) closes them.
+    h.select("a.txt").keys("li");
+    click(&mut h, Some(Action::ClickVersion(0)));
+    assert!(h.app.info);
+    assert_eq!(h.app.info_snapshot().map(|(_, n, _)| n), Some(2));
+    click(&mut h, Some(Action::ClickVersion(0)));
     assert!(!h.app.info);
 }
 
