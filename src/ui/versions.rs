@@ -78,9 +78,9 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
         g.hit(0, l1 + 1, y, Action::ClickVersion(k));
         let date = fmt::time(track.set[run.from].time, &app.tz, app.clock());
         g.put(1, y, &date, if here { t.bold } else { t.text });
-        let n = run.snapshots();
-        let snaps = format!("{n} snap{}", if n > 1 { "s" } else { "" });
-        g.put(23, y, &snaps, t.dim);
+        // Right-aligned under SNAPSHOTS.
+        let n = run.snapshots().to_string();
+        g.put(32 - fmt::width(&n) as u16, y, &n, t.dim);
         // `b`: the pinned base is in this run; `▵`: a labelled snapshot is.
         let snaps = &track.set[run.from..=run.to];
         let mut end = l1 + 1;
@@ -109,8 +109,14 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
                 g.put(34, y, "identical", t.added);
             }
             Some(Some((a, d))) => {
-                let c = g.put_to(34, y, &format!("+{a}"), t.added, end);
-                g.put_to(c + 1, y, &format!("−{d}"), t.deleted, end);
+                // Only the sides that aren't zero: `+3`, `−1`, `+3 −1`.
+                let mut c = 34;
+                if a > 0 {
+                    c = g.put_to(c, y, &format!("+{a}"), t.added, end) + 1;
+                }
+                if d > 0 {
+                    g.put_to(c, y, &format!("−{d}"), t.deleted, end);
+                }
             }
             Some(None) => {
                 g.put(34, y, "binary", t.dim);
