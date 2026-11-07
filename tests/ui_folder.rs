@@ -8,15 +8,18 @@ use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::layout::Rect;
 
 use common::{Harness, PROJECT, SRC};
-use restoric::app::{Action, App};
+use restoric::app::{Action, App, View};
 use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::ui;
 use restoric::ui::theme::Theme;
+use restoric::worker::Request;
 
 #[test]
 fn starts_at_the_newest_change() {
@@ -161,6 +164,54 @@ fn versions_13() {
     let mut h = Harness::new(SRC);
     h.at("2026-09-09 19:23").select("main.go").keys("l");
     insta::assert_snapshot!(h.screen(100, 34));
+}
+
+/// `vs disk` is diffed by the worker: `loading…` until it's done.
+#[test]
+fn preview_vs_disk_loading() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("main.go").keys("l");
+    h.app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    let held = h.pump_holding(|r| matches!(r, Request::PreviewDiff { .. }));
+    insta::assert_snapshot!(h.screen(100, 34));
+    h.release(held);
+    let mut want = Harness::new(SRC);
+    want.at("2026-09-09 19:23")
+        .select("main.go")
+        .keys("l")
+        .key(KeyCode::Tab);
+    assert_eq!(h.screen(100, 34), want.screen(100, 34));
+}
+
+/// The margin marks wait for the worker's diff; the content doesn't.
+#[test]
+fn margin_marks_loading() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("main.go").keys("l");
+    h.app
+        .key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    let held = h.pump_holding(|r| matches!(r, Request::PreviewDiff { .. }));
+    insta::assert_snapshot!(h.screen(100, 34));
+    h.release(held);
+    let mut want = Harness::new(SRC);
+    want.at("2026-09-09 19:23").select("main.go").keys("lj");
+    assert_eq!(h.screen(100, 34), want.screen(100, 34));
+    assert!(h.screen(100, 34).contains("│ 10+ // serve"));
+}
+
+/// VS DISK is diffed by the worker: `…` on each row until it's done.
+#[test]
+fn versions_vs_disk_loading() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-09 19:23").select("main.go");
+    h.app
+        .key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+    let held = h.pump_holding(|r| matches!(r, Request::DiskStat { .. }));
+    insta::assert_snapshot!(h.screen(100, 34));
+    h.release(held);
+    let mut want = Harness::new(SRC);
+    want.at("2026-09-09 19:23").select("main.go").keys("l");
+    assert_eq!(h.screen(100, 34), want.screen(100, 34));
 }
 
 #[test]
@@ -410,6 +461,13 @@ fn snapshot_info_follows_clicks() {
     assert_eq!(h.app.info_snapshot().map(|(_, n, _)| n), Some(2));
     click(&mut h, Some(Action::ClickVersion(0)));
     assert!(!h.app.info);
+    // So with `on disk`: a click selects it, one on it closes them.
+    h.keys("i");
+    click(&mut h, Some(Action::GoDisk));
+    assert!(h.app.info);
+    assert!(matches!(&h.app.view, View::Versions(v) if v.disk));
+    click(&mut h, Some(Action::GoDisk));
+    assert!(!h.app.info);
 }
 
 const PHOTOS: &str = "
@@ -573,4 +631,22 @@ fn empty_folder_hint() {
         "/r/void",
     );
     insta::assert_snapshot!(h.screen(100, 14));
+}
+
+/// VS DISK is asked for the rows on screen: a taller terminal asks for
+/// the rows it shows once it's drawn.
+#[test]
+fn versions_vs_disk_after_resize() {
+    let mut dsl = String::from("host bege-laptop\nroot /home/bege/data\n");
+    for d in 0..60 {
+        let (hour, min) = (10 + d / 6, d % 6 * 10);
+        dsl += &format!("snapshot 2026-07-01 {hour:02}:{min:02}\n  write a.txt v{d}\\n\n");
+    }
+    let mut h = Harness::with(&dsl, "/home/bege/data");
+    h.select("a.txt").keys("l");
+    assert!(h.screen(100, 80).contains("…"));
+    h.app.page_changed();
+    h.pump();
+    let s = h.screen(100, 80);
+    assert!(!s.contains("…"), "{s}");
 }

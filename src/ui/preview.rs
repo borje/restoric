@@ -158,13 +158,16 @@ pub fn content(
                 (pt, text, "Identical to the latest snapshot.")
             }
         };
-        let d = diff::diff(&old_text, &new_text);
-        if d.identical() {
+        let Some(d) = app.preview_diff() else {
+            g.put(x0, top, "loading…", t.dim);
+            return;
+        };
+        if d.lines.is_empty() {
             g.put(x0, top, same, t.added);
             return;
         }
         let (old, new) = (diff::lines(&old_text), diff::lines(&new_text));
-        let lines = diff::hunks(&d, 3);
+        let lines = &d.lines;
         let off = app.scroll.unwrap_or(0).min(lines.len().saturating_sub(h));
         app.scroll_base.set(off);
         for (k, l) in lines.iter().skip(off).take(h).enumerate() {
@@ -188,14 +191,9 @@ pub fn content(
     }
 
     let lines = diff::lines(&text);
-    let marks = match prev {
-        Some(Some(p)) => match app.files.get(&fingerprint::content(p)) {
-            Some(pb) => diff::text(&pb.data).map(|pt| diff::marks(&diff::diff(&pt, &text))),
-            None => None,
-        },
-        _ => None,
-    }
-    .unwrap_or_default();
+    // Until the worker has diffed it with the version before, unmarked.
+    let unmarked = diff::Marks::default();
+    let marks = app.preview_diff().map_or(&unmarked, |d| &d.marks);
     let auto = marks.first().map_or(0, |f| f.saturating_sub(4));
     let off = app
         .scroll

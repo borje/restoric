@@ -6,7 +6,7 @@ pub mod cmdline;
 pub mod keys;
 pub mod selection;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -15,7 +15,9 @@ use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 
-use crate::diff::{self, DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, SideKey};
+use crate::diff::{
+    self, DIFF_LIMIT, DiffKey, FORCED_LIMIT, FileDiff, HunkLine, PreviewDiff, PreviewKey, SideKey,
+};
 use crate::index::NodeRef;
 use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
@@ -299,6 +301,9 @@ impl Action {
 /// A listing by version, the base it's compared with (`b`) and folder.
 pub type ListingKey = (Version, Option<SnapshotId>, PathBuf);
 
+/// The preview's diff, by its sides and the bytes it was made from.
+type PreviewEntry = (PreviewKey, Arc<FileBytes>, Arc<FileBytes>, Arc<PreviewDiff>);
+
 /// Lines added and removed going to the file on disk; `None` for binary.
 pub type DiskStat = Option<(usize, usize)>;
 
@@ -315,6 +320,8 @@ enum Pending {
     /// Asked once per folder; never forgotten.
     Counts(PathBuf),
     Diff(DiffKey),
+    DiskStat(Fp, PathBuf),
+    PreviewDiff(PreviewKey),
     Size(TreeId),
     Added(SnapshotId, Option<SnapshotId>, PathBuf),
 }
@@ -391,11 +398,16 @@ pub struct App {
     /// File contents on disk (`None`: missing or not a file).
     pub disk_files: HashMap<PathBuf, Option<Arc<FileBytes>>>,
     /// Lines added and removed against disk, by (content, path).
-    pub disk_stats: RefCell<HashMap<(Fp, PathBuf), DiskStat>>,
+    pub disk_stats: HashMap<(Fp, PathBuf), DiskStat>,
     /// Nodes at (path, snapshot index in the path's set).
     pub nodes: HashMap<(PathBuf, usize), Option<Node>>,
     /// Full-screen diffs.
     pub diffs: HashMap<DiffKey, Arc<FileDiff>>,
+    /// Bumped when what was read from disk is forgotten, so diffs against
+    /// disk asked for before are dropped.
+    disk_epoch: u64,
+    /// The preview's diff and the bytes it's of: only the latest is kept.
+    preview_diff: Option<PreviewEntry>,
     pending: HashSet<Pending>,
     /// Show items deleted earlier (`.`).
     pub ghosts: bool,
@@ -533,9 +545,11 @@ impl App {
             live: HashMap::new(),
             files: HashMap::new(),
             disk_files: HashMap::new(),
-            disk_stats: RefCell::new(HashMap::new()),
+            disk_stats: HashMap::new(),
             nodes: HashMap::new(),
             diffs: HashMap::new(),
+            disk_epoch: 0,
+            preview_diff: None,
             pending: HashSet::new(),
             ghosts: false,
             hide_new: false,
@@ -899,7 +913,6 @@ impl App {
                 Request::Live {
                     set,
                     path: path.to_path_buf(),
-                    item: false,
                 },
             );
         }
@@ -1027,12 +1040,19 @@ impl App {
             View::Diff(d) => self.ensure_diff(&d),
             View::Find(_) => {}
         }
+        self.want_preview_diff();
 
         let key = self.preview_key();
         if key != self.scroll_key {
             self.scroll_key = key;
             self.scroll = None;
         }
+    }
+
+    /// The panes' size changed at the last draw (the terminal was
+    /// resized): asks for what fits now.
+    pub fn page_changed(&mut self) {
+        self.ensure();
     }
 
     /// `S`: the size of every folder in the listing, and what this
@@ -1152,6 +1172,7 @@ impl App {
         let Some(t) = self.tracks.get(&path).filter(|t| t.loaded()) else {
             return;
         };
+        let runs: Vec<Run> = t.runs.iter().rev().copied().collect();
         let starts: Vec<usize> = t
             .runs
             .iter()
@@ -1166,6 +1187,121 @@ impl App {
                 self.want_file(&n);
             }
         }
+        let node = |s: usize| self.nodes.get(&(path.clone(), s)).cloned().flatten();
+        let latest = runs.iter().find(|r| r.exists).and_then(|r| node(r.from));
+        // VS DISK for the rows that can be on screen, and the newest
+        // version (the `on disk` row's subtitle).
+        let rows = runs
+            .iter()
+            .enumerate()
+            .skip(v.sel.saturating_sub(self.page))
+            .take(2 * self.page + 1)
+            .filter(|(_, r)| r.exists)
+            .filter_map(|(_, r)| node(r.from));
+        let nodes: Vec<Node> = latest.into_iter().chain(rows).collect();
+        for n in nodes {
+            self.want_disk_stat(&n, &path);
+        }
+    }
+
+    /// The two files the preview diffs, and the file's path: from a
+    /// version in the repository to the one after (margin marks), or to
+    /// the file on disk (`None`: `vs disk`; for the file on disk, its
+    /// margin marks and `vs latest` against the newest version).
+    pub fn preview_sides(&self) -> Option<(&Node, Option<&Node>, PathBuf)> {
+        match &self.view {
+            View::Folder => {
+                let e = self.selected()?;
+                if e.is_dir() || e.node.kind != NodeKind::File {
+                    return None;
+                }
+                let path = self.folder.join(&e.node.name);
+                if self.on_disk() && !e.is_gone() {
+                    return Some((self.latest_version(&path)??, None, path));
+                }
+                if self.preview == PreviewMode::Disk {
+                    return Some((&e.node, None, path));
+                }
+                let snap = self.set().get(self.entry_snapshot(e))?.id;
+                let t = self.tracks.get(&path).filter(|t| t.loaded())?;
+                let prev = self.previous_version(&path, t.index_of(snap)?)??;
+                Some((prev, Some(&e.node), path))
+            }
+            View::Versions(v) => {
+                let t = self.tracks.get(&v.path).filter(|t| t.loaded())?;
+                let node = |r: &Run| self.nodes.get(&(v.path.clone(), r.from))?.as_ref();
+                let mut runs = t.runs.iter().rev();
+                if v.disk {
+                    return Some((node(runs.find(|r| r.exists)?)?, None, v.path.clone()));
+                }
+                let n = node(runs.nth(v.sel).filter(|r| r.exists)?)?;
+                if self.preview == PreviewMode::Disk {
+                    return Some((n, None, v.path.clone()));
+                }
+                Some((node(runs.find(|r| r.exists)?)?, Some(n), v.path.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    /// [`App::preview_sides`] and the starts of both files, once read.
+    fn preview_bytes(&self) -> Option<(PreviewKey, Arc<FileBytes>, Arc<FileBytes>)> {
+        let (old, new, path) = self.preview_sides()?;
+        let repo = |n: &Node| {
+            let fp = fingerprint::content(n);
+            Some((SideKey::Content(fp), self.files.get(&fp)?.clone()))
+        };
+        let (ok, ob) = repo(old)?;
+        let (nk, nb) = match new {
+            Some(n) => repo(n)?,
+            None => (
+                SideKey::Disk(path.clone()),
+                self.disk_files.get(&path)?.clone()?,
+            ),
+        };
+        Some(((ok, nk), ob, nb))
+    }
+
+    /// The preview's diff, if the worker made it from the bytes still held.
+    pub fn preview_diff(&self) -> Option<&PreviewDiff> {
+        let (key, old, new) = self.preview_bytes()?;
+        let (k, o, n, d) = self.preview_diff.as_ref()?;
+        (*k == key && Arc::ptr_eq(o, &old) && Arc::ptr_eq(n, &new)).then_some(d.as_ref())
+    }
+
+    /// Whether the preview's diff is on its way, its bytes all read.
+    pub fn awaiting_preview_diff(&self) -> bool {
+        self.preview_diff().is_none() && self.preview_bytes().is_some()
+    }
+
+    fn want_preview_diff(&mut self) {
+        if self.preview_diff().is_some() {
+            return;
+        }
+        if let Some((key, old, new)) = self.preview_bytes() {
+            self.request(
+                Pending::PreviewDiff(key.clone()),
+                Request::PreviewDiff { key, old, new },
+            );
+        }
+    }
+
+    /// Lines added and removed from `node` to the file on disk, once both
+    /// are read.
+    fn want_disk_stat(&mut self, node: &Node, path: &Path) {
+        let fp = fingerprint::content(node);
+        let key = (fp, path.to_path_buf());
+        if self.disk_stats.contains_key(&key) {
+            return;
+        }
+        let (Some(ours), Some(disk)) = (self.files.get(&fp), self.disk_files.get(path)) else {
+            return;
+        };
+        let (ours, disk) = (ours.clone(), disk.clone());
+        self.request(
+            Pending::DiskStat(fp, path.to_path_buf()),
+            Request::DiskStat { key, ours, disk },
+        );
     }
 
     /// The two sides of a diff and their labels, once their nodes are known.
@@ -1296,7 +1432,14 @@ impl App {
             && !self.diffs.contains_key(&key)
         {
             let (old, new) = (Box::new(old), Box::new(new));
-            self.request(Pending::Diff(key.clone()), Request::Diff { key, old, new });
+            let epoch = self.disk_epoch;
+            let req = Request::Diff {
+                key: key.clone(),
+                old,
+                new,
+                epoch,
+            };
+            self.request(Pending::Diff(key), req);
         }
     }
 
@@ -1324,8 +1467,9 @@ impl App {
         let side = SideKey::Disk(path.clone());
         self.diffs
             .retain(|key, _| key.old != side && key.new != side);
+        self.disk_epoch += 1;
         self.disk_files.remove(&path);
-        self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
+        self.disk_stats.retain(|(_, p), _| *p != path);
         self.view = View::Diff(DiffView {
             path,
             run: k,
@@ -1441,11 +1585,45 @@ impl App {
             Response::File { key, bytes } => {
                 self.pending.remove(&Pending::File(key));
                 self.files.insert(key, bytes);
+                self.ensure();
             }
             Response::DiskFile { path, bytes } => {
                 self.pending.remove(&Pending::Disk(path.clone()));
-                self.disk_stats.borrow_mut().retain(|(_, p), _| *p != path);
+                self.disk_stats.retain(|(_, p), _| *p != path);
                 self.disk_files.insert(path, bytes);
+                self.ensure();
+            }
+            Response::PreviewDiff {
+                key,
+                old,
+                new,
+                diff,
+            } => {
+                self.pending.remove(&Pending::PreviewDiff(key.clone()));
+                // Made from what the preview still shows; else ask again.
+                let fresh = self.preview_bytes().is_some_and(|(k, o, n)| {
+                    k == key && Arc::ptr_eq(&o, &old) && Arc::ptr_eq(&n, &new)
+                });
+                if fresh {
+                    self.preview_diff = Some((key, old, new, diff));
+                } else {
+                    self.ensure();
+                }
+            }
+            Response::DiskStat { key, disk, stat } => {
+                let (fp, path) = key.clone();
+                self.pending.remove(&Pending::DiskStat(fp, path.clone()));
+                // Against the file on disk as it's still known; else ask again.
+                let same = match (self.disk_files.get(&path), &disk) {
+                    (Some(Some(a)), Some(b)) => Arc::ptr_eq(a, b),
+                    (Some(None), None) => true,
+                    _ => false,
+                };
+                if same {
+                    self.disk_stats.insert(key, stat);
+                } else {
+                    self.ensure();
+                }
             }
             Response::Plan { targets, plan } => {
                 if let Some((t, p)) = &mut self.plan
@@ -1475,9 +1653,15 @@ impl App {
                 }
                 self.ensure();
             }
-            Response::Diff { key, diff } => {
+            Response::Diff { key, diff, epoch } => {
                 self.pending.remove(&Pending::Diff(key.clone()));
-                self.diffs.insert(key, diff);
+                let disk = |k: &SideKey| matches!(k, SideKey::Disk(_));
+                if epoch != self.disk_epoch && (disk(&key.old) || disk(&key.new)) {
+                    // The disk was forgotten since: ask again.
+                    self.ensure();
+                } else {
+                    self.diffs.insert(key, diff);
+                }
             }
             Response::RestoreProgress(p) => {
                 if let Some(r) = &mut self.restoring {
@@ -1767,11 +1951,12 @@ impl App {
         self.live.remove(&f);
         let inside = |p: &Path| p.parent() == Some(f.as_path());
         self.disk_files.retain(|p, _| !inside(p));
-        self.disk_stats.borrow_mut().retain(|(_, p), _| !inside(p));
+        self.disk_stats.retain(|(_, p), _| !inside(p));
         self.exists.retain(|p, _| !inside(p));
         let disk_side = |k: &SideKey| matches!(k, SideKey::Disk(p) if inside(p));
         self.diffs
             .retain(|k, _| !disk_side(&k.old) && !disk_side(&k.new));
+        self.disk_epoch += 1;
         self.pending.retain(|p| match p {
             Pending::Live(q)
             | Pending::Listing(Version::Disk, _, q)
@@ -1792,11 +1977,12 @@ impl App {
             .retain(|(v, p), _| *v != Version::Disk || !within(p));
         self.live.retain(|p, _| !within(p));
         self.disk_files.retain(|p, _| !within(p));
-        self.disk_stats.borrow_mut().retain(|(_, p), _| !within(p));
+        self.disk_stats.retain(|(_, p), _| !within(p));
         self.exists.retain(|p, _| !within(p));
         let disk_side = |k: &SideKey| matches!(k, SideKey::Disk(p) if within(p));
         self.diffs
             .retain(|k, _| !disk_side(&k.old) && !disk_side(&k.new));
+        self.disk_epoch += 1;
         self.pending.retain(|p| match p {
             Pending::Live(q)
             | Pending::Disk(q)

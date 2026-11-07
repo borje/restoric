@@ -154,6 +154,28 @@ pub fn hunks(d: &LineDiff, context: usize) -> Vec<HunkLine> {
     out
 }
 
+/// What the preview shows of a diff of the starts of two files: the
+/// hunks with 3 lines of context (`vs disk`), and the margin marks.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PreviewDiff {
+    pub lines: Vec<HunkLine>,
+    pub marks: Marks,
+}
+
+impl PreviewDiff {
+    pub fn new(old: &str, new: &str) -> Self {
+        let d = diff(old, new);
+        PreviewDiff {
+            lines: hunks(&d, 3),
+            marks: marks(&d),
+        }
+    }
+}
+
+/// The preview's diff by its sides: a file in the repository, to another
+/// or to the file on disk.
+pub type PreviewKey = (SideKey, SideKey);
+
 /// Most of a file the full-screen diff reads unless asked.
 pub const DIFF_LIMIT: u64 = 2 * 1024 * 1024;
 

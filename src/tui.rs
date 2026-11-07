@@ -218,6 +218,18 @@ impl Term {
             for req in app.outbox.drain(..) {
                 worker.send(req);
             }
+            // The preview's diff of what's already read takes a few ms: wait
+            // for it, briefly, rather than draw the preview unmarked and at
+            // its top, then again marked and scrolled to its first change.
+            let deadline = std::time::Instant::now() + Duration::from_millis(50);
+            while app.awaiting_preview_diff()
+                && let Ok(r) = responses.recv_deadline(deadline)
+            {
+                app.apply(r);
+                for req in app.outbox.drain(..) {
+                    worker.send(req);
+                }
+            }
             for effect in std::mem::take(&mut app.effects) {
                 match effect {
                     Effect::Clipboard(text) => copy(&text),
@@ -232,12 +244,17 @@ impl Term {
                 last_reload = std::time::Instant::now();
                 worker.send(crate::worker::Request::Reload { quiet: true });
             }
+            let page = app.page;
             self.terminal.draw(|f| {
                 let area = f.area();
                 hits = ui::draw(&mut app, f.buffer_mut(), area, &theme);
             })?;
             if app.quit {
                 return Ok(app.to_picker);
+            }
+            if app.page != page {
+                app.page_changed();
+                continue;
             }
             select! {
                 recv(self.events) -> ev => match ev? {

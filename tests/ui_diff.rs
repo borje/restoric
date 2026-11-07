@@ -6,6 +6,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use common::{Harness, SRC};
 use restoric::app::{DiffMode, View};
+use restoric::worker::{Request, handle};
 
 fn diff_view(h: &Harness) -> restoric::app::DiffView {
     match &h.app.view {
@@ -197,4 +198,29 @@ fn bottom_shows_the_last_line() {
     h.screen(100, 20);
     h.keys("G");
     assert!(h.screen(100, 20).contains("line 394"));
+}
+
+/// A diff against disk asked for before the disk was read again (here:
+/// the diff opened again) is dropped when it comes back.
+#[test]
+fn stale_disk_diff_is_dropped() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-08-17 16:04").select("main.go");
+    let d = KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE);
+    let is_diff = |r: &Request| matches!(r, Request::Diff { .. });
+    h.app.key(d);
+    let stale = h.pump_holding(is_diff);
+    h.key(KeyCode::Esc);
+    h.app.key(d);
+    let fresh = h.pump_holding(is_diff);
+    for r in stale {
+        let mut out = Vec::new();
+        handle(&h.ctx, r, &mut |resp| out.push(resp));
+        out.into_iter().for_each(|r| h.app.apply(r));
+    }
+    assert!(h.app.diffs.is_empty());
+    h.release(fresh);
+    let mut want = Harness::new(SRC);
+    want.at("2026-08-17 16:04").select("main.go").keys("d");
+    assert_eq!(h.screen(100, 34), want.screen(100, 34));
 }

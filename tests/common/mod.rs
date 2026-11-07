@@ -20,7 +20,7 @@ use restoric::repo::Repo;
 use restoric::repo::fake::FakeRepo;
 use restoric::ui;
 use restoric::ui::theme::Theme;
-use restoric::worker::{Ctx, handle};
+use restoric::worker::{Ctx, Request, handle};
 
 pub const PROJECT: &str = include_str!("../fixtures/project.dsl");
 
@@ -80,16 +80,44 @@ impl Harness {
     /// Runs every request the app has made, until it makes no more.
     pub fn pump(&mut self) {
         while !self.app.outbox.is_empty() {
-            let reqs = std::mem::take(&mut self.app.outbox);
-            let mut out = Vec::new();
-            for r in reqs {
-                handle(&self.ctx, r, &mut |resp| out.push(resp));
-            }
-            for r in out {
-                self.app.apply(r);
-            }
+            self.pump_once();
         }
         self.app.bumped = false;
+    }
+
+    /// As `pump`, but holds back the requests `hold` picks, as a worker
+    /// that hasn't got to them yet. [`Harness::release`] runs them.
+    pub fn pump_holding(&mut self, hold: impl Fn(&Request) -> bool) -> Vec<Request> {
+        let mut held = Vec::new();
+        loop {
+            let (h, rest) = std::mem::take(&mut self.app.outbox)
+                .into_iter()
+                .partition::<Vec<_>, _>(|r| hold(r));
+            held.extend(h);
+            if rest.is_empty() {
+                return held;
+            }
+            self.app.outbox = rest;
+            self.pump_once();
+        }
+    }
+
+    pub fn release(&mut self, held: Vec<Request>) -> &mut Self {
+        self.app.outbox.extend(held);
+        self.pump();
+        self
+    }
+
+    /// Runs the requests in the outbox, not those they lead to.
+    fn pump_once(&mut self) {
+        let reqs = std::mem::take(&mut self.app.outbox);
+        let mut out = Vec::new();
+        for r in reqs {
+            handle(&self.ctx, r, &mut |resp| out.push(resp));
+        }
+        for r in out {
+            self.app.apply(r);
+        }
     }
 
     pub fn act(&mut self, a: Action) -> &mut Self {

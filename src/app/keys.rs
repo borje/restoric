@@ -274,6 +274,7 @@ impl App {
                 // Clicking the selected version opens its diff: not a move.
                 let moves = match (&a, &self.view) {
                     (Some(Action::ClickVersion(k)), View::Versions(v)) => *k != v.sel || v.disk,
+                    (Some(Action::GoDisk), View::Versions(v)) => !v.disk,
                     _ => matches!(a, Some(Action::GoSnapshot(_) | Action::GoDisk)),
                 };
                 if self.help || (self.info && !moves) {

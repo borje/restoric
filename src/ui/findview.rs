@@ -37,7 +37,9 @@ pub fn draw(app: &App, g: &mut Grid, f: &FindView) {
     g.put(lx, 2, "LAST SEEN", t.dim2);
     g.put(sx, 2, "NOW", t.dim2);
     if n == 0 && f.progress.is_none() {
-        g.put(px, 5, "Nothing with that name in any snapshot.", t.dim);
+        // Above the status bar on a short terminal.
+        let y = 5.min(bottom);
+        g.put(px, y, "Nothing with that name in any snapshot.", t.dim);
         return;
     }
     let top = 3;

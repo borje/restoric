@@ -243,4 +243,12 @@ fn tiny_terminals_dont_panic() {
         d.screen(100, rows);
     }
     assert!(h.screen(100, 5).contains("too small"));
+    // An empty find says so above the status bar.
+    let mut n = Harness::new(SRC);
+    n.keys("szzzz").key(KeyCode::Enter);
+    let s = n.screen(100, 6);
+    assert!(
+        s.lines().nth(4).unwrap().contains("Nothing with that name"),
+        "{s}"
+    );
 }

@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crossbeam_channel::{Receiver, Sender};
 
-use crate::diff::{self, DiffKey, FileDiff};
+use crate::diff::{self, DiffKey, FileDiff, PreviewDiff, PreviewKey};
 use crate::disk::Disk;
 use crate::index::find::Found;
 use crate::index::fingerprint::{self, Fp};
@@ -87,7 +87,6 @@ pub enum Request {
     Live {
         set: Arc<Vec<SnapshotInfo>>,
         path: PathBuf,
-        item: bool,
     },
     /// The start of a file in the repository.
     ReadFile { node: Node },
@@ -141,6 +140,22 @@ pub enum Request {
         key: DiffKey,
         old: Box<Side>,
         new: Box<Side>,
+        /// [`App::disk_epoch`](crate::app::App) when asked.
+        epoch: u64,
+    },
+    /// The preview's diff of the starts of two files, as read.
+    PreviewDiff {
+        key: PreviewKey,
+        old: Arc<FileBytes>,
+        new: Arc<FileBytes>,
+    },
+    /// Lines added and removed going from a file's start (`key.0`) to the
+    /// start of the file on disk (`key.1`), as read for the preview.
+    DiskStat {
+        key: (Fp, PathBuf),
+        ours: Arc<FileBytes>,
+        /// `None`: missing on disk.
+        disk: Option<Arc<FileBytes>>,
     },
 }
 
@@ -180,8 +195,9 @@ impl Request {
     /// can be skipped once the user has moved on.
     fn skippable(&self) -> bool {
         match self {
-            Request::ChangePoints { item, .. } | Request::Live { item, .. } => *item,
+            Request::ChangePoints { item, .. } => *item,
             Request::PointCounts { .. }
+            | Request::Live { .. }
             | Request::Restore { .. }
             | Request::Undo
             | Request::ReadAll { .. }
@@ -257,6 +273,21 @@ pub enum Response {
     Diff {
         key: DiffKey,
         diff: Arc<FileDiff>,
+        epoch: u64,
+    },
+    PreviewDiff {
+        key: PreviewKey,
+        /// What it was made from.
+        old: Arc<FileBytes>,
+        new: Arc<FileBytes>,
+        diff: Arc<PreviewDiff>,
+    },
+    DiskStat {
+        key: (Fp, PathBuf),
+        /// What it was diffed against.
+        disk: Option<Arc<FileBytes>>,
+        /// `None` for binary.
+        stat: Option<(usize, usize)>,
     },
     /// How far the running restore has got.
     RestoreProgress(restore::Progress),
@@ -392,7 +423,7 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     entries: Arc::new(gone),
                 });
             }
-            Request::Live { set, path, .. } => {
+            Request::Live { set, path } => {
                 let counts = match set.last() {
                     Some(newest) => index.live(ctx.disk.as_ref(), newest, &path)?,
                     None => Counts::default(),
@@ -556,12 +587,44 @@ pub fn handle(ctx: &Ctx, req: Request, send: &mut dyn FnMut(Response)) {
                     progress: None,
                 });
             }
-            Request::Diff { key, old, new } => {
+            Request::Diff {
+                key,
+                old,
+                new,
+                epoch,
+            } => {
                 let diff = file_diff(ctx, &old, &new, key.limit)?;
                 send(Response::Diff {
                     key,
                     diff: Arc::new(diff),
+                    epoch,
                 });
+            }
+            Request::PreviewDiff { key, old, new } => {
+                // A binary side shows no diff; the preview says it's binary.
+                let diff = match (diff::text(&old.data), diff::text(&new.data)) {
+                    (Some(a), Some(b)) => PreviewDiff::new(&a, &b),
+                    _ => PreviewDiff::default(),
+                };
+                send(Response::PreviewDiff {
+                    key,
+                    old,
+                    new,
+                    diff: Arc::new(diff),
+                });
+            }
+            Request::DiskStat { key, ours, disk } => {
+                let stat = match &disk {
+                    None => diff::text(&ours.data).map(|t| (0, diff::lines(&t).len())),
+                    Some(d) => match (diff::text(&ours.data), diff::text(&d.data)) {
+                        (Some(a), Some(b)) => {
+                            let d = diff::diff(&a, &b);
+                            Some((d.added, d.removed))
+                        }
+                        _ => None,
+                    },
+                };
+                send(Response::DiskStat { key, disk, stat });
             }
         }
         index.flush()?;

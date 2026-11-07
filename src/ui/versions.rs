@@ -4,30 +4,14 @@
 use super::preview::{Source, content, head};
 use super::{Grid, TOP, fmt};
 use crate::app::{Action, App, VersionsView};
-use crate::diff;
 use crate::index::fingerprint;
 use crate::repo::Node;
 
-/// Lines added and removed going from `node` to the file on disk, cached.
+/// Lines added and removed going from `node` to the file on disk, once
+/// the worker has them.
 fn vs_disk(app: &App, node: &Node, v: &VersionsView) -> Option<Option<(usize, usize)>> {
     let key = (fingerprint::content(node), v.path.clone());
-    if let Some(s) = app.disk_stats.borrow().get(&key) {
-        return Some(*s);
-    }
-    let ours = app.files.get(&key.0)?;
-    let disk = app.disk_files.get(&v.path)?;
-    let stat = match disk {
-        None => diff::text(&ours.data).map(|t| (0, diff::lines(&t).len())),
-        Some(d) => match (diff::text(&ours.data), diff::text(&d.data)) {
-            (Some(a), Some(b)) => {
-                let d = diff::diff(&a, &b);
-                Some((d.added, d.removed))
-            }
-            _ => None,
-        },
-    };
-    app.disk_stats.borrow_mut().insert(key, stat);
-    Some(stat)
+    app.disk_stats.get(&key).copied()
 }
 
 pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
@@ -131,7 +115,9 @@ pub fn draw(app: &App, g: &mut Grid, v: &VersionsView) {
             Some(None) => {
                 g.put(34, y, "binary", t.dim);
             }
-            None => {}
+            None => {
+                g.put(34, y, "…", t.dim);
+            }
         }
     }
 
