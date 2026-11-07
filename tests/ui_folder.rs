@@ -63,6 +63,13 @@ fn under_fifty_columns_lists_only() {
 }
 
 #[test]
+fn header_shows_the_repository() {
+    let mut h = Harness::new(SRC);
+    h.app.location = Some("sftp:nas:/backup/restic".into());
+    insta::assert_snapshot!(h.screen(100, 6));
+}
+
+#[test]
 fn backup_root() {
     let mut h = Harness::new(SRC);
     h.keys("gh");

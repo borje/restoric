@@ -350,6 +350,8 @@ pub struct App {
     pub mine: Vec<String>,
     /// The host picked in the picker, for the title bar.
     pub shown_host: Option<String>,
+    /// The repository, credentials hidden, for the title bar.
+    pub location: Option<String>,
     /// The session started in the picker: `q` in the folder view goes back to it.
     pub from_picker: bool,
     /// Set with `quit`: go back to the picker instead of quitting.
@@ -520,6 +522,7 @@ impl App {
             filter,
             mine: Vec::new(),
             shown_host: None,
+            location: None,
             from_picker: false,
             to_picker: false,
             start_dir: folder.clone(),

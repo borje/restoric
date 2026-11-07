@@ -604,6 +604,8 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
     let mut picker = Picker::new(folder.clone(), home.clone(), tz.clone(), now);
     // The repository in use: the one opened before the picker, or the one
     // picked at the repo level. Its index lasts from one pick to the next.
+    // The repository in use, for the title bar.
+    let mut shown_location = None;
     let mut current = match start(args, view, config, &folder, view.browse)? {
         Start::Repo {
             repo,
@@ -616,6 +618,7 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
             if held && !view.browse {
                 let mut app = App::new(snaps, f.clone(), folder, tz, home);
                 app.mine = f.hosts;
+                app.location = Some(location);
                 let mut term = Term::new()?;
                 let index = Arc::new(index_for(*repo, view, config));
                 return tui(&mut term, index, Arc::new(RealDisk), app, view, config).map(|_| ());
@@ -628,6 +631,7 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
                 );
             }
             picker = picker.with_groups(&location, &snaps, &f.hosts, message);
+            shown_location = Some(location);
             Some((entry, Arc::new(index_for(*repo, view, config))))
         }
         Start::Repos => {
@@ -716,6 +720,10 @@ fn browse(args: &RepoArgs, view: &mut ViewArgs, config: &Config, folder: PathBuf
         let mut app = App::new(snaps, f, open_at, tz.clone(), home.clone());
         app.mine = base.hosts;
         app.shown_host = Some(pick.host);
+        if let Some(i) = pick.repo {
+            shown_location = Some(redact(&config.repo[i].repository));
+        }
+        app.location = shown_location.clone();
         app.start_dir = folder.clone();
         app.from_picker = true;
         if let Some(name) = select {

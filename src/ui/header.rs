@@ -49,7 +49,7 @@ pub fn draw(app: &App, g: &mut Grid) {
                 };
                 right = Some(p);
             }
-            _ => {}
+            _ => right = app.location.clone(),
         }
     }
 
