@@ -54,7 +54,7 @@ pub fn draw(app: &App, g: &mut Grid) {
         let c = g.put(0, r, " DIFF ", t.badge_blue) + 1;
         let mode = match d.mode {
             crate::app::DiffMode::Base => "vs base (b)",
-            _ if d.disk => "vs previous (p)",
+            _ if d.disk => "disk vs last backup (p)",
             crate::app::DiffMode::Disk => "vs disk (c)",
             crate::app::DiffMode::Previous => "vs previous (p)",
         };
