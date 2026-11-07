@@ -31,6 +31,13 @@ pub fn day(t: Timestamp, tz: &TimeZone, now: Timestamp) -> String {
     t.to_zoned(tz.clone()).strftime(f).to_string()
 }
 
+/// `Sep 06`, or `Sep '24` when it isn't recent: always 6 or 7 cells,
+/// for the short Versions column.
+pub fn short(t: Timestamp, tz: &TimeZone, now: Timestamp) -> String {
+    let f = if recent(t, now) { "%b %d" } else { "%b '%y" };
+    t.to_zoned(tz.clone()).strftime(f).to_string()
+}
+
 /// `737 B`, `1.3K`, `4.0M`, `2.1G`
 pub fn size(n: u64) -> String {
     const K: f64 = 1024.0;

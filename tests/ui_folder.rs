@@ -56,6 +56,13 @@ fn under_eighty_columns() {
 }
 
 #[test]
+fn under_fifty_columns_lists_only() {
+    let mut h = Harness::new(SRC);
+    h.at("2026-09-06 18:03").select("main.go");
+    insta::assert_snapshot!(h.screen(46, 12));
+}
+
+#[test]
 fn backup_root() {
     let mut h = Harness::new(SRC);
     h.keys("gh");

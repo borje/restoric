@@ -120,31 +120,43 @@ impl Grid<'_> {
 /// Columns of the three panes: Versions, listing, preview.
 pub struct Panes {
     pub versions: Option<(u16, u16)>,
+    /// The Versions column in its short form: `Sep 06 +1~3`, no time.
+    pub compact: bool,
     pub listing: (u16, u16),
     pub preview: Option<(u16, u16)>,
 }
 
+/// Width of the Versions column, full and short, separator not included.
+pub const VERSIONS: u16 = 22;
+pub const VERSIONS_SHORT: u16 = 16;
+
 pub fn panes(cols: u16) -> Panes {
     // The listing takes 40% of what's left after the Versions column,
-    // within these bounds; the preview gets the rest.
+    // within these bounds; the preview gets the rest. Short of room the
+    // preview goes first, then the Versions column shrinks: it's the time
+    // axis, the reason restoric exists.
     let listing = |room: u16, min: u16| (room * 40 / 100).clamp(min, 50);
+    let beside = |w: u16, compact| Panes {
+        versions: Some((0, w - 1)),
+        compact,
+        listing: (w + 1, cols.saturating_sub(1)),
+        preview: None,
+    };
     if cols >= 100 {
-        let l1 = 23 + listing(cols - 23, 40) - 1;
+        let l1 = VERSIONS + 1 + listing(cols - VERSIONS - 1, 40) - 1;
         Panes {
-            versions: Some((0, 21)),
-            listing: (23, l1),
             preview: Some((l1 + 2, cols - 1)),
+            listing: (VERSIONS + 1, l1),
+            ..beside(VERSIONS, false)
         }
     } else if cols >= 80 {
-        let l1 = listing(cols, 38) - 1;
-        Panes {
-            versions: None,
-            listing: (0, l1),
-            preview: Some((l1 + 2, cols - 1)),
-        }
+        beside(VERSIONS, false)
+    } else if cols >= 50 {
+        beside(VERSIONS_SHORT, true)
     } else {
         Panes {
             versions: None,
+            compact: false,
             listing: (0, cols.saturating_sub(1)),
             preview: None,
         }

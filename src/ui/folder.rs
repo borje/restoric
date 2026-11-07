@@ -100,6 +100,8 @@ pub fn draw(app: &App, g: &mut Grid) {
                 let off = sr
                     .saturating_sub(height / 2)
                     .min(vrows(s).count().saturating_sub(height));
+                // Where the counts start: after the date and a gap.
+                let counts_at = if p.compact { 9 } else { 14 };
                 for (k, row) in vrows(s).skip(off).take(height).enumerate() {
                     let row = &row;
                     let y = TOP + k as u16;
@@ -111,7 +113,8 @@ pub fn draw(app: &App, g: &mut Grid) {
                                 g.put(v0, y, "▶", t.accent);
                             }
                             let style = if here { t.live.patch(t.bold) } else { t.live };
-                            let c = g.put(v0 + 1, y, "on disk  ", style);
+                            let label = if p.compact { "on disk " } else { "on disk  " };
+                            let c = g.put(v0 + 1, y, label, style);
                             match app.live.get(&app.folder) {
                                 Some(lc) if !lc.is_empty() => {
                                     put_counts(g, c, y, lc, "", v1 + 1);
@@ -129,7 +132,10 @@ pub fn draw(app: &App, g: &mut Grid) {
                             if here {
                                 g.put(v0, y, "▶", t.accent);
                             }
-                            let label = format!("┄ {} unchanged ┄", to - from + 1);
+                            let label = match p.compact {
+                                true => format!("┄ {} ┄", to - from + 1),
+                                false => format!("┄ {} unchanged ┄", to - from + 1),
+                            };
                             let style = if here { t.accent } else { t.dim2 };
                             g.put_to(v0 + 3, y, &label, style, v1);
                             // A click goes to the newest labelled snapshot, if any.
@@ -144,11 +150,14 @@ pub fn draw(app: &App, g: &mut Grid) {
                                 g.fill(y, v0, v1, t.selected);
                                 g.put(v0, y, "▶", t.accent);
                             }
-                            let date = fmt::time(s.set[*v].time, &app.tz, app.clock());
+                            let date = match p.compact {
+                                true => fmt::short(s.set[*v].time, &app.tz, app.clock()),
+                                false => fmt::time(s.set[*v].time, &app.tz, app.clock()),
+                            };
                             g.put(v0 + 1, y, &date, if here { t.bold } else { t.text });
                             if let Some(c) = s.counts.get(v) {
                                 let end = if noted(*v) { v1 } else { v1 + 1 };
-                                put_counts(g, v0 + 14, y, c, "", end);
+                                put_counts(g, v0 + counts_at, y, c, "", end);
                             }
                             if noted(*v) {
                                 g.put(v1, y, "▵", t.dim);
