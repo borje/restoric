@@ -12,7 +12,7 @@ pub fn icon(node: &Node, t: &Theme, nerd: bool, open: bool) -> (&'static str, St
         return nerd_icon(node, t, open);
     }
     if node.kind == NodeKind::Dir {
-        return (if open { "▾" } else { "▸" }, t.changed);
+        return (if open { "▾" } else { "▸" }, t.dir);
     }
     if let NodeKind::Symlink { .. } = node.kind {
         return ("→", t.dim);
@@ -36,13 +36,13 @@ fn ext(node: &Node) -> String {
 
 fn nerd_icon(node: &Node, t: &Theme, open: bool) -> (&'static str, Style) {
     match node.kind {
-        NodeKind::Dir => return (if open { "\u{f07c}" } else { "\u{f07b}" }, t.changed),
+        NodeKind::Dir => return (if open { "\u{f07c}" } else { "\u{f07b}" }, t.dir),
         NodeKind::Symlink { .. } => return ("\u{f0c1}", t.dim),
         _ => {}
     }
     match node.name.to_string_lossy().to_lowercase().as_str() {
         "cargo.toml" | "cargo.lock" => return ("\u{e7a8}", t.dim),
-        "makefile" | "justfile" => return ("\u{f489}", t.changed),
+        "makefile" | "justfile" => return ("\u{f489}", t.dir),
         "dockerfile" => return ("\u{f308}", t.accent),
         "license" | "licence" => return ("\u{f15c}", t.live),
         ".gitignore" | ".gitattributes" => return ("\u{e702}", t.dim),
@@ -53,14 +53,14 @@ fn nerd_icon(node: &Node, t: &Theme, open: bool) -> (&'static str, Style) {
         "go" => ("\u{e627}", t.code),
         "py" => ("\u{e73c}", t.accent),
         "js" | "mjs" | "cjs" => ("\u{e74e}", t.accent),
-        "ts" | "tsx" => ("\u{e628}", t.changed),
-        "c" | "h" => ("\u{e61e}", t.changed),
-        "cpp" | "cc" | "hpp" => ("\u{e61d}", t.changed),
+        "ts" | "tsx" => ("\u{e628}", t.dir),
+        "c" | "h" => ("\u{e61e}", t.dir),
+        "cpp" | "cc" | "hpp" => ("\u{e61d}", t.dir),
         "java" => ("\u{e738}", t.deleted),
         "rb" => ("\u{e739}", t.deleted),
-        "lua" => ("\u{e620}", t.changed),
+        "lua" => ("\u{e620}", t.dir),
         "html" | "htm" => ("\u{e736}", t.deleted),
-        "css" | "scss" => ("\u{e749}", t.changed),
+        "css" | "scss" => ("\u{e749}", t.dir),
         "md" | "markdown" | "rst" => ("\u{f48a}", t.live),
         "sh" | "bash" | "zsh" | "fish" => ("\u{f489}", t.added),
         "json" => ("\u{e60b}", t.accent),

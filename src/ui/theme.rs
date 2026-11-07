@@ -66,11 +66,14 @@ impl Theme {
         Self {
             text: Style::default(),
             bold: Style::default().add_modifier(Modifier::BOLD),
-            dim: fg(Color::DarkGray),
-            dim2: fg(Color::DarkGray),
-            accent: fg(Color::Yellow),
+            // DIM rather than DarkGray: DarkGray is near black on light
+            // themes (Solarized Light), darker than the text it should recede from.
+            dim: Style::default().add_modifier(Modifier::DIM),
+            dim2: Style::default().add_modifier(Modifier::DIM),
+            accent: fg(Color::Cyan),
             added: fg(Color::Green),
-            changed: fg(Color::Blue),
+            // Yellow, as git and yazi: blue is for folders.
+            changed: fg(Color::Yellow),
             deleted: fg(Color::Red),
             live: fg(Color::Magenta),
             dir: fg(Color::Blue).add_modifier(Modifier::BOLD),
@@ -96,7 +99,7 @@ impl Theme {
                 .add_modifier(Modifier::BOLD),
             warn: fg(Color::Red).add_modifier(Modifier::BOLD),
             popup: Style::default(),
-            popup_border: fg(Color::DarkGray),
+            popup_border: Style::default().add_modifier(Modifier::DIM),
         }
     }
 

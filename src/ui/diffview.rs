@@ -97,7 +97,7 @@ pub fn draw(app: &App, g: &mut Grid, d: &DiffView) {
                 let y = top + k as u16;
                 let (a, b, sign, text, style, sign_style) = match l {
                     HunkLine::Header(n) => {
-                        g.put(1, y, &format!("┄┄ around line {n} ┄┄"), t.changed);
+                        g.put(1, y, &format!("┄┄ around line {n} ┄┄"), t.dir);
                         continue;
                     }
                     HunkLine::Op(Op::Same { a, b }) => {
