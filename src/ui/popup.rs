@@ -267,16 +267,28 @@ fn plan_lines(app: &App, t: &Theme) -> Vec<Vec<(String, Style)>> {
     let mut lines: Vec<Vec<(String, Style)>> = [
         (c.changed, "~", "replaced", t.changed, ""),
         (c.deleted, "+", "brought back", t.added, ""),
-        (c.added, "−", "moved to :undo", t.deleted, "  (not in that version)"),
+        (
+            c.added,
+            "−",
+            "moved to :undo",
+            t.deleted,
+            "  (not in that version)",
+        ),
     ]
     .into_iter()
     .filter(|(n, ..)| *n > 0)
     .map(|(n, sign, verb, style, note)| {
-        vec![(format!("{sign} {n} {verb}"), style), (note.to_string(), t.dim)]
+        vec![
+            (format!("{sign} {n} {verb}"), style),
+            (note.to_string(), t.dim),
+        ]
     })
     .collect();
     if lines.is_empty() {
-        lines.push(vec![("Nothing on disk differs, by size and time.".into(), t.dim)]);
+        lines.push(vec![(
+            "Nothing on disk differs, by size and time.".into(),
+            t.dim,
+        )]);
     }
     let s = if p.files == 1 { "" } else { "s" };
     lines.push(vec![(
@@ -339,7 +351,12 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
         t.text,
     );
     g.put(c, y + 2, &tg.snapshot.id.0.short(), t.accent);
-    g.put(x + 3, y + 3, &fmt::fit_middle(&from, (w - 6) as usize), t.dim);
+    g.put(
+        x + 3,
+        y + 3,
+        &fmt::fit_middle(&from, (w - 6) as usize),
+        t.dim,
+    );
     for (k, (label, detail)) in options.iter().enumerate() {
         let r = y + 5 + k as u16;
         let on = d.sel == k;
@@ -352,7 +369,12 @@ pub fn restore_dialog(app: &App, g: &mut Grid) {
             if on { t.accent.patch(t.bold) } else { t.dim },
         );
         g.put_to(x + 9, r, label, if on { t.bold } else { t.text }, x + 39);
-        g.put(x + 40, r, &fmt::fit_middle(detail, (w - 43) as usize), t.dim);
+        g.put(
+            x + 40,
+            r,
+            &fmt::fit_middle(detail, (w - 43) as usize),
+            t.dim,
+        );
         g.hit(x + 1, x + w - 1, r, Action::DialogOption(k));
     }
     if d.confirm {

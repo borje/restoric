@@ -212,7 +212,12 @@ pub fn draw(app: &App, g: &mut Grid) {
         .selected()
         .filter(|e| !e.is_dir() && !e.is_deleted())
         .and_then(|e| e.node.mtime)
-        .map(|m| (format!("modified {}  ", fmt::time(m, &app.tz, app.clock())), t.dim));
+        .map(|m| {
+            (
+                format!("modified {}  ", fmt::time(m, &app.tz, app.clock())),
+                t.dim,
+            )
+        });
     let rows = app.rows().len();
     let below_root = app.folder != app.root;
     let (pos, total) = if below_root {

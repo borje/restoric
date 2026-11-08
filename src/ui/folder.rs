@@ -145,9 +145,8 @@ pub fn draw(app: &App, g: &mut Grid) {
                             } else {
                                 // How many, and for how long nothing changed:
                                 // from the version below to the last of them.
-                                let quiet = fmt::span(
-                                    s.set[*to].time.duration_since(s.set[from - 1].time),
-                                );
+                                let quiet =
+                                    fmt::span(s.set[*to].time.duration_since(s.set[from - 1].time));
                                 let one = if n == 1 { "snapshot" } else { "snapshots" };
                                 let long = format!("┄ {n} {one} · {quiet}");
                                 let label = if p.compact {
