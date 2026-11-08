@@ -16,7 +16,7 @@ jobs:
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
           - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
-          - { os: macos-14, target: aarch64-apple-darwin }
+          - { os: macos-15, target: aarch64-apple-darwin }
           - { os: macos-15-intel, target: x86_64-apple-darwin }
     runs-on: ${{ matrix.os }}
     steps:
@@ -47,7 +47,8 @@ jobs:
           cargo deb --no-build --target ${{ matrix.target }} --output .
       - uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          # One job writes the notes; each job that sets this appends a copy.
+          generate_release_notes: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
           files: |
             restoric-*.tar.gz
             restoric_*.deb
